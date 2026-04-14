@@ -1,51 +1,71 @@
-# Documentación del proyecto
+# 📚 Documentación del Proyecto JARVIS
 
-Esta carpeta reúne la documentación técnica y funcional del proyecto `TFG-JARVIS`.
+> Sistema RAG Corporativo Inteligente — TFG Universidad Rey Juan Carlos 2026
 
-## Punto de entrada recomendado
+## Índice de Documentos
 
-- [`../README.md`](../README.md): visión general del proyecto y arranque rápido.
-- [`../memoria/README.md`](../memoria/README.md): estructura activa de la memoria en LaTeX.
+### 🚀 Inicio Rápido
+| Documento | Descripción |
+|-----------|-------------|
+| [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) | Guía paso a paso de despliegue con Docker Compose |
+| [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) | Todas las variables de entorno del `.env` |
+| [TECHNOLOGY_STACK.md](TECHNOLOGY_STACK.md) | Stack tecnológico completo del proyecto |
 
-## Documentación por perfil
+### 📘 Arquitectura y Código
+| Documento | Descripción |
+|-----------|-------------|
+| [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) | Arquitectura de microservicios detallada |
+| [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md) | Mapa de archivos de código fuente |
+| [STUDENT_GUIDE.md](STUDENT_GUIDE.md) | Guía para la defensa académica del TFG |
+| [FINE_TUNING_GUIDE.md](FINE_TUNING_GUIDE.md) | Entrenamiento LoRA sobre Qwen 2.5 |
 
-### Si quieres desplegar el sistema
+### 🔌 Integraciones
+| Documento | Descripción |
+|-----------|-------------|
+| [BOE_INTEGRATION.md](BOE_INTEGRATION.md) | Servidor MCP para el Boletín Oficial del Estado |
+| [MCP_EXPLICADO.md](MCP_EXPLICADO.md) | Qué es MCP y cómo se usa en el proyecto |
+| [SHAREPOINT_INTEGRATION.md](SHAREPOINT_INTEGRATION.md) | Sincronización con SharePoint vía Graph API |
+| [SHAREPOINT_RAG_GUIDE.md](SHAREPOINT_RAG_GUIDE.md) | Guía de RAG con documentos de SharePoint |
+| [ADVANCED_EXTENSIONS.md](ADVANCED_EXTENSIONS.md) | SSO, NGINX avanzado, extensiones MCP |
 
-- [`ENV_CONFIGURATION.md`](ENV_CONFIGURATION.md)
-- [`DEPLOYMENT_CHECKLIST.md`](DEPLOYMENT_CHECKLIST.md)
-- [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md)
+### 👤 Usuario y Testing
+| Documento | Descripción |
+|-----------|-------------|
+| [USER_GUIDE.md](USER_GUIDE.md) | Manual de usuario: todos los modos de JARVIS |
+| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Guía de testing y validación del sistema |
+| [USER_FEEDBACK_FORM.md](USER_FEEDBACK_FORM.md) | Formulario de feedback de usuarios |
 
-### Si quieres entender la implementación
+### 📋 Otros
+| Documento | Descripción |
+|-----------|-------------|
+| [CHANGELOG.md](CHANGELOG.md) | Historial de cambios del proyecto (v2.1 incluido) |
+| [DEPLOYMENT_GANTT.md](DEPLOYMENT_GANTT.md) | Diagrama GANTT del despliegue |
 
-- [`CODEBASE_REFERENCE.md`](CODEBASE_REFERENCE.md)
-- [`TECHNOLOGY_STACK.md`](TECHNOLOGY_STACK.md)
-- [`BOE_INTEGRATION.md`](BOE_INTEGRATION.md)
-- [`SHAREPOINT_INTEGRATION.md`](SHAREPOINT_INTEGRATION.md)
+---
 
-### Si estás preparando la defensa o la revisión académica
+## 🏗️ Arquitectura Resumida
 
-- [`STUDENT_GUIDE.md`](STUDENT_GUIDE.md)
-- [`../memoria/`](../memoria/)
+```
+Usuario → NGINX (TLS) → OpenWebUI → Pipeline JARVIS (14 modos)
+                                        ├── Backend RAG (FastAPI) → Qdrant / LiteLLM / Ollama
+                                        ├── Indexer (SharePoint + OCR)
+                                        └── MCP-BOE (API del BOE)
+```
 
-### Si eres usuario final o estás validando funcionalidades
+**Modelos de IA:**
+- `rag-qwen-ft:latest` — LLM principal (fine-tuned con LoRA sobre Qwen 2.5)
+- `qwen2.5:32b-instruct-q4_K_M` — Modelo alternativo de texto
+- `qwen2.5vl:7b` — Modelo de visión para imágenes
+- `paraphrase-multilingual-MiniLM-L12-v2` — Embeddings (384 dim)
 
-- [`USER_GUIDE.md`](USER_GUIDE.md)
-- [`TESTING_GUIDE.md`](TESTING_GUIDE.md)
+**Stack:** Python 3.11 · FastAPI · Docker Compose · Qdrant · PostgreSQL · Redis · Ollama · LiteLLM · Prometheus · Grafana
 
-## Estructura documental
+## 🆕 Novedades v2.1
 
-- `README.md`: mapa de esta carpeta.
-- `STUDENT_GUIDE.md`: guía académica para explicar el proyecto con tono de alumno.
-- `CODEBASE_REFERENCE.md`: estructura real del repositorio y responsabilidad de carpetas y módulos.
-- `TECHNICAL_ARCHITECTURE.md`: arquitectura técnica del sistema.
-- `TECHNOLOGY_STACK.md`: tecnologías utilizadas y su papel.
-- `BOE_INTEGRATION.md`: integración con el BOE.
-- `SHAREPOINT_INTEGRATION.md`: integración con SharePoint.
-- `ADVANCED_EXTENSIONS.md`: configuraciones e integraciones opcionales.
-- `FINE_TUNING_GUIDE.md`: experimentación y procesos de ajuste fino.
-- `USER_GUIDE.md`: manual funcional para usuarios.
-- `TESTING_GUIDE.md`: guía de validación y pruebas.
-
-## Nota de coherencia
-
-La referencia académica principal del proyecto es la carpeta [`memoria/`](../memoria/). Si alguna documentación operativa o histórica entra en conflicto con la memoria, debe prevalecer la estructura y el alcance definidos en la memoria activa.
+| Componente | Descripción |
+|------------|-------------|
+| `core/sql_agent.py` | Agente NL→SQL con whitelist, timeout y auto-corrección |
+| `core/auth.py` | Validación JWT Azure AD (JWKS + PyJWT), activable con `AZURE_JWT_VALIDATION=true` |
+| `api/query.py` | Endpoint unificado `POST /api/v1/query` con auto-routing RAG+SQL |
+| `docker-compose.yml` | Límites de recursos (`deploy.resources.limits`) para 6 servicios |
+| `services/litellm/config.yaml` | Secretos gestionados por variables de entorno (no hardcodeados) |

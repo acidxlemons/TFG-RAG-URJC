@@ -1,7 +1,7 @@
 # 🛠️ Arquitectura Técnica - JARVIS RAG System
 
 **Para**: Desarrolladores, Arquitectos, Administradores de Sistemas  
-**Versión**: 3.9  
+**Versión**: 4.0 (v2.1)  
 **Proyecto**: TFG - Universidad Rey Juan Carlos  
 **Nivel**: Técnico
 

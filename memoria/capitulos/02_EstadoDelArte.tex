@@ -16,13 +16,13 @@ Desde el punto de vista del usuario, un LLM permite dialogar en lenguaje natural
 En la práctica, existen dos formas habituales de utilizar LLMs:
 
 \begin{itemize}
-    \item \textbf{Modelos propietarios vía API}: ofrecen un producto muy maduro y alto rendimiento, pero implican dependencia de un proveedor externo y procesamiento fuera del perímetro corporativo.
-    \item \textbf{Modelos de pesos abiertos (\textit{open-weights})}: permiten ejecución local u \textit{on-premise}, lo que habilita mayor control sobre datos, configuración y despliegue.
+    \item \textit{Modelos propietarios vía API}: ofrecen un producto muy maduro y alto rendimiento, pero implican dependencia de un proveedor externo y procesamiento fuera del perímetro corporativo.
+    \item \textit{Modelos de pesos abiertos (\textit{open-weights})}: permiten ejecución local u \textit{on-premise}, lo que habilita mayor control sobre datos, configuración y despliegue.
 \end{itemize}
 
 En este proyecto se prioriza el segundo enfoque porque el requisito principal es operar en local. También conviene diferenciar entre \textit{pesos abiertos} y \textit{código abierto}: que un modelo pueda descargarse y ejecutarse localmente no implica necesariamente una licencia plenamente abierta \cite{meta2024llama31hf,google2024gemmaterms,qwen2024qwen25license}.
 
-El sistema desarrollado reutiliza modelos ya existentes, principalmente Llama 3.1 y Qwen2.5, por ser viables en despliegue local y contar con un ecosistema maduro \cite{meta2024llama31,qwen2024qwen25blog}. Esta decisión refuerza la idea central del proyecto: el valor no está en crear un nuevo modelo fundacional, sino en integrarlo correctamente con el conocimiento de la organización.
+El sistema desarrollado reutiliza modelos ya existentes, principalmente de la familia Qwen 2.5 y, en fases previas del proyecto, también Llama 3.1, por ser viables en despliegue local y contar con un ecosistema maduro \cite{meta2024llama31,qwen2024qwen25blog}. Esta decisión refuerza la idea central del proyecto: el valor no está en crear un nuevo modelo fundacional, sino en integrarlo correctamente con el conocimiento de la organización.
 
 % ============================================================
 \section{Por qué un LLM por sí solo no resuelve este problema}
@@ -40,7 +40,7 @@ El problema abordado en este TFG no consiste en mantener una conversación gener
 Por ello, aunque los LLMs son la pieza que permite la interacción en lenguaje natural, no constituyen por sí mismos la solución completa. Hace falta una arquitectura adicional que recupere información, filtre fuentes, construya contexto y limite la generación a aquello que realmente se ha encontrado.
 
 % ============================================================
-\section{Generación Aumentada por Recuperación (RAG)}
+\section{Generación Aumentada mediante Recuperación (RAG)}
 % ============================================================
 
 La arquitectura que responde a ese problema es RAG (\textit{Retrieval-Augmented Generation}) \cite{lewis2020rag}. Su idea básica es sencilla: antes de generar una respuesta, el sistema busca fragmentos relevantes de documentos y se los proporciona al modelo como contexto. De esta forma, el LLM deja de apoyarse solo en su memoria estadística y pasa a responder utilizando evidencia concreta.
@@ -48,8 +48,8 @@ La arquitectura que responde a ese problema es RAG (\textit{Retrieval-Augmented 
 Un pipeline RAG típico tiene dos fases:
 
 \begin{enumerate}
-    \item \textbf{Recuperación}: la pregunta del usuario se transforma en una representación numérica y se buscan fragmentos relevantes en una base documental indexada.
-    \item \textbf{Generación}: el LLM recibe la pregunta junto con ese contexto recuperado y redacta una respuesta basada en él.
+    \item \textit{Recuperación}: la pregunta del usuario se transforma en una representación numérica y se buscan fragmentos relevantes en una base documental indexada.
+    \item \textit{Generación}: el LLM recibe la pregunta junto con ese contexto recuperado y redacta una respuesta basada en él.
 \end{enumerate}
 
 Para un lector no técnico, puede entenderse como una combinación entre un buscador y un asistente conversacional. El buscador encuentra la información; el asistente la explica. Esa combinación es la razón por la que RAG encaja mejor en este proyecto que un chatbot convencional.
@@ -59,9 +59,9 @@ Para un lector no técnico, puede entenderse como una combinación entre un busc
 En un sistema real, RAG no suele quedarse en una búsqueda semántica simple:
 
 \begin{itemize}
-    \item \textbf{Búsqueda híbrida}: combina recuperación densa mediante embeddings con recuperación léxica tipo BM25 para no perder coincidencias exactas como siglas, identificadores, nombres de procedimientos o artículos legales \cite{robertson2009bm25,weaviateHybridDocs,qdrantHybridTutorial}.
-    \item \textbf{Reordenación y filtrado}: se seleccionan los fragmentos más útiles antes de enviarlos al modelo.
-    \item \textbf{Memoria conversacional acotada}: se conserva parte del historial cuando aporta contexto, pero evitando que el \textit{prompt} crezca sin control.
+    \item \textit{Búsqueda híbrida}: combina una recuperación basada en significado, obtenida al comparar embeddings, con otra basada en coincidencias exactas de palabras, habitualmente implementada con métodos como BM25. Esto evita perder siglas, identificadores, nombres de procedimientos o artículos legales \cite{robertson2009bm25,weaviateHybridDocs,qdrantHybridTutorial}.
+    \item \textit{Reordenación y filtrado}: se seleccionan los fragmentos más útiles antes de enviarlos al modelo.
+    \item \textit{Memoria conversacional acotada}: se conserva parte del historial cuando aporta contexto, pero evitando que el \textit{prompt} crezca sin control.
 \end{itemize}
 
 La solución de este TFG utiliza precisamente esa variante práctica de RAG, porque es la que mejor se adapta a consultas corporativas reales.
@@ -70,7 +70,7 @@ La solución de este TFG utiliza precisamente esa variante práctica de RAG, por
 \section{Modelos de Embeddings}
 % ============================================================
 
-Los embeddings convierten texto en vectores numéricos donde la cercanía entre vectores representa similitud semántica. Son el mecanismo que permite pasar de una pregunta escrita por una persona a una búsqueda de contenido relacionada por significado y no solo por palabras exactas.
+Los embeddings convierten texto en vectores numéricos donde la cercanía entre vectores representa similitud semántica. De forma intuitiva, puede pensarse que cada texto se transforma en una huella numérica compacta: si dos huellas quedan cerca en ese espacio, sus significados tienden a ser parecidos. Son el mecanismo que permite pasar de una pregunta escrita por una persona a una búsqueda de contenido relacionada por significado y no solo por palabras exactas.
 
 Una medida habitual de similitud es la similitud del coseno:
 
@@ -107,7 +107,7 @@ Pinecone & Propietaria & No (SaaS) & Sí & Parcial \\
 \end{tabular}
 \end{table}
 
-Se selecciona \textbf{Qdrant} por ser \textit{on-premise}, por su filtrado por metadatos y por su buen soporte para búsqueda híbrida \cite{qdrantHybridTutorial,qdrantSparseVectors}. Para este TFG no es solo una decisión de rendimiento, sino también de control: permite separar colecciones, añadir metadatos y aplicar restricciones de acceso documentales.
+Se selecciona Qdrant por ser \textit{on-premise}, por su filtrado por metadatos y por su buen soporte para búsqueda híbrida \cite{qdrantHybridTutorial,qdrantSparseVectors}. Para este TFG no es solo una decisión de rendimiento, sino también de control: permite separar colecciones, añadir metadatos y aplicar restricciones de acceso documentales.
 
 % ============================================================
 \section{Cuantización y ejecución local}
@@ -127,13 +127,15 @@ Este concepto es importante para entender una de las decisiones prácticas del p
 
 El ajuste fino (\textit{fine-tuning}) adapta un modelo generalista a un dominio concreto. Sin embargo, reentrenar por completo un LLM moderno está fuera del alcance normal de un TFG y tampoco era el objetivo principal de este trabajo.
 
-La técnica LoRA (\textit{Low-Rank Adaptation}) reduce drásticamente ese coste entrenando solo adaptadores de bajo rango insertados en el modelo original \cite{hu2021lora}:
+La técnica LoRA (\textit{Low-Rank Adaptation}) reduce drásticamente ese coste reentrenando solo una pequeña parte de la red neuronal del modelo, en lugar de modificar todos sus pesos \cite{hu2021lora}. Concretamente, inserta capas adicionales de tamaño muy reducido —matrices de bajo rango— en las capas de atención del transformador y reentrena únicamente esas capas añadidas, dejando los pesos originales congelados. En la práctica, puede entenderse como ampliar la red neuronal con nuevas conexiones especializadas sin tener que reentrenar toda la arquitectura de partida.
+
+Formalmente, el cambio en el peso de una capa se expresa como:
 
 \begin{equation}
 W' = W + \Delta W = W + BA
 \end{equation}
 
-donde $A$ y $B$ son matrices de rango reducido y $r \ll \min(d,k)$.
+donde $A$ y $B$ son matrices de rango reducido con $r \ll \min(d,k)$, lo que hace que el número de parámetros entrenables pase de millones a miles.
 
 En este proyecto, LoRA se estudia como una vía de adaptación incremental sobre modelos ya existentes, no como el eje principal de la solución. La experiencia obtenida muestra que, para consultas RAG puras, suele tener más impacto un buen contexto recuperado y un buen modelo de embeddings que modificar directamente los pesos del LLM generativo.
 
@@ -143,6 +145,6 @@ En este proyecto, LoRA se estudia como una vía de adaptación incremental sobre
 
 MCP es un estándar abierto propuesto por Anthropic en 2024 para integrar herramientas externas con agentes basados en LLM mediante una interfaz cliente-servidor tipada \cite{anthropicMcpAnnouncement}. Un servidor MCP expone herramientas y un cliente compatible puede descubrirlas e invocarlas de forma estructurada.
 
-Para este TFG, MCP es relevante por dos motivos. Primero, porque representa una forma moderna de conectar modelos con herramientas externas. Segundo, porque permite aclarar el alcance del trabajo: el proyecto no implementa una plataforma MCP completa desde cero, sino un \textbf{servidor MCP propio} orientado a consulta normativa del BOE, desarrollado como prueba de integración real.
+Para este TFG, MCP es relevante por dos motivos. Primero, porque representa una forma moderna de conectar modelos con herramientas externas. Segundo, porque permite aclarar el alcance del trabajo: el proyecto no implementa una plataforma MCP completa desde cero, sino un \textit{servidor MCP propio} orientado a consulta normativa del BOE, desarrollado como prueba de integración real.
 
-Ese servidor se ha validado en ejecución por terminal con clientes compatibles. Sin embargo, la funcionalidad visible dentro de la interfaz web sigue resolviéndose mediante API tradicional, ya que el cliente web utilizado no integra todavía MCP de forma nativa. Por tanto, MCP aparece en este trabajo como tecnología implementada y validada, pero todavía no como flujo principal de uso para el usuario final.
+Ese servidor se ha validado en ejecución por terminal con clientes compatibles. Además, OpenWebUI ya ofrece soporte nativo para servidores MCP en versiones recientes \cite{openwebuiMcp2026}. Aun así, en este TFG la funcionalidad visible dentro de la interfaz web sigue resolviéndose principalmente mediante API tradicional y pipeline propio, porque esa fue la vía integrada y validada durante el desarrollo para mantener mayor control sobre autenticación, encaminamiento y operación del sistema. Por tanto, MCP aparece en este trabajo como tecnología implementada y validada, pero todavía no como flujo principal de uso para el usuario final.

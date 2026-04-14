@@ -5,15 +5,15 @@
 \section{Motivación}
 % ============================================================
 
-En los entornos corporativos actuales, el volumen de información disponible crece de forma constante, pero no crece de forma ordenada. La documentación relevante suele estar repartida entre repositorios como Microsoft SharePoint, PDFs internos, muchos de ellos escaneados, wikis, portales de proveedores, procedimientos técnicos y fuentes públicas como el Boletín Oficial del Estado (BOE). En la práctica, el problema habitual no es la falta de información, sino la \textbf{dispersión, la heterogeneidad de formatos y la dificultad para recuperar contenido útil} cuando se necesita.
+En los entornos corporativos actuales, el volumen de información disponible crece de forma constante, pero no crece de forma ordenada. La documentación relevante suele estar repartida entre repositorios como Microsoft SharePoint, PDFs internos, muchos de ellos escaneados, wikis, portales de proveedores, procedimientos técnicos y fuentes públicas como el Boletín Oficial del Estado (BOE). En la práctica, el problema habitual no es la falta de información, sino la dispersión, la heterogeneidad de formatos y la dificultad para recuperar contenido útil cuando se necesita.
 
 Los métodos tradicionales de búsqueda por palabras clave fallan en situaciones muy comunes: cuando el usuario no conoce el término exacto, cuando la información está contenida en documentos largos, cuando existen sinónimos o acrónimos internos, o cuando el contenido está en PDFs escaneados y requiere OCR. Como consecuencia, tareas rutinarias como confirmar un procedimiento, localizar un requisito normativo o recuperar una especificación se convierten en procesos lentos y propensos a errores.
 
 En paralelo, la popularización de los grandes modelos de lenguaje (LLMs, \textit{Large Language Models}) ha permitido interactuar con sistemas de información mediante lenguaje natural. Sin embargo, en un contexto corporativo, una respuesta fluida pero incorrecta tiene un coste elevado: puede inducir decisiones erróneas y generar confianza injustificada. El problema se agrava cuando el modelo no dispone de acceso al conocimiento interno, cuando la documentación cambia con frecuencia o cuando la consulta requiere precisión y respaldo documental.
 
-Por este motivo, resulta especialmente relevante el enfoque de Generación Aumentada por Recuperación (RAG, \textit{Retrieval-Augmented Generation}), que combina la generación de lenguaje con la recuperación de información desde una base documental. En lugar de responder de memoria, el sistema fundamenta la respuesta en documentos recuperados, mejorando la \textbf{utilidad}, la \textbf{trazabilidad} y reduciendo la probabilidad de \textbf{respuestas no justificadas} \cite{lewis2020rag}.
+Por este motivo, resulta especialmente relevante el enfoque de Generación Aumentada mediante Recuperación (RAG, \textit{Retrieval-Augmented Generation}), que combina la generación de lenguaje con la recuperación de información desde una base documental. En lugar de responder de memoria, el sistema fundamenta la respuesta en documentos recuperados, mejorando la utilidad, la trazabilidad y reduciendo la probabilidad de respuestas no justificadas \cite{lewis2020rag}.
 
-Este Trabajo de Fin de Grado no parte de entrenar un modelo desde cero. Sería un objetivo desproporcionado para el alcance del proyecto y, además, no resolvería por sí mismo el problema principal, que no es crear otro LLM generalista, sino \textbf{poner modelos ya existentes a trabajar de forma útil, segura y controlada sobre información corporativa cambiante}. Por ello, el trabajo se centra en seleccionar, integrar, adaptar y orquestar tecnologías existentes de código abierto y pesos abiertos: modelos de lenguaje ejecutados localmente, embeddings, una base de datos vectorial, un backend propio en Python, mecanismos de ingesta documental y una interfaz conversacional empresarial.
+Este Trabajo de Fin de Grado no parte de entrenar un modelo desde cero. Sería un objetivo desproporcionado para el alcance del proyecto y, además, no resolvería por sí mismo el problema principal, que no es crear otro LLM generalista, sino poner modelos ya existentes a trabajar de forma útil, segura y controlada sobre información corporativa cambiante. Por ello, el trabajo se centra en seleccionar, integrar, adaptar y orquestar tecnologías existentes de código abierto y pesos abiertos: modelos de lenguaje ejecutados localmente, embeddings, una base de datos vectorial, un backend propio en Python, mecanismos de ingesta documental y una interfaz conversacional empresarial.
 
 Con esta motivación, el proyecto aborda el diseño, desarrollo e integración de un sistema RAG corporativo desplegado en infraestructura controlada (\textit{on-premise}), capaz de ingerir documentos desde fuentes heterogéneas y ofrecer a los usuarios una interfaz conversacional orientada a consultas técnicas, con recuperación semántica y soporte documental.
 
@@ -29,10 +29,10 @@ La magnitud del fenómeno es considerable. Según el informe \textit{Work Trend 
 Los riesgos principales asociados a este fenómeno son:
 
 \begin{itemize}
-    \item \textbf{Exposición de información sensible}: al introducir documentos, fragmentos de procedimientos, incidencias, datos operativos o contenido contractual en herramientas externas, la información puede salir del perímetro de seguridad corporativo. Un estudio de Komprise (2025) reveló que el 44\% de las organizaciones ha experimentado fugas de datos sensibles hacia herramientas de IA \cite{komprise2025survey}.
-    \item \textbf{Riesgo regulatorio y de cumplimiento}: en sectores regulados o con datos personales o sensibles, el tratamiento de la información exige garantías sobre finalidad, acceso, ubicación y medidas de seguridad. El uso informal de herramientas externas introduce incertidumbre y eleva el riesgo de incumplimiento normativo.
-    \item \textbf{Calidad y consistencia}: los modelos generalistas pueden producir respuestas plausibles incluso cuando carecen de base documental. En ámbitos técnicos o normativos, esto se traduce en errores silenciosos con apariencia de certeza.
-    \item \textbf{Ausencia de gobernanza}: sin control centralizado, la organización no sabe qué herramientas se usan, con qué datos, con qué finalidad ni con qué impacto.
+    \item \textit{Exposición de información sensible}: al introducir documentos, fragmentos de procedimientos, incidencias, datos operativos o contenido contractual en herramientas externas, la información puede salir del perímetro de seguridad corporativo. Un estudio de Komprise (2025) reveló que el 44\% de las organizaciones ha experimentado fugas de datos sensibles hacia herramientas de IA \cite{komprise2025survey}.
+    \item \textit{Riesgo regulatorio y de cumplimiento}: en sectores regulados o con datos personales o sensibles, el tratamiento de la información exige garantías sobre finalidad, acceso, ubicación y medidas de seguridad. El uso informal de herramientas externas introduce incertidumbre y eleva el riesgo de incumplimiento normativo.
+    \item \textit{Calidad y consistencia}: los modelos generalistas pueden producir respuestas plausibles incluso cuando carecen de base documental. En ámbitos técnicos o normativos, esto se traduce en errores silenciosos con apariencia de certeza.
+    \item \textit{Ausencia de gobernanza}: sin control centralizado, la organización no sabe qué herramientas se usan, con qué datos, con qué finalidad ni con qué impacto.
 \end{itemize}
 
 Este proyecto aborda directamente esta problemática mediante una alternativa interna: un sistema conversacional desplegado en la infraestructura de la organización, donde los documentos no se envían a servicios externos y donde las respuestas se apoyan en recuperación documental, reduciendo respuestas no fundamentadas y permitiendo trazabilidad hacia fuentes internas.
@@ -47,14 +47,21 @@ La solución propuesta consiste en construir un asistente corporativo que actúe
 Para resolver los problemas descritos en la sección anterior, el sistema combina varios bloques:
 
 \begin{itemize}
-    \item \textbf{Modelos ya existentes ejecutados en local}: se reutilizan LLMs y modelos de embeddings disponibles públicamente, desplegados dentro de la infraestructura propia.
-    \item \textbf{Un backend propio en Python}: se desarrolla la lógica que conecta los modelos con las fuentes documentales, aplica reglas de acceso y construye respuestas trazables.
-    \item \textbf{Un pipeline RAG}: antes de responder, el sistema recupera fragmentos relevantes de la documentación para que la generación se apoye en evidencia.
-    \item \textbf{Conectores e integraciones}: se incorporan mecanismos para trabajar con SharePoint, documentos escaneados, páginas web y normativa del BOE.
-    \item \textbf{Una interfaz conversacional reutilizable}: en lugar de crear una interfaz desde cero, se aprovecha OpenWebUI y se amplía mediante un pipeline propio.
+    \item \textit{Modelos ya existentes ejecutados en local}: se reutilizan LLMs y modelos de embeddings disponibles públicamente, desplegados dentro de la infraestructura propia.
+    \item \textit{Un backend propio en Python}: se desarrolla la lógica que conecta los modelos con las fuentes documentales, aplica reglas de acceso y construye respuestas trazables.
+    \item \textit{Un pipeline RAG}: antes de responder, el sistema recupera fragmentos relevantes de la documentación para que la generación se apoye en evidencia.
+    \item \textit{Conectores e integraciones}: se incorporan mecanismos para trabajar con SharePoint, documentos escaneados, páginas web y normativa del BOE.
+    \item \textit{Una interfaz conversacional reutilizable}: en lugar de crear una interfaz desde cero, se aprovecha OpenWebUI y se amplía mediante un pipeline propio.
 \end{itemize}
 
-Este enfoque tiene dos ventajas. La primera es práctica: permite construir un sistema funcional en el contexto de un TFG sin depender del entrenamiento masivo de modelos. La segunda es metodológica: separa claramente qué aporta la tecnología base y qué aporta el trabajo realizado en el proyecto. En este caso, la contribución no está en crear un nuevo modelo fundacional, sino en \textbf{diseñar una arquitectura útil, explicar por qué cada pieza es necesaria y desarrollar la lógica que convierte herramientas sueltas en un sistema corporativo coherente}.
+Este enfoque tiene dos ventajas. La primera es práctica: permite construir un sistema funcional en el contexto de un TFG sin depender del entrenamiento masivo de modelos. La segunda es metodológica: separa claramente qué aporta la tecnología base y qué aporta el trabajo realizado en el proyecto. En este caso, la contribución no está en crear un nuevo modelo fundacional, sino en diseñar una arquitectura útil, explicar por qué cada pieza es necesaria y desarrollar la lógica que convierte herramientas sueltas en un sistema corporativo coherente.
+
+% ============================================================
+\section{Código del proyecto}
+\label{sec:codigo-proyecto}
+% ============================================================
+
+Tanto el código fuente como la documentación técnica del proyecto están publicados en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-JARVIS}}. Este repositorio incluye la definición de la arquitectura Docker, los servicios implementados en Python, la configuración de los modelos locales y los materiales necesarios para reproducir el despliegue. Se menciona aquí de forma explícita porque una parte importante del valor del trabajo reside precisamente en la combinación de componentes reutilizados con código propio integrador.
 
 % ============================================================
 \section{Objetivos del proyecto}
@@ -68,17 +75,17 @@ La motivación operativa es clara: si los problemas detectados son dispersión d
 Para alcanzar este objetivo general, se han definido los siguientes objetivos específicos:
 
 \begin{enumerate}
-    \item \textbf{Diseñar una arquitectura modular basada en componentes existentes y desarrollo propio}: combinar modelos de lenguaje locales, embeddings, una base de datos vectorial y una interfaz conversacional, añadiendo un backend en Python que orqueste todo el sistema.
+    \item \textit{Diseñar una arquitectura modular reutilizando bloques ya disponibles y añadiendo desarrollo propio donde aporta valor}: combinar modelos de lenguaje locales, embeddings, una base de datos vectorial y una interfaz conversacional, añadiendo un backend en Python que orqueste todo el sistema.
 
-    \item \textbf{Permitir ingesta multicanal y actualización de conocimiento}: incorporar carga y actualización documental desde fuentes heterogéneas, con especial foco en SharePoint, incluyendo OCR para documentos escaneados y extracción web cuando sea necesario.
+    \item \textit{Permitir ingesta multicanal y actualización de conocimiento}: incorporar carga y actualización documental desde fuentes heterogéneas, con especial foco en SharePoint, incluyendo OCR para documentos escaneados y extracción web cuando sea necesario.
 
-    \item \textbf{Ofrecer respuestas fundamentadas y trazables}: implementar un flujo RAG que priorice la recuperación documental frente a la generación libre y muestre al usuario sobre qué fuentes se construye cada respuesta.
+    \item \textit{Ofrecer respuestas fundamentadas y trazables}: implementar un flujo RAG que priorice la recuperación documental frente a la generación libre y muestre al usuario sobre qué fuentes se construye cada respuesta.
 
-    \item \textbf{Añadir capacidades complementarias sin entrenar modelos desde cero}: integrar búsqueda web controlada, scraping, análisis de imágenes y consulta normativa del BOE reutilizando herramientas ya disponibles y conectándolas mediante lógica propia.
+    \item \textit{Añadir capacidades complementarias sin entrenar modelos desde cero}: integrar búsqueda web controlada, scraping, análisis de imágenes y consulta normativa del BOE reutilizando herramientas ya disponibles y conectándolas mediante lógica propia.
 
-    \item \textbf{Explorar MCP como línea de integración futura}: desarrollar un servidor compatible con el enfoque de Model Context Protocol (MCP) \cite{anthropic2024mcp} para el caso del BOE, dejando preparada una vía de evolución aunque la interfaz web del proyecto siga usando integración por API en la implementación actual.
+    \item \textit{Explorar MCP como línea de integración futura}: desarrollar un servidor compatible con el enfoque de Model Context Protocol (MCP) \cite{anthropic2024mcp} para el caso del BOE, dejando preparada una vía de evolución aunque la interfaz web del proyecto siga usando integración por API en la implementación actual.
 
-    \item \textbf{Desplegar el sistema de forma reproducible y observable}: contenerizar el ecosistema con Docker y habilitar métricas y paneles de monitorización que permitan operar y analizar el sistema.
+    \item \textit{Desplegar el sistema de forma reproducible y observable}: contenerizar el ecosistema con Docker y habilitar métricas y paneles de monitorización que permitan operar y analizar el sistema.
 \end{enumerate}
 
 % ============================================================
@@ -95,30 +102,35 @@ El proyecto cubre el ciclo completo de construcción de un sistema RAG empresari
     \item Desarrollo de un backend propio en Python para orquestación, recuperación documental, control de acceso y conexión con herramientas externas.
     \item Integración de un pipeline de ingesta documental con soporte para PDFs, HTML, imágenes y documentación alojada en SharePoint.
     \item Construcción de un motor de búsqueda semántica basado en embeddings y almacenamiento vectorial.
-    \item Integración de una interfaz conversacional web con autenticación corporativa.
+    \item Reutilización de OpenWebUI como interfaz conversacional e integración de su autenticación con el proveedor corporativo de identidad mediante OIDC/Azure AD.
+    \item Extensión de OpenWebUI mediante un pipeline propio que añade encaminamiento, memoria de sesión y control de acceso documental.
     \item Integración funcional con fuentes externas como SharePoint, BOE e Internet.
     \item Desarrollo de un servidor MCP para normativa del BOE como prueba de concepto técnica orientada a futuras integraciones.
     \item Incorporación de un stack de monitorización y observabilidad para analizar uso y rendimiento.
 \end{itemize}
 
-En relación con MCP, conviene precisar el alcance para evitar ambigüedades: en este TFG no se desarrolla un cliente MCP completo dentro de la interfaz web, sino un \textbf{servidor MCP propio} validado en entorno compatible. La funcionalidad visible por el usuario final se presta actualmente mediante llamadas a API, mientras que MCP queda como capacidad implementada y preparada para evolucionar.
+En otras palabras, el alcance combina dos tipos de trabajo. Por un lado, se reutilizan componentes ya maduros, como OpenWebUI, Ollama, Qdrant o PaddleOCR. Por otro, se desarrollan específicamente para el TFG las piezas que faltaban para convertirlos en un sistema coherente: el backend RAG, el pipeline JARVIS, el indexador, la integración BOE y la configuración operativa del despliegue.
+
+En relación con MCP, conviene precisar el alcance para evitar ambigüedades: en este TFG no se desarrolla un cliente MCP completo dentro de la interfaz web, sino un servidor MCP propio validado en entorno compatible. La funcionalidad visible por el usuario final se presta actualmente mediante llamadas a API, mientras que MCP queda como capacidad implementada y preparada para evolucionar.
 
 \subsection{Limitaciones}
 
 Se identifican las siguientes limitaciones reconocidas:
 
 \begin{itemize}
-    \item \textbf{Requisitos hardware}: el sistema requiere una GPU NVIDIA con suficiente VRAM para mantener un rendimiento aceptable en tareas de OCR e inferencia local.
+    \item \textit{Requisitos hardware}: el sistema requiere una GPU NVIDIA con suficiente VRAM para mantener un rendimiento aceptable en tareas de OCR e inferencia local.
 
-    \item \textbf{Predominio de SharePoint en la validación}: aunque la arquitectura está pensada para documentos cambiantes en la nube y de distinta naturaleza, la validación experimental se ha centrado sobre todo en SharePoint, que es la integración más desarrollada del proyecto.
+    \item \textit{Predominio de SharePoint en la validación}: aunque la arquitectura está pensada para documentos cambiantes en la nube y de distinta naturaleza, la validación experimental se ha centrado sobre todo en SharePoint, que es la integración más desarrollada del proyecto.
 
-    \item \textbf{BOE con doble nivel de integración}: el sistema permite consultas normativas desde la interfaz mediante API, pero la integración MCP nativa en la web no se incorpora todavía por limitaciones del cliente utilizado.
+    \item \textit{BOE con doble nivel de integración}: el sistema permite consultas normativas desde la interfaz mediante API, pero la integración MCP nativa en la web no se incorpora todavía por limitaciones del cliente utilizado.
 
-    \item \textbf{MCP validado fuera de la interfaz principal}: el servidor MCP desarrollado funciona en entorno de terminal con clientes compatibles, pero su adopción dentro de la interfaz web queda como trabajo futuro.
+    \item \textit{MCP validado fuera de la interfaz principal}: el servidor MCP desarrollado funciona en entorno de terminal con clientes compatibles, pero su adopción dentro de la interfaz web queda como trabajo futuro.
 
-    \item \textbf{Sesgo en el ajuste fino}: el \textit{fine-tuning} LoRA se realiza con datos sintéticos generados a partir del propio sistema base, lo que puede introducir sesgos y limitar la generalización.
+    \item \textit{Sesgo en el ajuste fino}: el \textit{fine-tuning} LoRA se realiza con datos sintéticos generados a partir del propio sistema base, lo que puede introducir sesgos y limitar la generalización.
 
-    \item \textbf{Evaluación acotada}: la evaluación se realiza principalmente de forma funcional y cualitativa; benchmarks académicos más formales quedan fuera del alcance temporal del proyecto.
+    \item \textit{Evaluación acotada}: la evaluación se realiza principalmente de forma funcional y cualitativa; benchmarks académicos más formales quedan fuera del alcance temporal del proyecto.
+
+    \item \textit{Obsolescencia rápida del contexto tecnológico}: el ecosistema de modelos, herramientas y estándares evoluciona a gran velocidad, de modo que algunas decisiones tecnológicas razonables durante el desarrollo pueden quedar superadas en pocos meses.
 \end{itemize}
 
 % ============================================================
@@ -130,7 +142,7 @@ Las contribuciones técnicas concretas de este trabajo son:
 \begin{enumerate}
     \item Una arquitectura reproducible basada en microservicios, definida declarativamente en Docker Compose, con servicios orientados a ingesta, almacenamiento, recuperación, generación y monitorización.
 
-    \item Un agente enrutador, JARVIS, capaz de seleccionar distintos modos de operación en función de la intención detectada y de guiar cada consulta hacia el subsistema adecuado.
+    \item Un agente encaminador, JARVIS, capaz de seleccionar distintos modos de operación en función de la intención detectada y de guiar cada consulta hacia el subsistema adecuado.
 
     \item Un pipeline de ingesta multicanal que unifica SharePoint, scraping web, OCR y carga manual en una única base de conocimiento vectorial.
 

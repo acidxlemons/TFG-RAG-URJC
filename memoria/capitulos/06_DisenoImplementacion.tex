@@ -205,14 +205,14 @@ DuckDuckGo                  & \textbf{Integración}   & Búsqueda en internet co
 }
 \end{table}
 
-En resumen, el trabajo de desarrollo propio abarca más de \textbf{6.000 líneas de código Python} distribuidas entre el Pipeline JARVIS, el Backend, el Indexer y el servidor MCP-BOE, además de toda la configuración declarativa del ecosistema Docker. Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
+En resumen, el trabajo de desarrollo propio abarca más de 6.000 líneas de código Python distribuidas entre el Pipeline JARVIS, el Backend, el Indexer y el servidor MCP-BOE, además de toda la configuración declarativa del ecosistema Docker. Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
 
 % ============================================================
 \section[Pipeline de OpenWebUI]{El Mecanismo Pipeline de OpenWebUI (Hook)}
 \label{sec:hook-pipeline}
 % ============================================================
 
-El Pipeline de OpenWebUI es el \textbf{punto de conexión fundamental} entre la interfaz de usuario y todo el backend del sistema \cite{openwebui2024docs}. Sin este mecanismo, OpenWebUI sería simplemente una interfaz para chatear directamente con Ollama. El Pipeline es lo que convierte esa interfaz genérica en un asistente corporativo inteligente.
+El Pipeline de OpenWebUI es el punto de conexión fundamental entre la interfaz de usuario y todo el backend del sistema \cite{openwebui2024docs}. Sin este mecanismo, OpenWebUI sería simplemente una interfaz para chatear directamente con Ollama. El Pipeline es lo que convierte esa interfaz genérica en un asistente corporativo inteligente.
 
 \subsection{Concepto de Hook}
 
@@ -307,7 +307,7 @@ def pipe(self, user_message, model_id, messages, body):
 
 \subsection{Sistema Valves: Configuración Dinámica}
 
-La clase anidada \texttt{Valves} hereda de \texttt{Pydantic BaseModel} y define todos los parámetros configurables del Pipeline. La particularidad es que OpenWebUI detecta automáticamente esta clase y expone sus campos como \textbf{formulario editable en la interfaz de administración}. Esto significa que un administrador puede modificar la URL del backend, cambiar el modelo de texto, añadir departamentos al mapeo o activar/desactivar el modo de depuración directamente desde el navegador, sin editar código ni reiniciar servicios.
+La clase anidada \texttt{Valves} hereda de \texttt{Pydantic BaseModel} y define todos los parámetros configurables del Pipeline. La particularidad es que OpenWebUI detecta automáticamente esta clase y expone sus campos como formulario editable en la interfaz de administración. Esto significa que un administrador puede modificar la URL del backend, cambiar el modelo de texto, añadir departamentos al mapeo o activar/desactivar el modo de depuración directamente desde el navegador, sin editar código ni reiniciar servicios.
 
 Los parámetros configurados como Valves incluyen:
 
@@ -540,7 +540,17 @@ Para evitar reprocesar documentos ya ingeridos, el Indexer implementa sincroniza
 
 La integración con el BOE se implementa mediante un servidor MCP (\textit{Model Context Protocol}) construido con la librería \texttt{fastmcp}. El servidor expone funciones de búsqueda y consulta que transforman peticiones en lenguaje natural en llamadas estructuradas a la API de Datos Abiertos del BOE.
 
-Esta integración no debe interpretarse como una simple ``búsqueda web más''. El BOE es un caso no genérico porque exige trabajar con una fuente oficial, identificar disposiciones por su identificador normativo, resolver referencias legales con precisión y devolver respuestas donde importa más la exactitud documental que la fluidez conversacional. Por eso se implementó una capa específica de resolución semántica y consulta estructurada, en lugar de delegar estas peticiones a un buscador generalista.
+Esta integración no es una búsqueda web genérica, y merece una justificación específica. En el contexto del tipo de empresa para la que se diseña este sistema, el acceso a normativa legal (legislación laboral, protección de datos, contratación pública) es frecuente y tiene consecuencias directas sobre decisiones operativas. Un error en la interpretación de una norma no es solo un fallo académico: puede traducirse en incumplimientos, sanciones o decisiones mal fundamentadas.
+
+El BOE presenta características que lo distinguen como caso de uso propio:
+\begin{itemize}
+    \item Las leyes se identifican por códigos oficiales (p.~ej. \texttt{BOE-A-2018-16673}), no por títulos que el usuario recuerde fielmente.
+    \item Un mismo texto legal puede referenciarse coloquialmente de docenas de formas distintas (``la LOPD'', ``la ley de privacidad'', ``el reglamento de protección de datos'').
+    \item La información relevante suele estar en artículos numerados concretos, no en un fragmento genérico.
+    \item Tanto la exactitud como la fuente de procedencia son cruciales: citar una norma derogada o una sección incorrecta tiene consecuencias.
+\end{itemize}
+
+Por todo ello se implementó una capa específica de resolución semántica y consulta estructurada —en lugar de delegar estas peticiones a un buscador generalista— que traduce el lenguaje del usuario al identificador normativo correcto antes de invocar la API oficial.
 
 \subsection{Resolución Semántica de Leyes}
 

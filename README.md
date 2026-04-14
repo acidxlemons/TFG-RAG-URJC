@@ -12,15 +12,15 @@
 <p align="center">
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick%20Start-5%20min-brightgreen?style=for-the-badge" alt="Quick Start"></a>
   <a href="#-características"><img src="https://img.shields.io/badge/Features-20+-blue?style=for-the-badge" alt="Features"></a>
-  <a href="docs/FINE_TUNING_GUIDE.md"><img src="https://img.shields.io/badge/Fine--Tuning-Guide-orange?style=for-the-badge" alt="Fine-Tuning"></a>
+  <a href="https://acidxlemons.github.io/TFG-JARVIS/"><img src="https://img.shields.io/badge/Landing-Page-purple?style=for-the-badge" alt="Landing Page"></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-3776ab?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776ab?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ed?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA-76b900?logo=nvidia&logoColor=white" alt="NVIDIA">
-  <img src="https://img.shields.io/badge/LLM-Ollama%20%2B%20LiteLLM-black?logo=meta&logoColor=white" alt="LLM">
-  <img src="https://img.shields.io/badge/Vectors-Qdrant-dc382d?logo=redis&logoColor=white" alt="Qdrant">
+  <img src="https://img.shields.io/badge/LLM-Qwen%202.5%20%2B%20Ollama-black?logo=meta&logoColor=white" alt="LLM">
+  <img src="https://img.shields.io/badge/Vectors-Qdrant-dc382d" alt="Qdrant">
 </p>
 
 ---
@@ -36,7 +36,6 @@
 - [🎓 Fine-Tuning](#-fine-tuning)
 - [🔐 Seguridad](#-seguridad)
 - [📚 Documentación](#-documentación)
-- [🤝 Contribuir](#-contribuir)
 - [📄 Licencia](#-licencia)
 
 ---
@@ -44,11 +43,11 @@
 ## 🎯 ¿Qué es esto?
 
 **JARVIS** es un asistente de IA inteligente desarrollado como TFG en la URJC que permite:
-- Consultar documentos mediante lenguaje natural (RAG)
-- Buscar información en internet
-- Analizar páginas web y PDFs
-- Consultar el **Boletín Oficial del Estado (BOE)** en tiempo real
-- Procesar imágenes con OCR
+- Consultar documentos corporativos mediante lenguaje natural (RAG)
+- Buscar información en internet en tiempo real
+- Analizar páginas web y PDFs (incluidos escaneados con OCR)
+- Consultar el **Boletín Oficial del Estado (BOE)** con resolución semántica
+- Analizar imágenes con modelos de visión (Qwen 2.5 VL)
 
 ### El Problema que Resuelve
 
@@ -56,7 +55,7 @@
 |----------|-----------|
 | "¿Dónde está ese documento?" | "¿Qué dice la normativa sobre X?" |
 | Buscar en múltiples fuentes | Respuesta unificada con **fuentes citadas** |
-| Consultar BOE manualmente | "¿Qué modifica la LOPD?" → Respuesta inmediata |
+| Consultar BOE manualmente | "Busca en el BOE la ley de protección de datos" → Respuesta inmediata |
 
 ### ¿Por qué Local y No ChatGPT/Copilot?
 
@@ -76,26 +75,29 @@
 ## ✨ Características
 
 ### 🧠 Core RAG
-- **🔍 Búsqueda Híbrida** — Semántica (embeddings) + Léxica (keywords) + Reranking
-- **📚 Citaciones Automáticas** — Referencias `[1], [2], [3]` con archivo y página
-- **🎯 Detección de Intención** — Adapta la estrategia según el tipo de pregunta
-- **🌐 Multi-idioma** — Detecta y responde en tu idioma
+- **🔍 Búsqueda Híbrida** — Semántica (embeddings MiniLM-L12-v2) + Léxica (BM25)
+- **📚 Citaciones Automáticas** — Referencias con archivo y página de origen
+- **🎯 Detección de Intención** — 14 modos de operación con encaminamiento inteligente
+- **🌐 Multi-idioma** — Detecta y responde en español e inglés
+- **🗄️ SQL Agent (v2.1)** — NL→SQL con validación por lista blanca y auto-corrección
+- **🔐 JWT Auth (v2.1)** — Validación criptográfica de tokens Azure AD con JWKS
 
 ### 🏛️ Conectores Externos
-- **📰 BOE API** — Consulta legislación, sumarios, texto de leyes
-- **🔗 Web Scraping** — Analiza URLs en tiempo real
-- **🌐 Web Search** — Búsqueda en internet con SearXNG
+- **📰 BOE API** — Resolución semántica de leyes + consulta de normativa
+- **🔗 Web Scraping** — Renderizado JS con Playwright + extracción con Trafilatura
+- **🌐 Web Search** — Búsqueda en internet vía DuckDuckGo con fallback HTML
+- **☁️ SharePoint** — Sincronización delta incremental vía Microsoft Graph API
 
 ### 📄 Procesamiento de Documentos
-- **📑 OCR Inteligente** — PaddleOCR con GPU para PDFs escaneados
-- **📊 Multi-formato** — PDF, DOCX, TXT, XLSX
-- **✂️ Chunking Semántico** — Fragmentación preservando contexto
+- **📑 OCR Inteligente** — PaddleOCR con aceleración GPU para PDFs escaneados
+- **📊 Multi-formato** — PDF, DOCX, TXT, imágenes
+- **✂️ Chunking Semántico** — Fragmentación con solapamiento del 10-15%
 
 ### 📊 Observabilidad
-- **📈 Prometheus + Grafana** — Métricas de latencia, uso, GPU
-- **🔍 GPU Monitoring** — NVIDIA DCGM Exporter
+- **📈 Prometheus + Grafana** — 3 dashboards: Backend, GPU y Base de Datos
+- **🔍 GPU Monitoring** — NVIDIA DCGM Exporter para VRAM, temperatura, utilización
 
-> **Nota:** Este sistema también soporta SSO con Azure AD y sincronización con SharePoint, pero estas funcionalidades requieren configuración adicional y credenciales corporativas.
+> **Nota:** El sistema soporta SSO con Azure AD y sincronización con SharePoint, pero estas funcionalidades requieren credenciales corporativas adicionales.
 
 ---
 
@@ -110,68 +112,84 @@
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                         🔒 NGINX (SSL)                                 │
-│                      Reverse Proxy + WAF                               │
+│                    Reverse Proxy + TLS + WebSocket                      │
 └─────────────────────────────┬────────────────────────────────────────┘
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
-┌─────────────────────────┐     ┌─────────────────────────┐
-│      🖥️ OpenWebUI        │     │     📡 RAG Backend       │
-│    (Chat Interface)      │────▶│      (FastAPI)           │
-│   + Pipeline Agent       │     │  • Hybrid Search         │
-│   + SSO Azure AD         │     │  • Query Processor       │
-└─────────────────────────┘     │  • OCR Pipeline          │
-                                └───────────┬─────────────┘
-                                            │
-     ┌──────────────────┬───────────────────┼───────────────────┐
-     ▼                  ▼                   ▼                   ▼
-┌──────────┐     ┌──────────┐       ┌──────────────┐     ┌──────────┐
-│  🧮 Qdrant │     │ 🐘 Postgres│      │ 🤖 LiteLLM    │     │ 💾 Redis  │
-│ (Vectors) │     │ (Metadata)│      │   ↓ Ollama    │     │ (Cache)  │
-│  HNSW     │     │  Users    │      │  LLaMA 3.1   │     │  TTL 1h  │
-└──────────┘     └──────────┘       └──────────────┘     └──────────┘
-     │
-     │ Sync cada 5min
-     ▼
-┌──────────────────────────┐
-│   📤 SharePoint Indexer   │
-│  • Microsoft Graph API   │
-│  • Delta Token Sync      │
-│  • Multi-Site Support    │
-└──────────────────────────┘
+┌─────────────────────────┐     ┌─────────────────────────────┐
+│      🖥️ OpenWebUI        │     │    🧠 Pipeline JARVIS        │
+│    (Chat Interface)      │────▶│  Agente Encaminador (9099)   │
+│   Puerto 3002 (ext)      │     │  14 modos de operación       │
+│   + SSO Azure AD         │     │  Detección de intenciones    │
+└─────────────────────────┘     └──────────────┬──────────────┘
+                                               │
+              ┌────────────────────────────────┼────────────────┐
+              ▼                                ▼                ▼
+┌──────────────────────┐   ┌──────────────────────┐  ┌──────────────┐
+│   📡 RAG Backend      │   │  📤 Indexer (8003)    │  │ 🏛️ MCP-BOE   │
+│   FastAPI (8002)      │   │  Sync SharePoint      │  │  (8011)      │
+│  • Búsqueda Híbrida   │   │  • Graph API + MSAL   │  │  FastMCP     │
+│  • Scraping + Web     │   │  • OCR (PaddleOCR)    │  │  API BOE     │
+│  • Métricas Prometheus│   │  • Cron cada 5 min     │  └──────────────┘
+└──────────┬───────────┘   └──────────┬───────────┘
+           │                          │
+  ┌────────┼────────┬────────────┬────┘
+  ▼        ▼        ▼            ▼
+┌────────┐ ┌──────┐ ┌──────────┐ ┌────────┐
+│ 🧮 Qdrant│ │🐘 PG │ │🤖 LiteLLM│ │💾 Redis│
+│(Vectors)│ │(Meta)│ │  Proxy   │ │(Cache) │
+│  6335   │ │ 5433 │ │  4001    │ │ 6380   │
+└────────┘ └──────┘ └────┬─────┘ └────────┘
+                         │
+                    ┌────┴────┐
+                    ▼         ▼
+          ┌──────────┐ ┌──────────────────────┐
+          │Ollama    │ │ Modelos de IA:        │
+          │(11435)   │ │ • JARVIS (rag-qwen-ft)│
+          │GPU NVIDIA│ │ • Qwen 2.5 32B Q4     │
+          └──────────┘ │ • Qwen 2.5 VL 7B      │
+                       │ • MiniLM-L12-v2 (emb) │
+                       └──────────────────────┘
 ```
 
-**14 Microservicios** orquestados con Docker Compose:
+### Servicios del Ecosistema
 
-| Servicio | Puerto | Función |
-|----------|--------|---------|
-| `nginx` | 8443, 80 | Reverse proxy + SSL |
-| `openwebui` | 3002 | Interfaz de chat |
-| `tfg-backend` | 8002 | API de búsqueda y procesamiento |
-| `mcp-boe` | 8011 | **MCP Server** - Consultas BOE |
-| `qdrant` | 6335 | Base de datos vectorial |
-| `postgres` | 5433 | Metadatos y usuarios |
-| `redis` | 6380 | Cache de respuestas |
-| `litellm` | 4001 | Proxy de LLMs |
-| `ollama` | 11435 | Servidor de modelos locales |
-| `indexer` | 8003 | Sincronización SharePoint |
+| Servicio | Puerto Externo | Función |
+|----------|---------------|---------|
+| `nginx` | 8443, 8080 | Proxy inverso + TLS + WebSocket |
+| `openwebui` | 3002 | Interfaz de chat conversacional |
+| `pipelines` (JARVIS) | 9100 | Agente encaminador inteligente |
+| `backend` (FastAPI) | 8002 | Motor RAG, scraping, búsqueda web, métricas |
+| `indexer` (FastAPI) | 8003 | Sincronización SharePoint, ingesta, OCR |
+| `mcp-boe` | 8011 | Servidor MCP para consultas al BOE |
+| `ollama` | 11435 | Servidor de modelos LLM locales (GPU) |
+| `litellm` | 4001 | Proxy unificado de modelos + caché |
+| `qdrant` | 6335 | Base de datos vectorial (HNSW) |
+| `postgres` | 5433 | Base de datos relacional |
+| `redis` | 6380 | Caché de respuestas (TTL 1h) |
+| `minio` | 9002 | Almacenamiento de objetos (backup S3) |
 | `prometheus` | 9091 | Recolección de métricas |
-| `grafana` | 3003 | Dashboards |
-| `minio` | 9002 | Almacenamiento S3 |
-| `dcgm-exporter` | 9401 | Métricas GPU |
+| `grafana` | 3003 | Dashboards de observabilidad |
+| `dcgm-exporter` | 9401 | Métricas GPU NVIDIA |
+| `pgadmin` | 5051 | Administración de PostgreSQL |
 
-### 🏛️ MCP Server BOE
+### 🤖 Modelos de IA Desplegados
+
+| Modelo | Función | VRAM |
+|--------|---------|------|
+| `rag-qwen-ft:latest` (JARVIS) | LLM principal para consultas RAG | ~8 GB |
+| `qwen2.5:32b-instruct-q4_K_M` | Modelo de texto alternativo | ~19 GB |
+| `qwen2.5vl:7b` | Análisis de imágenes y OCR visual | ~6 GB |
+| `paraphrase-multilingual-MiniLM-L12-v2` | Embeddings (384 dimensiones) | CPU |
+
+### 🏛️ Servidor MCP BOE
 
 El sistema incluye un **servidor MCP** (Model Context Protocol) para consultar el Boletín Oficial del Estado:
 
 ```bash
-# Verificar que funciona
 cd mcp-boe-server
 python test_mcp_real.py
-
-# Resultado:
-# [SUCCESS] MCP SERVER FUNCIONA CORRECTAMENTE!
-# Herramientas: 7
 ```
 
 **Herramientas disponibles:**
@@ -182,9 +200,7 @@ python test_mcp_real.py
 | `search_legislation` | Buscar leyes por texto |
 | `get_law_text` | Texto completo de una ley |
 | `get_law_analysis` | Análisis jurídico |
-| `resolve_law_name` | Resolver LOPD → BOE-A-2018-16673 |
-
-**Clientes compatibles:** Claude Desktop, Continue.dev, Cline (VS Code), scripts Python.
+| `resolve_law_name` | Resolver "LOPD" → BOE-A-2018-16673 |
 
 📖 Ver [Documentación MCP](mcp-boe-server/README.md)
 
@@ -196,14 +212,15 @@ python test_mcp_real.py
 
 | Requisito | Mínimo | Recomendado |
 |-----------|--------|-------------|
-| **RAM** | 16 GB | 32+ GB |
+| **SO** | Ubuntu 22.04 LTS | Ubuntu 22.04+ |
+| **RAM** | 32 GB | 64 GB |
 | **CPU** | 4 cores | 8+ cores |
-| **GPU** | - | NVIDIA 8+ GB VRAM |
-| **Disco** | 50 GB SSD | 200+ GB NVMe |
-| **Docker** | v24+ | Latest |
-| **Docker Compose** | v2.20+ | Latest |
+| **GPU** | NVIDIA 16 GB VRAM | NVIDIA 24+ GB VRAM |
+| **CUDA** | 12.x | 12.x |
+| **Disco** | 500 GB SSD | NVMe |
+| **Docker** | v24+ con NVIDIA Container Toolkit | Latest |
 
-### Instalación (5 minutos)
+### Instalación
 
 ```bash
 # 1. Clonar repositorio
@@ -212,8 +229,7 @@ cd TFG-JARVIS
 
 # 2. Configurar variables de entorno
 cp .env.example .env
-# ⚠️ IMPORTANTE: Editar .env con tus credenciales
-nano .env  # o tu editor preferido
+nano .env  # Editar con tus credenciales
 
 # 3. Iniciar todos los servicios
 docker compose up -d
@@ -221,33 +237,32 @@ docker compose up -d
 # 4. Verificar que todo está corriendo
 docker compose ps
 
-# 5. Descargar modelo LLM (primera vez)
-docker compose exec ollama ollama pull llama3.1:8b-instruct-q8_0
+# 5. Los modelos se descargan automáticamente (qwen2.5, qwen2.5vl)
 ```
 
 ### Verificar Instalación
 
 ```bash
-# Health check general
+# Health check del backend
 curl http://localhost:8002/health
 
 # Verificar Qdrant
 curl http://localhost:6335/health
 
 # Acceder a la interfaz
-open http://localhost:3002   # macOS
-start http://localhost:3002  # Windows
-xdg-open http://localhost:3002  # Linux
+open https://localhost:8443   # macOS / a través de NGINX
+start https://localhost:8443  # Windows
 ```
 
 ### Tu Primera Consulta
 
-1. Abre `http://localhost:3002`
-2. Selecciona el pipeline "JARVIS"
+1. Abre `https://localhost:8443` (o `http://localhost:3002` directamente)
+2. Selecciona el modelo **JARVIS**
 3. Prueba estas consultas:
-   - *"¿Qué dice el BOE de hoy?"*
-   - *"Dame el artículo 5 de la LOPD"*
-   - *"Analiza esta URL: https://..."*
+   - *"¿Qué documentos tienes?"* (lista de archivos indexados)
+   - *"¿Cuál es la política de calidad?"* (consulta RAG)
+   - *"Busca en el BOE la ley de protección de datos"* (consulta BOE)
+   - *"Busca en internet noticias sobre IA"* (búsqueda web)
 
 ---
 
@@ -270,7 +285,7 @@ GRAFANA_PASSWORD=CHANGE_THIS_PASSWORD
 # ========================================
 
 # AZURE_TENANT_ID=your-tenant-id
-# AZURE_CLIENT_ID=your-client-id  
+# AZURE_CLIENT_ID=your-client-id
 # AZURE_CLIENT_SECRET=your-client-secret
 ```
 
@@ -304,70 +319,53 @@ Si deseas sincronizar documentos desde SharePoint:
 
 ## 📊 Monitoreo
 
-### Acceso a Dashboards y Bases de Datos
+### Acceso a Dashboards
 
-El entorno de JARVIS es 100% transparente y accesible localmente para desarrolladores y administradores:
-
-| Dashboard / DB | URL Local | Credenciales | Propósito |
-|----------------|-----------|--------------|-----------|
-| **pgAdmin (PostgreSQL)** | http://localhost:5051 | admin@example.com / admin | Ver histórico de chat y usuarios (`rag_system` DB) |
-| **Qdrant UI** | http://localhost:6335/dashboard | - | Ver vectores y embeddings de documentos |
-| **Grafana** | http://localhost:3003 | admin / (ver `.env`) | Métricas generales y consumo GPU |
-| **Prometheus** | http://localhost:9091 | - | Métricas en bruto |
-
-#### Consultas CLI Comunes
-
-Si prefieres usar la terminal en lugar de las interfaces web (`pgAdmin` o `Qdrant UI`):
-
-```bash
-# Consultar el histórico de mensajes en PostgreSQL
-docker exec -it tfg-postgres psql -U rag_user -d rag_system -c "SELECT role, content FROM messages LIMIT 10;"
-
-# Ver estadísticas e ingestas en Qdrant
-curl http://localhost:6335/collections/documents
-```
-
-> 💡 **Nota:** Tienes más detalles sobre consultas complejas en la [Guía de Testing](docs/TESTING_GUIDE.md).
+| Dashboard / DB | URL Local | Propósito |
+|----------------|-----------|-----------|
+| **OpenWebUI** | http://localhost:3002 | Interfaz de chat principal |
+| **Grafana** | http://localhost:3003 | Dashboards de backend, GPU y BBDD |
+| **Prometheus** | http://localhost:9091 | Métricas en bruto |
+| **Qdrant UI** | http://localhost:6335/dashboard | Vectores y embeddings |
+| **pgAdmin** | http://localhost:5051 | Administración PostgreSQL |
+| **MinIO Console** | http://localhost:9003 | Almacenamiento de objetos |
 
 ### Métricas Clave
 
 ```promql
-# Latencia p95 de búsquedas
+# Latencia p95 de búsquedas RAG
 histogram_quantile(0.95, rate(rag_search_duration_seconds_bucket[5m]))
-
-# Hit rate (búsquedas exitosas)
-rate(rag_search_hits_total[5m]) / rate(rag_search_requests_total[5m])
 
 # Uso de GPU
 DCGM_FI_DEV_GPU_UTIL
+
+# Cache hit rate
+rate(rag_cache_hits_total[5m]) / rate(rag_requests_total[5m])
 ```
 
 ---
 
 ## 🎓 Fine-Tuning
 
-Este sistema soporta fine-tuning de 3 componentes:
+Este sistema soporta fine-tuning de modelos con LoRA:
 
 | Componente | Técnica | Cuándo usarlo |
 |------------|---------|---------------|
-| **LLM** | LoRA | Cambiar formato de respuestas, tono |
-| **Embeddings** | Full FT | Vocabulario corporativo específico |
-| **Reranker** | Contrastive | Mejorar precisión de ranking |
-
-📖 **[Ver Guía Completa de Fine-Tuning](docs/FINE_TUNING_GUIDE.md)**
-
-### Quick Fine-Tuning (Embeddings)
+| **LLM (Qwen 2.5)** | LoRA | Adaptar terminología corporativa |
+| **Embeddings** | Full FT | Vocabulario de dominio específico |
 
 ```bash
 # 1. Generar dataset desde documentos indexados
 python scripts/generate_dataset_from_qdrant.py --output data/dataset.json
 
-# 2. Entrenar embeddings
-python scripts/finetune_embeddings.py --dataset data/dataset.json --epochs 3
+# 2. Entrenar con LoRA
+python scripts/finetune_lora.py --dataset data/dataset.json --epochs 3
 
-# 3. Re-indexar con nuevo modelo
-python scripts/reindex_with_finetuned.py
+# 3. Exportar a GGUF y registrar en Ollama
+python scripts/export_gguf.py
 ```
+
+📖 **[Ver Guía Completa de Fine-Tuning](docs/FINE_TUNING_GUIDE.md)**
 
 ---
 
@@ -379,19 +377,20 @@ python scripts/reindex_with_finetuned.py
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    FLUJO DE AUTORIZACIÓN                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│  1. Usuario → Azure AD SSO → OpenWebUI (obtiene JWT)                │
-│  2. JWT contiene grupos del usuario                                  │
-│  3. Pipeline mapea grupos → colecciones Qdrant                      │
+│  1. Usuario → NGINX (TLS) → OpenWebUI                               │
+│  2. SSO Azure AD → JWT con grupos del usuario                       │
+│  3. Pipeline JARVIS mapea grupos → colecciones Qdrant               │
 │  4. Búsqueda RAG filtra SOLO colecciones autorizadas               │
+│  5. Servicios internos aislados en red Docker (rag-network)         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Checklist de Seguridad
 
 - [ ] Cambiar TODAS las contraseñas en `.env`
-- [ ] Configurar certificados SSL válidos (no autofirmados en producción)
-- [ ] Habilitar firewall para puertos internos
-- [ ] Configurar Azure AD con MFA
+- [ ] Configurar certificados SSL válidos
+- [ ] Verificar que solo NGINX expone puertos al exterior (8443)
+- [ ] Configurar Azure AD con MFA (si aplica)
 - [ ] Revisar permisos de archivos (`chmod 600 .env`)
 
 ---
@@ -405,35 +404,33 @@ Toda la documentación está en la carpeta [`docs/`](docs/README.md).
 |-----------|-------------|
 | 📖 **[DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)** | Guía paso a paso de despliegue |
 | ⚙️ **[ENV_CONFIGURATION.md](docs/ENV_CONFIGURATION.md)** | Configuración de variables de entorno |
-| 🛠️ **[TECHNOLOGY_STACK.md](docs/TECHNOLOGY_STACK.md)** | Explicación de cada tecnología |
+| 🛠️ **[TECHNOLOGY_STACK.md](docs/TECHNOLOGY_STACK.md)** | Stack tecnológico completo |
 
 ### 📘 Guías Técnicas
 | Documento | Descripción |
 |-----------|-------------|
 | 🏗️ **[TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)** | Arquitectura completa del sistema |
-| 📜 **[CODEBASE_REFERENCE.md](docs/CODEBASE_REFERENCE.md)** | Mapa de todos los archivos de código |
-| 🎓 **[STUDENT_GUIDE.md](docs/STUDENT_GUIDE.md)** | Guía para defensa académica (TFG) |
-| 🧠 **[FINE_TUNING_GUIDE.md](docs/FINE_TUNING_GUIDE.md)** | Cómo entrenar modelos personalizados |
+| 📜 **[CODEBASE_REFERENCE.md](docs/CODEBASE_REFERENCE.md)** | Mapa de archivos de código |
+| 🎓 **[STUDENT_GUIDE.md](docs/STUDENT_GUIDE.md)** | Guía para defensa académica |
+| 🧠 **[FINE_TUNING_GUIDE.md](docs/FINE_TUNING_GUIDE.md)** | Entrenamiento de modelos LoRA |
 
 ### 🔌 Integraciones
 | Documento | Descripción |
 |-----------|-------------|
-| 🏛️ **[BOE_INTEGRATION.md](docs/BOE_INTEGRATION.md)** | Integración con el Boletín Oficial del Estado |
+| 🏛️ **[BOE_INTEGRATION.md](docs/BOE_INTEGRATION.md)** | Integración con el BOE |
 | 🤖 **[mcp-boe-server/README.md](mcp-boe-server/README.md)** | Servidor MCP para el BOE |
-| 🔗 **[ADVANCED_EXTENSIONS.md](docs/ADVANCED_EXTENSIONS.md)** | MCP, SSO, Nginx avanzado |
+| 🔗 **[ADVANCED_EXTENSIONS.md](docs/ADVANCED_EXTENSIONS.md)** | MCP, SSO, NGINX avanzado |
 | ☁️ **[SHAREPOINT_INTEGRATION.md](docs/SHAREPOINT_INTEGRATION.md)** | Sincronización con SharePoint |
 
 ### 👤 Usuario Final
 | Documento | Descripción |
 |-----------|-------------|
-| 📗 **[USER_GUIDE.md](docs/USER_GUIDE.md)** | Manual de usuario |
-| 🧪 **[TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** | Guía de testing |
+| 📗 **[USER_GUIDE.md](docs/USER_GUIDE.md)** | Manual de usuario completo |
+| 🧪 **[TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** | Guía de testing y validación |
 
 ---
 
 ## 🛠️ Troubleshooting
-
-### Problemas Comunes
 
 <details>
 <summary><strong>❌ "No encuentra documentos"</strong></summary>
@@ -445,8 +442,8 @@ curl http://localhost:6335/collections/documents
 # 2. Verificar tenant_id correcto
 # El tenant del usuario debe coincidir con el de los documentos
 
-# 3. Bajar umbral de confianza
-# En el pipeline, ajustar MIN_CONFIDENCE a 0.3
+# 3. Indexar un documento de prueba
+curl -X POST http://localhost:8002/api/upload -F "file=@test.pdf"
 ```
 </details>
 
@@ -457,8 +454,8 @@ curl http://localhost:6335/collections/documents
 # 1. Verificar GPU
 nvidia-smi
 
-# 2. Deshabilitar reranking temporalmente
-# En .env: ENABLE_RERANKING=false
+# 2. Verificar si la caché Redis funciona
+docker exec tfg-redis redis-cli DBSIZE
 
 # 3. Verificar recursos
 docker stats
@@ -482,24 +479,6 @@ docker compose restart tfg-backend
 
 ---
 
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas! 
-
-### Cómo Contribuir
-
-1. **Fork** el repositorio
-2. **Crea** una rama (`git checkout -b feature/AmazingFeature`)
-3. **Commit** tus cambios (`git commit -m 'Add AmazingFeature'`)
-4. **Push** a la rama (`git push origin feature/AmazingFeature`)
-5. **Abre** un Pull Request
-
-### Código de Conducta
-
-Este proyecto sigue el [Contributor Covenant](https://www.contributor-covenant.org/).
-
----
-
 ## 📄 Licencia
 
 Este proyecto está bajo la licencia **MIT**. Ver [LICENSE](LICENSE) para más detalles.
@@ -510,11 +489,13 @@ Este proyecto está bajo la licencia **MIT**. Ver [LICENSE](LICENSE) para más d
 
 | Tecnología | Uso |
 |------------|-----|
+| [Qwen 2.5](https://qwenlm.github.io/) | Modelos de lenguaje (texto + visión) |
 | [Qdrant](https://qdrant.tech/) | Base de datos vectorial |
 | [Ollama](https://ollama.ai/) | Servidor de LLMs locales |
 | [OpenWebUI](https://github.com/open-webui/open-webui) | Interfaz de chat |
-| [LiteLLM](https://github.com/BerriAI/litellm) | Proxy de LLMs |
+| [LiteLLM](https://github.com/BerriAI/litellm) | Proxy de LLMs + caché |
 | [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | OCR open source |
+| [Playwright](https://playwright.dev/) | Web scraping con JS rendering |
 | [BOE API](https://boe.es/datosabiertos/) | Datos abiertos del BOE |
 
 ---

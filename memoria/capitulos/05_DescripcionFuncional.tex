@@ -20,7 +20,7 @@ JARVIS (\textit{Just A Rather Very Intelligent System}) es un asistente conversa
     \item Listar los documentos disponibles en la base de conocimiento.
 \end{itemize}
 
-El sistema se ha diseñado para que \textbf{detecte automáticamente la intención del usuario} a partir del texto del mensaje, sin necesidad de comandos explícitos, menús ni modos manuales. El usuario simplemente escribe su pregunta o solicitud y el sistema decide internamente qué funcionalidad activar. Esta transparencia busca que la experiencia sea natural e intuitiva, similar a interactuar con un asistente humano.
+El sistema se ha diseñado para que detecte automáticamente la intención del usuario a partir del texto del mensaje, sin necesidad de comandos explícitos, menús ni modos manuales. El usuario simplemente escribe su pregunta o solicitud y el sistema decide internamente qué funcionalidad activar. Esta transparencia busca que la experiencia sea natural e intuitiva, similar a interactuar con un asistente humano.
 
 % ============================================================
 \section{Acceso al Sistema e Inicio de Sesión}
@@ -43,13 +43,13 @@ No es necesario crear una cuenta separada ni recordar credenciales adicionales. 
 \label{sec:interfaz}
 % ============================================================
 
-La interfaz de usuario es una aplicación web tipo chat, similar en aspecto y funcionamiento a ChatGPT o Microsoft Copilot. La interfaz se estructura en los siguientes elementos principales:
+La interfaz de usuario es una aplicación web tipo chat, similar en aspecto y funcionamiento a ChatGPT o Microsoft Copilot. En el prototipo implementado, esta capa la proporciona OpenWebUI \cite{openwebui2024docs}. La interfaz se estructura en los siguientes elementos principales:
 
 \subsection{Panel Principal de Chat}
 
 El área central de la pantalla constituye el panel de conversación. El usuario escribe su mensaje en un campo de texto en la parte inferior y la respuesta del asistente aparece en la parte superior, en un formato de chat alternado (mensaje del usuario a la derecha, respuesta del asistente a la izquierda).
 
-Las respuestas se muestran en \textbf{streaming en tiempo real}: el texto aparece progresivamente, token a token, a medida que el modelo lo genera. Esto proporciona retroalimentación inmediata al usuario y evita la sensación de espera prolongada.
+Las respuestas se muestran en \textit{streaming en tiempo real}: el texto aparece progresivamente, token a token, a medida que el modelo lo genera. Esto proporciona retroalimentación inmediata al usuario y evita la sensación de espera prolongada.
 
 Las respuestas soportan formato enriquecido:
 \begin{itemize}
@@ -57,7 +57,7 @@ Las respuestas soportan formato enriquecido:
     \item \textbf{Bloques de código:} Con resaltado de sintaxis para múltiples lenguajes.
     \item \textbf{Tablas:} Para información estructurada.
     \item \textbf{Enlaces:} URLs clicables a fuentes externas o documentos referenciados.
-    \item \textbf{Indicadores visuales}: Etiquetas e iconos que ayudan a identificar el modo de operación activo.
+    \item \textit{Indicadores visuales}: Etiquetas e iconos que ayudan a identificar el modo de operación activo.
 \end{itemize}
 
 \subsection{Panel Lateral de Conversaciones}
@@ -88,10 +88,10 @@ Este es el modo principal del sistema y la funcionalidad que justifica todo el p
 \begin{itemize}
     \item \textbf{Ejemplo de consulta:} ``¿Cuál es la política de calidad de la empresa?''
     \item \textbf{Comportamiento:} El sistema busca en Qdrant los fragmentos más relevantes del documento de calidad indexado, los inyecta como contexto en el prompt y genera una respuesta precisa basada en el contenido real del documento.
-    \item \textbf{Indicador visual:} 📚 \texttt{Buscando en documentos internos...}
+    \item \textbf{Indicador visual:} \modebadge{blue}{RAG} \texttt{Buscando en documentos internos...}
 \end{itemize}
 
-Las respuestas en modo RAG incluyen \textbf{referencias a las fuentes}: el nombre del documento, la página y la puntuación de relevancia de cada fragmento utilizado, proporcionando trazabilidad completa.
+Las respuestas en modo RAG incluyen \textit{referencias a las fuentes}: el nombre del documento, la página y la puntuación de relevancia de cada fragmento utilizado, proporcionando trazabilidad completa.
 
 El sistema también detecta preguntas de seguimiento: si el usuario pregunta ``¿Y cuándo fue la última revisión?'' tras una consulta RAG, el sistema mantiene el modo RAG y utiliza el contexto de la conversación anterior para contextualizar la nueva búsqueda.
 
@@ -103,7 +103,7 @@ Para consultas que requieren información actualizada o que exceden el ámbito d
 \begin{itemize}
     \item \textbf{Ejemplo de consulta:} ``Busca en internet las últimas noticias sobre Docker''
     \item \textbf{Comportamiento:} El sistema ejecuta una búsqueda en DuckDuckGo, recupera los resultados más relevantes y genera una respuesta sintetizada con enlaces a las fuentes originales.
-    \item \textbf{Indicador visual:} 🌐 \texttt{Buscando en internet...}
+    \item \textbf{Indicador visual:} \modebadge{green}{WEB} \texttt{Buscando en internet...}
 \end{itemize}
 
 Las respuestas incluyen los enlaces directos a las fuentes consultadas en una sección de ``Fuentes'' al final del mensaje. El sistema detecta automáticamente consultas que necesitan información fresca (noticias, precios, resultados deportivos) y añade contexto temporal a la búsqueda.
@@ -116,10 +116,10 @@ Cuando el usuario incluye una URL en su mensaje, el sistema descarga y analiza e
 \begin{itemize}
     \item \textbf{Ejemplo de consulta:} ``Resume esta página: https://ejemplo.com/articulo''
     \item \textbf{Comportamiento:} El sistema abre la URL en un navegador automatizado (Playwright), espera a que se renderice todo el JavaScript, extrae el contenido textual limpio y genera un resumen o responde la pregunta del usuario basándose en el contenido extraído.
-    \item \textbf{Indicador visual:} 🔍 \texttt{Analizando URL...}
+    \item \textbf{Indicador visual:} \modebadge{cyan}{URL} \texttt{Analizando URL...}
 \end{itemize}
 
-El contenido extraído queda almacenado en la \textbf{memoria de sesión del usuario}, lo que permite realizar preguntas de seguimiento como ``¿Qué dice el tercer párrafo?'' sin necesidad de volver a enviar la URL. Además, el usuario puede optar por indexar el contenido permanentemente en la colección \texttt{webs} de Qdrant para futuras consultas RAG.
+El contenido extraído queda almacenado en la memoria de sesión del usuario, lo que permite realizar preguntas de seguimiento como ``¿Qué dice el tercer párrafo?'' sin necesidad de volver a enviar la URL. Además, el usuario puede optar por indexar el contenido permanentemente en la colección \texttt{webs} de Qdrant para futuras consultas RAG.
 
 \subsection{Análisis de Imágenes (Visión/OCR)}
 \label{subsec:modo-vision}
@@ -128,8 +128,8 @@ El sistema permite analizar imágenes adjuntadas directamente en el chat.
 
 \begin{itemize}
     \item \textbf{Ejemplo de consulta:} [Adjuntar foto de un documento] ``¿Qué pone en este documento?''
-    \item \textbf{Comportamiento:} La imagen se envía a un modelo de visión multimodal (Qwen 2.5 VL o LLaVA) que describe, transcribe o analiza el contenido visual.
-    \item \textbf{Indicador visual:} 🖼️ \texttt{Analizando imagen...}
+    \item \textbf{Comportamiento:} La imagen se envía a un modelo de visión multimodal (Qwen 2.5 VL en el despliegue actual) que describe, transcribe o analiza el contenido visual.
+    \item \textbf{Indicador visual:} \modebadge{magenta}{VISION} \texttt{Analizando imagen...}
 \end{itemize}
 
 La última imagen analizada queda almacenada en la memoria de sesión, permitiendo preguntas de seguimiento como ``¿Y cuál es la fecha que aparece?'' sin necesidad de reenviar la imagen.
@@ -137,12 +137,12 @@ La última imagen analizada queda almacenada en la memoria de sesión, permitien
 \subsection{Consulta Legislativa del BOE}
 \label{subsec:modo-boe}
 
-El sistema integra la capacidad de consultar el Boletín Oficial del Estado (BOE) directamente desde la interfaz de chat.
+El sistema integra la capacidad de consultar el Boletín Oficial del Estado (BOE) directamente desde la interfaz de chat \cite{boeDatosAbiertos2026}.
 
 \begin{itemize}
     \item \textbf{Ejemplo de consulta:} ``Busca en el BOE la ley de protección de datos''
     \item \textbf{Comportamiento:} El sistema resuelve semánticamente el nombre coloquial de la ley a su identificador oficial del BOE, consulta la API de Datos Abiertos del BOE y devuelve un resumen estructurado de la ley solicitada. De forma complementaria, el proyecto incorpora un servidor MCP para este dominio, ya validado fuera de la interfaz principal.
-    \item \textbf{Indicador visual:} 🏛️ \texttt{Consultando el BOE...}
+    \item \textbf{Indicador visual:} \modebadge{red}{BOE} \texttt{Consultando el BOE...}
 \end{itemize}
 
 El sistema también soporta consultas por número de artículo (``dame el artículo 5 de la LOPD'') y consultas del sumario del día (``¿qué ha salido hoy en el BOE?'').

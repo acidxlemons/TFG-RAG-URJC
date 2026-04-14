@@ -25,7 +25,8 @@
         <div class="nav-links">
             <a href="#arquitectura" class="nav-link">Arquitectura</a>
             <a href="#funcionalidades" class="nav-link">Capacidades</a>
-            <a href="#demo" class="nav-link">Demo</a>
+            <a href="#estructura" class="nav-link">Estructura</a>
+            <a href="#demo" class="nav-link">Métricas</a>
             <a href="https://github.com/acidxlemons/TFG-JARVIS" target="_blank" class="btn btn-outline">
                 <i class="fab fa-github"></i> Código
             </a>
@@ -41,7 +42,7 @@
                 </div>
                 <h1 class="hero-title">
                     Inteligencia Corporativa <br>
-                    <span class="gradient-text">Aumentada por Recuperación</span> (RAG)
+                    <span class="gradient-text">Aumentada mediante Recuperación</span> (RAG)
                 </h1>
                 <p class="hero-subtitle">
                     Transformando conocimiento corporativo (SharePoint, Web, BOE e Imágenes) en respuestas accionables
@@ -239,6 +240,31 @@
                 </div>
             </div>
 
+            <div class="feature-row">
+                <div class="feature-text">
+                    <h2 class="gradient-text">SQL Agent — NL→SQL <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:3px 8px; border-radius:6px; margin-left:6px; vertical-align:middle;">v2.1</span></h2>
+                    <p>Consulta tablas de datos estructurados con lenguaje natural sin necesidad de aprender SQL.
+                        El agente inspecciona el esquema, genera consultas <code>SELECT</code> seguras mediante LiteLLM
+                        y las auto-corrige si producen errores de sintaxis.</p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check-circle"></i> Validación por lista blanca: solo SELECT, WITH, EXPLAIN</li>
+                        <li><i class="fas fa-check-circle"></i> Auto-corrección hasta 2 reintentos con el error como contexto</li>
+                        <li><i class="fas fa-check-circle"></i> Endpoint unificado RAG+SQL con auto-routing (<code>/api/v1/query</code>)</li>
+                    </ul>
+                </div>
+                <div class="feature-visual glass-panel flex-center"
+                    style="flex-direction: column; text-align: center; padding: 2rem;">
+                    <i class="fas fa-table fa-4x" style="color: #10b981; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Validación de Seguridad</h4>
+                    <p class="text-muted" style="font-family:monospace; font-size:0.82rem; margin-top:0.5rem; line-height:1.8; text-align:left;">
+                        ✅ SELECT COUNT(*) FROM ...<br>
+                        ✅ WITH cte AS (SELECT ...)<br>
+                        ❌ DROP TABLE — bloqueado<br>
+                        ❌ DELETE / UPDATE — bloqueado
+                    </p>
+                </div>
+            </div>
+
             <div class="feature-row reverse">
                 <div class="feature-text">
                     <h2 class="gradient-text">Monitorización Avanzada</h2>
@@ -353,7 +379,7 @@
                     <p>Alucinaciones <br>(modo RAG)</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">6.000+</div>
+                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">7.000+</div>
                     <p>Líneas Python <br>Desarrollo Propio</p>
                 </div>
             </div>
