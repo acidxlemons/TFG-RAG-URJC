@@ -4101,7 +4101,7 @@ Archivo: `%APPDATA%\Claude\claude_desktop_config.json`
   "mcpServers": {
     "boe": {
       "command": "python",
-      "args": ["C:/Users/amballesteros/OneDrive - Europavia España/Escritorio/TFG-JARVIS/mcp-boe-server/mcp_boe_server.py", "--stdio"]
+      "args": ["C:/TFG-RAG-Clean/mcp-boe-server/mcp_boe_server.py", "--stdio"]
     }
   }
 }
