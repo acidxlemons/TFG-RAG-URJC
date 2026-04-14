@@ -6,7 +6,7 @@
         "properties": {
             "url": {
                 "type": "string",
-                "description": "La URL inicial del sitio web a analizar (ej: https://europavia.es)"
+                "description": "La URL inicial del sitio web a analizar (ej: https://docs.docker.com)"
             },
             "max_depth": {
                 "type": "integer",
