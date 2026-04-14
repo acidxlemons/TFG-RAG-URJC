@@ -16,17 +16,17 @@ La solución obtenida demuestra que es viable construir una capa conversacional 
 A continuación se evalúa el grado de cumplimiento de los objetivos planteados en el Capítulo~\ref{cap:intro}:
 
 \begin{enumerate}
-    \item \textbf{Arquitectura modular basada en componentes existentes y desarrollo propio} --- \textit{Cumplido.} Se ha construido una arquitectura de microservicios donde conviven herramientas externas reutilizadas y servicios desarrollados específicamente para el proyecto.
+    \item \textit{Arquitectura modular basada en componentes existentes y desarrollo propio} --- \textit{Cumplido.} Se ha construido una arquitectura de microservicios donde conviven herramientas externas reutilizadas y servicios desarrollados específicamente para el proyecto.
 
-    \item \textbf{Ingesta multicanal y actualización de conocimiento} --- \textit{Cumplido.} El sistema procesa documentos de distintas fuentes y formatos, con especial foco práctico en SharePoint, que ha sido el entorno principal de integración y prueba.
+    \item \textit{Ingesta multicanal y actualización de conocimiento} --- \textit{Cumplido.} El sistema procesa documentos de distintas fuentes y formatos, con especial foco práctico en SharePoint, que ha sido el entorno principal de integración y prueba.
 
-    \item \textbf{Respuestas fundamentadas y trazables} --- \textit{Cumplido.} La arquitectura RAG permite responder sobre documentación recuperada y mostrar al usuario el soporte documental utilizado.
+    \item \textit{Respuestas fundamentadas y trazables} --- \textit{Cumplido.} La arquitectura RAG permite responder sobre documentación recuperada y mostrar al usuario el soporte documental utilizado.
 
-    \item \textbf{Capacidades complementarias sin entrenar un modelo desde cero} --- \textit{Cumplido.} Se han integrado búsqueda web, scraping, OCR, análisis de imágenes y consulta normativa reutilizando tecnologías ya existentes y desarrollando la lógica de conexión necesaria.
+    \item \textit{Capacidades complementarias sin entrenar un modelo desde cero} --- \textit{Cumplido.} Se han integrado búsqueda web, scraping, OCR, análisis de imágenes y consulta normativa reutilizando tecnologías ya existentes y desarrollando la lógica de conexión necesaria.
 
-    \item \textbf{Exploración de MCP como vía futura} --- \textit{Cumplido parcialmente.} Se ha implementado un servidor MCP funcional para el caso del BOE, validado en entornos compatibles, aunque la interfaz web principal sigue utilizando integración por API.
+    \item \textit{Exploración de MCP como vía futura} --- \textit{Cumplido parcialmente.} Se ha implementado un servidor MCP funcional para el caso del BOE, validado en entornos compatibles, aunque la interfaz web principal sigue utilizando integración por API.
 
-    \item \textbf{Despliegue reproducible y observable} --- \textit{Cumplido.} El sistema se despliega mediante contenedores e incorpora monitorización para analizar su comportamiento.
+    \item \textit{Despliegue reproducible y observable} --- \textit{Cumplido.} El sistema se despliega mediante contenedores e incorpora monitorización para analizar su comportamiento.
 \end{enumerate}
 
 \subsection{Funcionalidades logradas}
@@ -61,9 +61,15 @@ Exploración de fine-tuning con LoRA & \checkmark \\
 \section{Comparación con Otros Sistemas}
 % ============================================================
 
-El análisis realizado en el Capítulo~\ref{cap:sistemas} sitúa la propuesta en una posición clara. Frente a soluciones comerciales como ChatGPT Enterprise o Microsoft Copilot, la principal ventaja es la soberanía del dato y la capacidad de adaptar el flujo interno del sistema. Frente a herramientas abiertas ya construidas, la propuesta destaca por integrar en una misma arquitectura autenticación corporativa, SharePoint, OCR, scraping, RAG y monitorización.
+El análisis realizado en el Capítulo~\ref{cap:sistemas} sitúa la propuesta en una posición clara. Frente a soluciones comerciales como ChatGPT Enterprise o Microsoft Copilot \cite{openaiChatgptEnterprise2026,microsoftCopilot3652026}, la principal ventaja es la soberanía del dato y la capacidad de adaptar el flujo interno del sistema. Frente a herramientas abiertas ya construidas como AnythingLLM u Onyx \cite{anythingllm2026docs,onyx2026docs}, la propuesta destaca por integrar en una misma arquitectura autenticación corporativa, SharePoint, OCR, scraping, RAG y monitorización.
 
 La conclusión más relevante de esa comparación es que la propuesta de este TFG no pretende competir con todos los productos del mercado en amplitud funcional, sino resolver de forma sólida una combinación muy concreta de requisitos: despliegue local, documentos corporativos cambiantes, integración con herramientas reales de empresa y respuestas trazables.
+
+% ============================================================
+\section{Código del proyecto}
+% ============================================================
+
+El código del proyecto, junto con la configuración de despliegue y la documentación técnica, está disponible en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-JARVIS}}. Se destaca de nuevo aquí porque la memoria describe una solución cuyo valor depende tanto del diseño conceptual como de la implementación reproducible de sus componentes.
 
 % ============================================================
 \section{Lecciones Aprendidas}
@@ -72,11 +78,11 @@ La conclusión más relevante de esa comparación es que la propuesta de este TF
 Las lecciones más importantes del proyecto pueden resumirse en los siguientes puntos:
 
 \begin{itemize}
-    \item \textbf{El problema principal no era entrenar un modelo, sino integrarlo bien}: reutilizar modelos existentes ha sido suficiente para construir una solución útil, siempre que el contexto recuperado y la arquitectura estuvieran bien diseñados.
-    \item \textbf{La calidad del RAG depende mucho de la ingesta}: chunking, OCR, limpieza web y metadatos influyen tanto como el modelo generativo.
-    \item \textbf{La GPU es un recurso crítico}: cuantización, carga bajo demanda y monitorización han sido esenciales para mantener el sistema operativo.
-    \item \textbf{Las fuentes documentales corporativas cambian}: por eso la sincronización incremental y el foco en SharePoint han sido piezas centrales del proyecto.
-    \item \textbf{Guiar al usuario también es una decisión técnica}: en este tipo de sistemas, una buena experiencia no depende solo de acertar la respuesta, sino de dejar claro qué está haciendo el sistema y en qué documentos se basa.
+    \item \textit{El problema principal no era entrenar un modelo, sino integrarlo bien}: reutilizar modelos existentes ha sido suficiente para construir una solución útil, siempre que el contexto recuperado y la arquitectura estuvieran bien diseñados.
+    \item \textit{La calidad del RAG depende mucho de la ingesta}: chunking, OCR, limpieza web y metadatos influyen tanto como el modelo generativo.
+    \item \textit{La GPU es un recurso crítico}: cuantización, carga bajo demanda y monitorización han sido esenciales para mantener el sistema operativo.
+    \item \textit{Las fuentes documentales corporativas cambian}: por eso la sincronización incremental y el foco en SharePoint han sido piezas centrales del proyecto.
+    \item \textit{Guiar al usuario también es una decisión técnica}: en este tipo de sistemas, una buena experiencia no depende solo de acertar la respuesta, sino de dejar claro qué está haciendo el sistema y en qué documentos se basa.
 \end{itemize}
 
 % ============================================================
@@ -107,12 +113,12 @@ Redacción y maquetación de la memoria & 40 h \\
 El proyecto abre varias líneas de evolución razonables:
 
 \begin{enumerate}
-    \item \textbf{Extender la integración documental}: ampliar la cobertura a más repositorios en la nube y sistemas documentales además de SharePoint.
-    \item \textbf{Completar la adopción de MCP}: conectar el servidor MCP desarrollado con clientes e interfaces que lo soporten de forma nativa.
-    \item \textbf{Mejorar la evaluación cuantitativa}: incorporar métricas formales y marcos de evaluación específicos para RAG.
-    \item \textbf{Ampliar tipos de contenido}: incluir hojas de cálculo, audio y otros formatos documentales empresariales.
-    \item \textbf{Refinar la adaptación al dominio}: seguir explorando embeddings especializados y técnicas de ajuste fino cuando aporten valor real.
-    \item \textbf{Generalizar el control de acceso}: ampliar la compatibilidad con otros proveedores de identidad y políticas más detalladas.
+    \item \textit{Extender la integración documental}: ampliar la cobertura a más repositorios en la nube y sistemas documentales además de SharePoint.
+    \item \textit{Completar la adopción de MCP}: conectar el servidor MCP desarrollado con clientes e interfaces que lo soporten de forma nativa.
+    \item \textit{Mejorar la evaluación cuantitativa}: incorporar métricas formales y marcos de evaluación específicos para RAG.
+    \item \textit{Ampliar tipos de contenido}: incluir hojas de cálculo, audio y otros formatos documentales empresariales.
+    \item \textit{Refinar la adaptación al dominio}: seguir explorando embeddings especializados y técnicas de ajuste fino cuando aporten valor real.
+    \item \textit{Generalizar el control de acceso}: ampliar la compatibilidad con otros proveedores de identidad y políticas más detalladas.
 \end{enumerate}
 
 % ============================================================

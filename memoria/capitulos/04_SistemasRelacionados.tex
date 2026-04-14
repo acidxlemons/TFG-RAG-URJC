@@ -1,4 +1,4 @@
-\chapter{Sistemas relacionados y posicionamiento de la propuesta}
+\chapter[Sistemas relacionados]{Sistemas relacionados y posicionamiento de la propuesta}
 \label{cap:sistemas}
 
 Este capítulo sitúa el sistema desarrollado dentro del ecosistema actual. El objetivo no es comparar por comparar, sino mostrar qué soluciones existían antes de comenzar el proyecto, cuáles han aparecido o ganado relevancia durante los últimos meses y qué hueco intenta cubrir la propuesta de este TFG. Esta parte es especialmente importante porque el ámbito de los asistentes con LLM evoluciona muy rápido: herramientas que hace pocos meses no estaban maduras hoy ya compiten en funcionalidades concretas.
@@ -9,13 +9,13 @@ Este capítulo sitúa el sistema desarrollado dentro del ecosistema actual. El o
 
 \subsection{ChatGPT y GPT Enterprise (OpenAI)}
 
-ChatGPT es el asistente conversacional más conocido del mercado. Su versión empresarial añade controles administrativos, garantías comerciales y mejores condiciones de tratamiento de datos. Aun así, sigue siendo un servicio en la nube: la organización no controla la infraestructura de inferencia ni puede modificar en profundidad la lógica del sistema.
+ChatGPT es el asistente conversacional más conocido del mercado. Su versión empresarial añade controles administrativos, garantías comerciales y mejores condiciones de tratamiento de datos \cite{openaiChatgptEnterprise2026}. Aun así, sigue siendo un servicio en la nube: la organización no controla la infraestructura de inferencia ni puede modificar en profundidad la lógica del sistema.
 
 Para este TFG, el principal límite de esta familia de soluciones no es su calidad técnica, sino la pérdida de soberanía operativa: los documentos y consultas no se procesan dentro de una infraestructura propia.
 
 \subsection{Microsoft Copilot para Microsoft 365}
 
-Microsoft Copilot destaca por su integración con SharePoint, Outlook, Teams y el resto del ecosistema Microsoft 365. Para organizaciones ya asentadas en ese entorno, su propuesta es muy atractiva porque reduce la fricción de adopción.
+Microsoft Copilot destaca por su integración con SharePoint, Outlook, Teams y el resto del ecosistema Microsoft 365 \cite{microsoftCopilot3652026}. Para organizaciones ya asentadas en ese entorno, su propuesta es muy atractiva porque reduce la fricción de adopción.
 
 Sin embargo, esa misma integración va asociada a varias restricciones relevantes para el enfoque de este trabajo:
 
@@ -28,47 +28,47 @@ Sin embargo, esa misma integración va asociada a varias restricciones relevante
 
 \subsection{Google Gemini y Vertex AI}
 
-Google ofrece Gemini como producto de productividad y Vertex AI como plataforma de desarrollo e integración. Su fortaleza está en la amplitud del ecosistema cloud y en la disponibilidad de servicios gestionados.
+Google ofrece Gemini como producto de productividad y Vertex AI como plataforma de desarrollo e integración \cite{googleGeminiWorkspace2024,googleVertexAiGenAI2025}. Su fortaleza está en la amplitud del ecosistema cloud y en la disponibilidad de servicios gestionados.
 
 Desde la perspectiva de este proyecto, la limitación vuelve a ser similar: son plataformas muy capaces, pero diseñadas principalmente para operar en la nube del proveedor, no para una arquitectura enteramente \textit{on-premise}.
 
 \subsection{Amazon Bedrock}
 
-Amazon Bedrock proporciona acceso a varios modelos mediante una API unificada y ofrece piezas para agentes y RAG. Es una solución flexible dentro del ecosistema AWS, pero sigue respondiendo al paradigma de servicio gestionado en la nube.
+Amazon Bedrock proporciona acceso a varios modelos mediante una API unificada y ofrece piezas para agentes y RAG \cite{awsBedrock2026}. Es una solución flexible dentro del ecosistema AWS, pero sigue respondiendo al paradigma de servicio gestionado en la nube.
 
 % ============================================================
-\section{Herramientas abiertas orientadas a RAG y asistentes privados}
+\section[Herramientas abiertas]{Herramientas abiertas orientadas a RAG y asistentes privados}
 % ============================================================
 
 \subsection{PrivateGPT}
 
-PrivateGPT\footnote{\url{https://github.com/zylon-ai/private-gpt}} representa una de las aproximaciones más conocidas a la idea de chat privado con documentos propios. Comparte con este TFG la filosofía de evitar servicios externos, pero está más orientado a un uso individual o de laboratorio que a un despliegue corporativo completo.
+PrivateGPT \cite{privategpt2026docs} representa una de las aproximaciones más conocidas a la idea de chat privado con documentos propios. Comparte con este TFG la filosofía de evitar servicios externos, pero está más orientado a un uso individual o de laboratorio que a un despliegue corporativo completo.
 
 \subsection{AnythingLLM}
 
-AnythingLLM\footnote{\url{https://github.com/Mintplex-Labs/anything-llm}} combina interfaz, RAG y gestión documental en una sola herramienta. Se acerca bastante a una solución práctica lista para usar, pero su comportamiento es más uniforme y menos controlable que el del sistema de este proyecto, donde existe un pipeline propio de enrutamiento e integración con fuentes específicas.
+AnythingLLM \cite{anythingllm2026docs} combina interfaz, RAG y gestión documental en una sola herramienta. Se acerca bastante a una solución práctica lista para usar, pero su comportamiento es más uniforme y menos controlable que el del sistema de este proyecto, donde existe un pipeline propio de encaminamiento e integración con fuentes específicas.
 
 \subsection{Danswer / Onyx}
 
-Danswer, renombrado posteriormente como Onyx, es una de las referencias más cercanas a un buscador corporativo con LLM y múltiples conectores. Su relevancia es alta porque demuestra que la necesidad que aborda este TFG no es académica, sino real y compartida por muchas organizaciones.
+Danswer, renombrado posteriormente como Onyx, es una de las referencias más cercanas a un buscador corporativo con LLM y múltiples conectores \cite{onyx2026docs}. Su relevancia es alta porque demuestra que la necesidad que aborda este TFG no es académica, sino real y compartida por muchas organizaciones.
 
 La diferencia principal es de enfoque: Onyx persigue un producto generalista para empresa; este TFG construye una arquitectura más controlada y personalizada alrededor de un caso concreto, con ejecución local, pipeline propio y mayor énfasis en componentes desplegables por separado.
 
 \subsection{OpenClaw y la aceleración reciente del ecosistema}
 
-Durante los últimos meses han aparecido o se han popularizado nuevas herramientas abiertas orientadas a agentes, automatización y uso local de modelos. Un ejemplo representativo es OpenClaw, que refleja una tendencia clara del sector: pasar de simples chats con documentos a sistemas más capaces de orquestar herramientas, navegar por información y ejecutar tareas más complejas.
+Durante los últimos meses han aparecido o se han popularizado nuevas herramientas abiertas orientadas a agentes, automatización y uso local de modelos. Un ejemplo representativo es OpenClaw \cite{openclaw2026docs}, que se centra en conectar agentes con múltiples canales de mensajería y refleja una tendencia clara del sector: pasar de simples chats con documentos a sistemas más capaces de orquestar herramientas, operar en varios canales y ejecutar tareas más complejas.
 
 Su mención es importante por dos razones. La primera es temporal: muestra que el espacio tecnológico del proyecto se está moviendo muy deprisa y que algunas referencias actuales no estaban igual de maduras cuando se definió la primera versión del sistema. La segunda es conceptual: confirma que la línea seguida en este TFG, basada en integrar modelos con herramientas y fuentes externas, va en la misma dirección que la evolución reciente del ecosistema.
 
 \subsection{NotebookLM y asistentes centrados en conocimiento aportado por el usuario}
 
-NotebookLM representa otra línea de evolución distinta. En lugar de centrarse tanto en la infraestructura o la orquestación, pone el acento en trabajar sobre documentos aportados por el usuario y generar explicaciones, resúmenes y conexiones entre fuentes. Su utilidad como referencia está en recordar que no todos los asistentes documentales buscan resolver el mismo problema.
+NotebookLM \cite{notebooklm2025docs} representa otra línea de evolución distinta. En lugar de centrarse tanto en la infraestructura o la orquestación, pone el acento en trabajar sobre documentos aportados por el usuario y generar explicaciones, resúmenes y conexiones entre fuentes. Su utilidad como referencia está en recordar que no todos los asistentes documentales buscan resolver el mismo problema.
 
 Frente a NotebookLM, este TFG persigue un objetivo más orientado a entorno corporativo integrado: autenticación, documentos compartidos, actualización periódica, control de acceso y despliegue local. Por tanto, NotebookLM sirve como comparación funcional parcial, no como equivalente arquitectónico.
 
 \subsection{Frameworks: LangChain y LlamaIndex}
 
-LangChain\footnote{\url{https://langchain.com/}} \cite{langchainRetrievalDocs} y LlamaIndex\footnote{\url{https://www.llamaindex.ai/}} \cite{llamaindexRagDocs} son marcos de desarrollo, no productos finales. Ayudan a construir sistemas con LLMs, pero no resuelven por sí solos necesidades como autenticación corporativa, despliegue, observabilidad o interfaz completa.
+LangChain \cite{langchainRetrievalDocs} y LlamaIndex \cite{llamaindexRagDocs} son marcos de desarrollo, no productos finales. Ayudan a construir sistemas con LLMs, pero no resuelven por sí solos necesidades como autenticación corporativa, despliegue, observabilidad o interfaz completa.
 
 Por eso, más que competidores directos, deben entenderse como piezas posibles dentro de un sistema mayor.
 
@@ -112,10 +112,10 @@ La tabla no debe leerse como una clasificación absoluta, sino como una comparac
 Tras este análisis, el sistema desarrollado ocupa una posición intermedia entre varias familias de soluciones:
 
 \begin{enumerate}
-    \item \textbf{Frente a soluciones comerciales}: sacrifica comodidad de servicio gestionado a cambio de soberanía del dato y capacidad de personalización.
-    \item \textbf{Frente a herramientas abiertas listas para usar}: añade más integración corporativa, más control sobre el flujo y más separación clara entre componentes.
-    \item \textbf{Frente a frameworks}: ofrece un sistema desplegable, no solo una base de desarrollo.
-    \item \textbf{Frente a herramientas recientes orientadas a agentes}: comparte la dirección de evolución, pero con un foco más concreto en consulta documental empresarial y trazabilidad.
+    \item \textit{Frente a soluciones comerciales}: sacrifica comodidad de servicio gestionado a cambio de soberanía del dato y capacidad de personalización.
+    \item \textit{Frente a herramientas abiertas listas para usar}: añade más integración corporativa, más control sobre el flujo y más separación clara entre componentes.
+    \item \textit{Frente a frameworks}: ofrece un sistema desplegable, no solo una base de desarrollo.
+    \item \textit{Frente a herramientas recientes orientadas a agentes}: comparte la dirección de evolución, pero con un foco más concreto en consulta documental empresarial y trazabilidad.
 \end{enumerate}
 
 En resumen, la propuesta de este TFG no compite por ser el asistente más generalista del mercado, sino por resolver de forma sólida un problema muy específico: \textbf{consultar documentación corporativa cambiante con lenguaje natural, dentro de una infraestructura controlada y apoyándose en herramientas existentes correctamente integradas}.

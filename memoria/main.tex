@@ -8,6 +8,11 @@
 \usepackage{csquotes} % Recomendado por biblatex con babel
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{indentfirst}
+\usepackage{titlesec}
+\usepackage{needspace}
+\usepackage{pdflscape}
 
 % ==========================================
 % MÁRGENES Y FORMATO
@@ -15,24 +20,35 @@
 \usepackage[top=3cm, bottom=3cm, left=3.5cm, right=2.5cm]{geometry}
 \usepackage{setspace}
 \onehalfspacing
+\emergencystretch=2em
+\raggedbottom
+\setlength{\parindent}{1.25em}
+\setlength{\parskip}{0pt}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
 
 % ==========================================
 % GRÁFICOS, TABLAS Y CÓDIGO
 % ==========================================
 \usepackage{graphicx}
+\graphicspath{{figuras/}}
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{xurl}
 \usepackage{tikz}
 \usepackage{multirow}       % Celdas multi-fila en tablas
 \usepackage{tabularx}       % Tablas con ancho ajustable
 \usepackage{pgfgantt}        % Diagramas de GANTT
+\usepackage{pgfplots}        % Gráficos de barras y líneas
+\pgfplotsset{compat=1.18}
 \usepackage{eurosym}         % Símbolo del euro
 \usepackage{amsmath}         % Ecuaciones matemáticas
 \usepackage{amssymb}         % Símbolos matemáticos
 
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds}
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
@@ -58,13 +74,46 @@
 }
 \lstset{style=mystyle}
 
+\titleformat{\section}
+  {\normalfont\Large\bfseries}
+  {\thesection}
+  {0.8em}
+  {}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}
+  {\thesubsection}
+  {0.8em}
+  {}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsubsection}
+  {0.8em}
+  {}
+
+\titlespacing*{\section}{0pt}{2.8ex plus 0.8ex minus 0.3ex}{1.2ex}
+\titlespacing*{\subsection}{0pt}{2.2ex plus 0.6ex minus 0.2ex}{0.8ex}
+\titlespacing*{\subsubsection}{0pt}{1.8ex plus 0.4ex minus 0.2ex}{0.6ex}
+
+\pretocmd{\section}{\needspace{8\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\needspace{5\baselineskip}}{}{}
+
+\newcommand{\modebadge}[2]{%
+    \begingroup
+    \setlength{\fboxsep}{4pt}%
+    \colorbox{#1!18}{\textcolor{black}{\texttt{#2}}}%
+    \endgroup
+}
+
 % ==========================================
 % BIBLIOGRAFÍA Y ENLACES
 % ==========================================
 \usepackage[
     backend=biber,
     style=ieee,
-    sorting=none
+    sorting=none,
+    url=true,
+    doi=true
 ]{biblatex}
 \addbibresource{bibliografia.bib}
 

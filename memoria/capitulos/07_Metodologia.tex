@@ -7,14 +7,14 @@ En este capítulo se describe el proceso de desarrollo seguido, el entorno hardw
 \section{Proceso de Desarrollo}
 % ============================================================
 
-El diseño e implementación de este Trabajo de Fin de Grado se ha conducido siguiendo un marco de trabajo ágil (\textit{Agile}), caracterizado por entregas iterativas e incrementales. Dada la naturaleza cambiante del ámbito de la Inteligencia Artificial y de los Modelos de Lenguaje Grande (LLMs), la flexibilidad para revisar decisiones técnicas, sustituir herramientas o ajustar el enrutamiento resultó especialmente importante durante el desarrollo.
+El diseño e implementación de este Trabajo de Fin de Grado se ha conducido siguiendo un marco de trabajo ágil (\textit{Agile}), caracterizado por entregas iterativas e incrementales. Dada la naturaleza cambiante del ámbito de la Inteligencia Artificial y de los Modelos de Lenguaje Grande (LLMs), la flexibilidad para revisar decisiones técnicas, sustituir herramientas o ajustar el encaminamiento resultó especialmente importante durante el desarrollo.
 
 Se estableció un ciclo de vida con las siguientes fases:
 \begin{enumerate}
     \item \textbf{Elicitación y Análisis de Requisitos:} Identificación de fuentes de información clave (SharePoint, páginas web corporativas y el BOE), así como las restricciones de privacidad requeridas por un despliegue puramente \textit{on-premise}.
     \item \textbf{Diseño de Arquitectura:} Planificación de la infraestructura basada en microservicios contenerizados y selección del stack tecnológico idóneo.
     \item \textbf{Implementación Incremental:} Programación progresiva de los módulos de ingesta, OCR, embeddings, búsqueda de Qdrant, backend y, por último, de la interfaz de usuario de OpenWebUI.
-    \item \textbf{Pruebas y Validación:} Validación funcional del enrutamiento inteligente y de las capacidades del RAG mediante métricas comparativas empíricas y experimentación cualitativa.
+    \item \textbf{Pruebas y Validación:} Validación funcional del encaminamiento inteligente y de las capacidades del RAG mediante métricas comparativas empíricas y experimentación cualitativa.
 \end{enumerate}
 
 \subsection{Iteraciones de Desarrollo}
@@ -44,6 +44,7 @@ La distribución temporal del proyecto se representa en el diagrama de GANTT de 
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{ganttchart}[
     hgrid,
     vgrid={*{4}{dotted}},
@@ -67,6 +68,7 @@ La distribución temporal del proyecto se representa en el diagrama de GANTT de 
 \ganttbar{BOE + LoRA + Grafana}{17}{20} \\
 \ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{20}
 \end{ganttchart}
+}
 \caption{Diagrama de GANTT del proyecto.}
 \label{fig:gantt}
 \end{figure}
@@ -152,7 +154,7 @@ Para la correcta organización del proyecto se utilizó el sistema de control de
 El entorno de desarrollo integrado (IDE) empleado primordialmente fue Visual Studio Code en Windows, acoplado al subsistema WSL o contenedores Docker en remoto para igualar la paridad funcional con el entorno de despliegue real Linux, evitando fricciones a nivel de sistema de archivos o librerías específicas compiladas para CUDA/NVIDIA.
 
 \subsection{Integración Continua con GitHub Actions}
-Se configuró un flujo de integración continua (CI) mediante GitHub Actions para automatizar el despliegue de la documentación del proyecto en GitHub Pages. Cada vez que se realiza un \textit{push} a la rama \texttt{main}, el workflow compila y publica automáticamente la landing page del proyecto, accesible públicamente en \url{https://acidxlemons.github.io/TFG-JARVIS/}.
+Se configuró un flujo de integración continua (CI) mediante GitHub Actions \cite{githubActions2026docs} para automatizar el despliegue de la documentación del proyecto en GitHub Pages. Cada vez que se realiza un \textit{push} a la rama \texttt{main}, el workflow compila y publica automáticamente la landing page del proyecto, accesible públicamente en \url{https://acidxlemons.github.io/TFG-JARVIS/}.
 
 % ============================================================
 \section{Estimación de Presupuesto}
@@ -164,6 +166,7 @@ Aunque el proyecto se ha desarrollado íntegramente con software de código abie
 \centering
 \caption{Estimación de presupuesto para el despliegue del sistema.}
 \label{tab:presupuesto}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcc}
 \toprule
 \textbf{Concepto} & \textbf{Coste Unitario} & \textbf{Coste Total} \\
@@ -178,7 +181,8 @@ Horas de desarrollo (200h $\times$ 25 \euro{}/h) & 25 \euro{}/h & 5.000 \euro{} 
 \midrule
 \multicolumn{2}{r}{\textbf{Total estimado}} & \textbf{9.615 \euro{}} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Cabe destacar que el coste de licencias de software es \textbf{cero euros}, dado que todas las tecnologías empleadas son de código abierto. Esto representa una ventaja competitiva significativa frente a soluciones comerciales como Microsoft Copilot o AWS Bedrock, cuyos costes recurrentes por token procesado pueden escalar rápidamente en entornos de uso intensivo.

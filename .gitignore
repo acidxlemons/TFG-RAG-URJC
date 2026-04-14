@@ -146,6 +146,21 @@ tests/reproduce_*.py
 *.ps1
 
 # ============================================
+# 📄 ARTEFACTOS LATEX (BUILD)
+# ============================================
+memoria/*.aux
+memoria/*.bbl
+memoria/*.bcf
+memoria/*.blg
+memoria/*.lof
+memoria/*.lot
+memoria/*.out
+memoria/*.run.xml
+memoria/*.synctex.gz
+memoria/*.toc
+memoria/capitulos/*.aux
+
+# ============================================
 # ⚠️ ARCHIVOS QUE REQUIEREN REVISIÓN MANUAL
 # ============================================
 # Estos archivos contienen IPs/URLs que podrían ser sensibles.
