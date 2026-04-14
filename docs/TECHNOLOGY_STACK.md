@@ -95,7 +95,7 @@ config/nginx/ssl/          # Certificados SSL
 **Nuestra personalización**:
 - Pipeline `jarvis.py` que detecta intención y enruta a RAG, BOE, Web Search, etc.
 - CSS corporativo para branding.
-- Modelo por defecto configurado como "europav-IA".
+- Modelo por defecto configurado como "JARVIS".
 
 **Puerto**: `3002` (externo) → `8080` (interno)
 

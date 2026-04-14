@@ -1,79 +1,60 @@
-﻿# backend/app/main.py
-"""
-Enterprise RAG System API — Punto de entrada principal
-
-Este archivo es el ORQUESTADOR de la aplicación. No contiene lógica de negocio.
-Su responsabilidad es:
-
-1. Configurar la aplicación FastAPI (título, docs, tags).
-2. Registrar middleware (CORS, métricas Prometheus, rate limiting).
-3. Incluir los routers de cada dominio.
-4. Definir el lifecycle (startup/shutdown).
-
-La lógica de negocio está distribuida en módulos especializados:
-- schemas/      → Modelos Pydantic (request/response)
-- services/     → Lógica de negocio (chat, detección de modo, caché)
-- api/          → Routers HTTP (chat, documentos, webhooks, sistema)
-- state.py      → Estado global y configuración
-- metrics.py    → Definiciones de métricas Prometheus
-
-Arquitectura:
-    main.py (orquestador)
-    ├── api/chat.py          → POST /chat, POST /chat/stream
-    ├── api/documents_endpoints.py → CRUD de documentos
-    ├── api/webhooks.py      → Webhooks de SharePoint
-    ├── api/system.py        → /health, /metrics, /
-    ├── api/scrape.py        → /scrape/analyze, /scrape/index (existente)
-    ├── api/web_search.py    → /web-search (existente)
-    ├── api/search.py        → /api/v1/search (existente)
-    └── api/external_data.py → /boe/... (existente)
-"""
-
-import os
-import time
+﻿import os
+import sys
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from qdrant_client import QdrantClient
+from slowapi import _rate_limit_exceeded_handler
 
-# Componentes internos
+from qdrant_client import QdrantClient
+from app.storage.qdrant_client import get_qdrant_client
+
+# Core and State
+from app.core.state import app_state, limiter
 from app.core.rag.retriever import RAGRetriever
+from app.core.rag.reranker import Reranker
 from app.core.memory.manager import MemoryManager
 from app.core.agent.base import RAGAgent
 from app.processing.ocr.paddle_ocr import OCRPipeline
 from app.processing.chunking.smart_chunker import SmartChunker
 from app.integrations.sharepoint.client import SharePointClient
 
-# Estado global y configuración
-from app.state import app_state, LITELLM_BASE_URL, LITELLM_API_KEY, LLM_MODEL
-
-# Métricas Prometheus
-from app.metrics import http_requests_total, http_request_duration_seconds
-
-# Routers de la API
+# Routers
 from app.api import scrape as scrape_api
 from app.api import search as search_api
 from app.api import web_search
-from app.api import external_data
-from app.api import chat as chat_router
-from app.api import documents_endpoints
-from app.api import webhooks as webhooks_router
-from app.api import system as system_router
+from app.api.routers.boe import router as boe_router
+from app.api import chat
+from app.api import documents
+from app.api import base_search
+from app.api import webhooks
+from app.api import health
+from app.api import query as query_api
 
 
 # ======================================================
 # LOGGING
 # ======================================================
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+log_format = os.getenv("LOG_FORMAT", "text")
+log_level = os.getenv("LOG_LEVEL", "INFO")
+
+if log_format == "json":
+    from pythonjsonlogger import jsonlogger
+
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = jsonlogger.JsonFormatter(
+        "%(asctime)s %(name)s %(levelname)s %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logging.basicConfig(handlers=[handler], level=log_level)
+else:
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -82,29 +63,51 @@ logger = logging.getLogger(__name__)
 # ======================================================
 
 def _bool_env(name: str, default: bool = False) -> bool:
-    """Lee una variable de entorno como booleano."""
     val = os.getenv(name)
     if val is None:
         return default
     return str(val).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _default_cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ALLOW_ORIGINS")
+    if configured is not None:
+        return [origin.strip() for origin in configured.split(",") if origin.strip()] or ["http://localhost"]
+
+    origins: list[str] = []
+    app_url = (os.getenv("APP_URL") or "").strip()
+    if app_url:
+        origins.append(app_url.rstrip("/"))
+
+    origins.extend(
+        [
+            "http://localhost",
+            "https://localhost",
+            "http://127.0.0.1",
+            "https://127.0.0.1",
+        ]
+    )
+    return list(dict.fromkeys(origins))
+
+
 # ======================================================
-# LIFECYCLE (startup / shutdown)
+# LIFECYCLE
 # ======================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicialización y limpieza de la aplicación."""
+    """Inicialización y limpieza de la aplicación RAG"""
     logger.info("🚀 Iniciando aplicación RAG...")
 
-    # Qdrant
+    # ===== Qdrant
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-    app_state.qdrant = QdrantClient(url=qdrant_url)
+    # Use shared Qdrant client with collection bootstrap
+    app_state.qdrant = get_qdrant_client()
     logger.info(f"✓ Qdrant conectado: {qdrant_url}")
 
-    # Retriever
+    # ===== Retriever
     default_tenant_id = os.getenv("DEFAULT_TENANT_ID")
+    reranker = Reranker()
     app_state.retriever = RAGRetriever(
         qdrant_client=app_state.qdrant,
         collection_name=os.getenv("QDRANT_COLLECTION", "documents"),
@@ -112,42 +115,43 @@ async def lifespan(app: FastAPI):
         top_k=int(os.getenv("RAG_TOP_K", "5")),
         score_threshold=float(os.getenv("RAG_SCORE_THRESHOLD", "0.7")),
         tenant_id=default_tenant_id,
+        reranker=reranker,
     )
     logger.info("✓ RAG Retriever inicializado")
 
-    # Memory Manager
+    # ===== Memory Manager
     postgres_url = os.getenv("POSTGRES_URL")
     if not postgres_url:
-        logger.warning("POSTGRES_URL no establecido.")
+        logger.warning("POSTGRES_URL no establecido. MemoryManager intentará conectarse con valor vacío.")
     app_state.memory = MemoryManager(database_url=postgres_url)
     logger.info("✓ Memory Manager inicializado")
 
-    # RAG Agent (legacy, mantenido por compatibilidad)
+    # ===== Agente clásico
     app_state.agent = RAGAgent(
         retriever=app_state.retriever,
         memory_manager=app_state.memory,
         llm_base_url=os.getenv("LITELLM_URL", "http://localhost:4000"),
-        llm_api_key=LITELLM_API_KEY or "not-configured",
-        model_name=LLM_MODEL,
+        llm_api_key=os.getenv("LITELLM_API_KEY") or os.getenv("LITELLM_MASTER_KEY", "sk-1234"),
+        model_name=os.getenv("LLM_MODEL", "JARVIS"),
         default_tenant_id=default_tenant_id,
     )
     logger.info("✓ RAG Agent inicializado")
 
-    # OCR Pipeline
+    # ===== OCR Pipeline
     app_state.ocr_pipeline = OCRPipeline(
-        num_workers=int(os.getenv("OCR_NUM_WORKERS", "6")),
+        num_workers=int(os.getenv("OCR_NUM_WORKERS", "2")),
         use_gpu=_bool_env("OCR_USE_GPU", True),
     )
     logger.info("✓ OCR Pipeline inicializado")
 
-    # Chunker
+    # ===== Chunker
     app_state.chunker = SmartChunker(
         chunk_size=int(os.getenv("CHUNK_SIZE", "500")),
         overlap=int(os.getenv("CHUNK_OVERLAP", "50")),
     )
     logger.info("✓ Smart Chunker inicializado")
 
-    # SharePoint (opcional)
+    # ===== SharePoint (opcional)
     app_state.sharepoint = None
     if os.getenv("SHAREPOINT_TENANT_ID"):
         app_state.sharepoint = SharePointClient(
@@ -159,136 +163,76 @@ async def lifespan(app: FastAPI):
         )
         logger.info("✓ SharePoint Client inicializado")
 
-    logger.info("✅ Aplicación lista")
-
+    logger.info("✅ Aplicación lista (Refactorizada y Modular)")
     yield
-
-    # Cleanup
-    logger.info("Cerrando aplicación...")
-    try:
-        app_state.ocr_pipeline.shutdown()
-    except Exception as e:
-        logger.warning(f"Error al cerrar OCR Pipeline: {e}")
 
 
 # ======================================================
 # APP FASTAPI
 # ======================================================
 
-tags_metadata = [
-    {"name": "Chat", "description": "Endpoints de conversación con modos RAG y chat normal"},
-    {"name": "Search", "description": "Búsqueda directa en documentos (semántica, keyword, híbrida)"},
-    {"name": "Documents", "description": "Gestión de documentos: upload, list, delete, status"},
-    {"name": "Web", "description": "Búsqueda en internet y web scraping"},
-    {"name": "System", "description": "Health checks y monitoreo del sistema"},
-]
-
 app = FastAPI(
-    title="Enterprise RAG System API",
-    version="2.1.0",
-    description="""
-## 🚀 Enterprise RAG System API
-
-Sistema RAG (Retrieval Augmented Generation) empresarial con:
-
-- **🔍 Búsqueda Híbrida**: Combina embeddings semánticos + keywords (BM25)
-- **📄 OCR Inteligente**: PaddleOCR con soporte GPU para PDFs escaneados
-- **💬 Chat con Memoria**: Contexto conversacional persistente
-- **🌐 Web Search**: Integración con DuckDuckGo
-- **📊 Multi-tenant**: Aislamiento de datos por tenant
-- **⚡ Streaming**: Respuestas en tiempo real via SSE
-
-### Autenticación
-Las requests requieren el header `X-Tenant-Id` para multi-tenancy.
-    """,
-    openapi_tags=tags_metadata,
+    title="JARVIS RAG System API",
+    version="2.0.0",
+    description="API RAG modular y refactorizada con soporte híbrido",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
 )
 
-
-# ======================================================
-# MIDDLEWARE
-# ======================================================
-
-# Rate Limiting (protección contra abuso)
-rate_limit = os.getenv("RATE_LIMIT", "60/minute")
-limiter = Limiter(key_func=get_remote_address, default_limits=[rate_limit])
+# Rate Limiting Global Middlewares
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-logger.info(f"Rate limiting configurado: {rate_limit}")
 
 # CORS
-allow_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "*")
-allow_origins = [o.strip() for o in allow_origins_env.split(",")] if allow_origins_env else ["*"]
+allow_origins = _default_cors_origins()
+allow_credentials = "*" not in allow_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-@app.middleware("http")
-async def track_requests(request: Request, call_next):
-    """Middleware: registra métricas Prometheus para cada request."""
-    start_time = time.time()
-
-    path = request.url.path
-    if path.startswith("/documents/"):
-        path = "/documents/{action}"
-    elif path.startswith("/api/v1/"):
-        path = "/api/v1/{endpoint}"
-
-    try:
-        response = await call_next(request)
-        status = response.status_code
-    except Exception:
-        status = 500
-        raise
-    finally:
-        duration = time.time() - start_time
-        if not path.startswith(("/metrics", "/docs", "/redoc")):
-            http_requests_total.labels(
-                method=request.method,
-                endpoint=path,
-                status=status
-            ).inc()
-            http_request_duration_seconds.labels(
-                method=request.method,
-                endpoint=path
-            ).observe(duration)
-
-    return response
-
-
 # ======================================================
-# ROUTERS
+# ROUTER IMPORTS
 # ======================================================
 
-# Chat (sync + streaming SSE)
-app.include_router(chat_router.router, tags=["Chat"])
+# Router de Web Scraping
+app.include_router(scrape_api.router)
 
-# Documents (upload, list, delete, stats, status)
-app.include_router(documents_endpoints.router, tags=["Documents"])
+# Enrutador heredado (Legacy raw Qdrant search)
+app.include_router(base_search.router)
 
-# Webhooks (SharePoint notifications)
-app.include_router(webhooks_router.router, tags=["Webhooks"])
+# Nuevo Endpoint RAG Híbrido Avanzado
+app.include_router(search_api.router, tags=["Search V2"])
 
-# System (health, root, metrics)
-app.include_router(system_router.router, tags=["System"])
+# DuckDuckGo Búsqueda Genérica
+app.include_router(web_search.router, tags=["Web Search"])
 
-# Scraping (existente)
-app.include_router(scrape_api.router, tags=["Web"])
+# Legislación BOE
+app.include_router(boe_router, prefix="/external/boe", tags=["BOE"])
 
-# Búsqueda híbrida v2 (existente)
-app.include_router(search_api.router, tags=["Search"])
+# Chat RAG Principal
+app.include_router(chat.router)
 
-# Web search DuckDuckGo (existente)
-app.include_router(web_search.router, tags=["Web"])
+# Almacenamiento, indexación y listado de documentos Qdrant
+app.include_router(documents.router)
 
-# External data BOE (existente)
-app.include_router(external_data.router, tags=["External Data"])
+# Webhooks de ingestión pasiva (SharePoint)
+app.include_router(webhooks.router)
+
+# Health Checks
+app.include_router(health.router)
+
+# Consultas unificadas RAG + SQL
+app.include_router(query_api.router)
+
+@app.get("/", tags=["System"])
+async def root():
+    """Root endpoint"""
+    return {
+        "name": "JARVIS RAG System API",
+        "version": "2.0.0",
+        "docs": "/docs",
+    }

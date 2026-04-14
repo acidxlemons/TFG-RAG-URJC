@@ -4,13 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise RAG System - TFG</title>
-    <meta name="description" content="Sistema RAG Corporativo Inteligente - TFG Universidad Rey Juan Carlos">
+    <title>JARVIS — Sistema RAG Corporativo | TFG URJC</title>
+    <meta name="description" content="JARVIS: Asistente inteligente corporativo con RAG, búsqueda web, OCR y consulta del BOE. Trabajo de Fin de Grado — Universidad Rey Juan Carlos 2026.">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <!-- FontAwesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
@@ -21,7 +20,7 @@
 
     <nav class="navbar glass-panel">
         <div class="logo">
-            <span class="gradient-text">RAG</span>System
+            <span class="gradient-text">JARVIS</span> RAG
         </div>
         <div class="nav-links">
             <a href="#arquitectura" class="nav-link">Arquitectura</a>
@@ -34,19 +33,19 @@
     </nav>
 
     <main>
-        <!-- Home Section -->
+        <!-- Hero Section -->
         <section id="hero" class="hero">
             <div class="hero-content">
                 <div class="badge glass-panel">
-                    <span class="pulse-dot"></span> TFG - Ing. Computadores
+                    <span class="pulse-dot"></span> TFG — Grado en Ingeniería Informática
                 </div>
                 <h1 class="hero-title">
                     Inteligencia Corporativa <br>
                     <span class="gradient-text">Aumentada por Recuperación</span> (RAG)
                 </h1>
                 <p class="hero-subtitle">
-                    Transformando conocimiento base (SharePoint, Web, BOE e Imágenes) en respuestas accionables mediante
-                    Inteligencia Artificial local y Open Source.
+                    Transformando conocimiento corporativo (SharePoint, Web, BOE e Imágenes) en respuestas accionables
+                    mediante Inteligencia Artificial local y Open Source. 12 microservicios, 100% on-premise.
                 </p>
                 <div class="hero-actions">
                     <a href="#demo" class="btn btn-primary">Ver Demo <i class="fas fa-play ml-2"></i></a>
@@ -61,7 +60,7 @@
                             <span class="dot yellow"></span>
                             <span class="dot green"></span>
                         </div>
-                        <span class="terminal-title">tfg-backend (8002)</span>
+                        <span class="terminal-title">jarvis-pipeline (9099)</span>
                     </div>
                     <div class="terminal-body" id="typewriter">
                         <!-- JS Typewriter text -->
@@ -74,11 +73,11 @@
         <section id="arquitectura" class="section">
             <div class="section-header text-center">
                 <h2>Arquitectura del Sistema</h2>
-                <p class="text-muted">Despliegue 100% On-Premise. Privacidad asegurada.</p>
+                <p class="text-muted">12 microservicios orquestados con Docker Compose. Despliegue 100% On-Premise.</p>
             </div>
             <div class="architecture-diagram glass-panel"
                 style="margin-bottom: 3rem; padding: 2rem; border-radius: 16px; overflow-x: auto;">
-                <h3 class="text-center" style="margin-bottom: 1.5rem;">Ecosistema Lógico y Modelos de IA Usados</h3>
+                <h3 class="text-center" style="margin-bottom: 1.5rem;">Ecosistema Completo y Modelos de IA</h3>
                 <div class="mermaid text-center" style="font-family: 'Inter', sans-serif;">
                     %%{init: {'theme':'dark', 'themeVariables': {'clusterBkg':'#0f172a','clusterBorder':'#334155'}}}%%
                     graph TD
@@ -88,11 +87,11 @@
                     classDef external fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff;
                     classDef monitor fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
 
-                    USER((Usuario)) -->|SSO Azure AD| NGINX[NGINX SSL :8443]
-                    NGINX --> OWUI[OpenWebUI]
-                    OWUI -->|REST| JARVIS{JARVIS Pipeline}
+                    USER((Usuario)) -->|HTTPS 8443| NGINX[NGINX TLS + WebSocket]
+                    NGINX --> OWUI[OpenWebUI :3002]
+                    OWUI -->|HTTP POST| JARVIS{Pipeline JARVIS :9099}
 
-                    JARVIS -->|RAG / Search / Scrape| BACKEND[FastAPI Backend]
+                    JARVIS -->|RAG / Search / Scrape| BACKEND[Backend FastAPI :8002]
 
                     BACKEND --> DDG[DuckDuckGo]:::external
                     BACKEND --> PW[Playwright]
@@ -100,31 +99,30 @@
                     BACKEND -.->|OCR| OCR((PaddleOCR GPU)):::model
                     BACKEND --> EMBED
 
-                    INDEXER[Indexer Cron 5min] -->|Graph API MSAL| SP[SharePoint]:::external
+                    INDEXER[Indexer :8003 Cron 5min] -->|Graph API + MSAL| SP[SharePoint]:::external
                     INDEXER -->|Ficheros| BACKEND
 
-                    JARVIS --> MCP[FastMCP BOE]
+                    JARVIS --> MCP[MCP-BOE :8011]
                     MCP --> BOEAPI[API BOE]:::external
 
-                    JARVIS -->|Vision| VISION((Qwen2.5VL + LLaVA)):::model
+                    JARVIS -->|Vision| VISION((Qwen 2.5 VL 7B)):::model
 
-                    BACKEND --> QDRANT[(Qdrant)]:::db
-                    BACKEND --> PG[(PostgreSQL)]:::db
-                    BACKEND --> REDIS[(Redis)]:::db
-                    BACKEND --> MINIO[(MinIO S3)]:::db
+                    BACKEND --> QDRANT[(Qdrant :6335)]:::db
+                    BACKEND --> PG[(PostgreSQL :5433)]:::db
+                    BACKEND --> REDIS[(Redis :6380)]:::db
+                    BACKEND --> MINIO[(MinIO S3 :9002)]:::db
 
-                    BACKEND --> LITELLM[LiteLLM Proxy]
+                    BACKEND --> LITELLM[LiteLLM Proxy :4001]
                     EMBED((MiniLM-L12-v2 384d)):::model
                     LITELLM -.->|Embeddings| EMBED
-                    LITELLM -.->|Chat| LLM1((LLaMA 3.1 8B Q8)):::model
-                    LITELLM -.->|Resumenes| LLM2((LLaMA 3.1 8B Q4)):::model
-                    LITELLM -.->|Corporativo| LLM3((Qwen 2.5 LoRA FT)):::model
+                    LITELLM -.->|Chat principal| LLM1((JARVIS rag-qwen-ft)):::model
+                    LITELLM -.->|Alternativo| LLM2((Qwen 2.5 32B Q4)):::model
 
                     subgraph Observabilidad [Monitorizacion]
-                    GRAF[Grafana]:::monitor
-                    PROM[Prometheus]:::monitor
-                    DCGM[DCGM GPU]:::monitor
-                    PGADMIN[pgAdmin]:::monitor
+                    GRAF[Grafana :3003]:::monitor
+                    PROM[Prometheus :9091]:::monitor
+                    DCGM[DCGM GPU :9401]:::monitor
+                    PGADMIN[pgAdmin :5051]:::monitor
                     GRAF -->|PromQL| PROM
                     PROM --> DCGM
                     PROM -->|/metrics| BACKEND
@@ -135,10 +133,10 @@
                     style="display:flex; flex-wrap:wrap; justify-content:center; gap:1.5rem; margin-top:1.5rem; font-size:0.85rem;">
                     <span style="display:flex; align-items:center; gap:0.4rem;"><span
                             style="width:14px;height:14px;border-radius:3px;background:#1e293b;border:2px solid #3b82f6;display:inline-block;"></span>
-                        Microservicios Propios</span>
+                        Servicios Propios</span>
                     <span style="display:flex; align-items:center; gap:0.4rem;"><span
                             style="width:14px;height:14px;border-radius:3px;background:#7c2d12;border:2px solid #fb923c;display:inline-block;"></span>
-                        Servicios Externos</span>
+                        APIs Externas</span>
                     <span style="display:flex; align-items:center; gap:0.4rem;"><span
                             style="width:14px;height:14px;border-radius:50%;background:#0f172a;border:2px dashed #10b981;display:inline-block;"></span>
                         Modelos de IA</span>
@@ -154,24 +152,23 @@
             <div class="grid cards-grid">
                 <div class="card glass-panel tilt-card">
                     <div class="card-icon"><i class="fas fa-brain"></i></div>
-                    <h3>Modelos Locales</h3>
-                    <p>Uso eficiente de VRAM mediante Q8 y Q4 Quantization con herramientas como <strong>Ollama</strong>
-                        y <strong>LiteLLM</strong>. (Llama 3.1 & Qwen).</p>
+                    <h3>Modelos Locales (Qwen 2.5)</h3>
+                    <p>Inferencia local con cuantización Q4/Q8 mediante <strong>Ollama</strong>
+                        y <strong>LiteLLM</strong>. Modelo principal fine-tuned con LoRA + modelo de visión Qwen 2.5 VL.</p>
                 </div>
 
                 <div class="card glass-panel tilt-card">
                     <div class="card-icon"><i class="fas fa-database"></i></div>
-                    <h3>Vector Store</h3>
-                    <p>Indexado e inferencia semántica optimizada usando <strong>Qdrant</strong> con modelos
-                        SentenceTransformer (MiniLM).</p>
+                    <h3>Búsqueda Híbrida</h3>
+                    <p>Búsqueda semántica (embeddings MiniLM-L12-v2) + léxica (BM25) sobre <strong>Qdrant</strong> con
+                        filtrado por departamento y control de acceso.</p>
                 </div>
 
                 <div class="card glass-panel tilt-card">
                     <div class="card-icon"><i class="fas fa-search-plus"></i></div>
-                    <h3>Observabilidad Transparente</h3>
-                    <p>Interfaces gráficas nativas con <strong>pgAdmin</strong> para trazar el historial relacional
-                        conversacional y <strong>Qdrant Dashboard</strong> para auditar visualmente el subespacio
-                        latente vectorial.</p>
+                    <h3>Observabilidad Completa</h3>
+                    <p>3 dashboards <strong>Grafana</strong> (Backend, GPU, BBDD) + <strong>Prometheus</strong> +
+                        NVIDIA DCGM para monitorizar VRAM, latencia y throughput en tiempo real.</p>
                 </div>
             </div>
         </section>
@@ -181,21 +178,21 @@
             <div class="feature-row">
                 <div class="feature-text">
                     <h2 class="gradient-text">Conexiones Multicanal</h2>
-                    <p>Integración automática (Webhooks y Cronjobs) con Microsoft SharePoint extraída vía MSAL. Se
-                        complementa con Web Scraping recursivo renderizando JS a través de Playwright, y búsquedas en
-                        tiempo real en DuckDuckGo.</p>
+                    <p>Sincronización automática con Microsoft SharePoint vía MSAL y Graph API.
+                        Web scraping con renderizado JavaScript mediante Playwright + extracción NLP con Trafilatura.
+                        Búsqueda en internet vía DuckDuckGo con fallback HTML.</p>
                     <ul class="feature-list">
-                        <li><i class="fas fa-check-circle"></i> Sincronización Delta Incremental</li>
-                        <li><i class="fas fa-check-circle"></i> HTML a Texto Limpio (Deep Scraping)</li>
-                        <li><i class="fas fa-check-circle"></i> Extracción PaddleOCR para PDFs Escaneados</li>
+                        <li><i class="fas fa-check-circle"></i> Sincronización Delta Incremental (cada 5 min)</li>
+                        <li><i class="fas fa-check-circle"></i> Cadena de Extracción: Trafilatura → Readability → BeautifulSoup</li>
+                        <li><i class="fas fa-check-circle"></i> PaddleOCR con GPU para PDFs Escaneados</li>
                     </ul>
                 </div>
                 <div class="feature-visual glass-panel">
                     <div class="mock-data">
-                        <div class="log-line success">[✓] Conectado a SharePoint (Tenant X)</div>
-                        <div class="log-line info">[*] Detectados 45 nuevos documentos PDF</div>
-                        <div class="log-line info">[*] Executando OCR en GPU sobre 15 imágenes...</div>
-                        <div class="log-line success">[✓] Embeddings generados y cargados a Qdrant</div>
+                        <div class="log-line success">[✓] Conectado a SharePoint (Graph API)</div>
+                        <div class="log-line info">[*] Detectados 45 documentos nuevos/modificados</div>
+                        <div class="log-line info">[*] OCR GPU en 15 PDFs escaneados...</div>
+                        <div class="log-line success">[✓] 2.340 chunks generados y cargados a Qdrant</div>
                     </div>
                 </div>
             </div>
@@ -203,14 +200,13 @@
             <div class="feature-row reverse">
                 <div class="feature-text">
                     <h2 class="gradient-text">Consulta Jurídica Inteligente</h2>
-                    <p>Integración en fase de <strong>prototipado técnico (desarrollo futuro)</strong> vía <strong>Model
-                            Context Protocol (MCP)</strong> con la API nativa del BOE Español. La arquitectura está
-                        sentada para buscar normativas consolidadas y resumir legislación de forma experimental.</p>
+                    <p>Servidor <strong>MCP</strong> (Model Context Protocol) propio que consulta la API del BOE.
+                        Incluye resolución semántica de nombres coloquiales a identificadores oficiales y
+                        generación de resúmenes estructurados con el LLM.</p>
                     <ul class="feature-list">
-                        <li><i class="fas fa-check-circle"></i> Agente MCP FastMCP Nativo</li>
-                        <li><i class="fas fa-check-circle"></i> Resolución Semántica (e.g. "Ley de Datos" ->
-                            BOE-A-2018-16673)</li>
-                        <li><i class="fas fa-check-circle"></i> Summaries ejecutivos con Llama 3</li>
+                        <li><i class="fas fa-check-circle"></i> Servidor FastMCP funcional y validado</li>
+                        <li><i class="fas fa-check-circle"></i> Resolución semántica: "Ley de Datos" → BOE-A-2018-16673</li>
+                        <li><i class="fas fa-check-circle"></i> Integrado en el pipeline JARVIS vía API directa</li>
                     </ul>
                 </div>
                 <div class="feature-visual glass-panel flex-center">
@@ -223,39 +219,154 @@
 
             <div class="feature-row">
                 <div class="feature-text">
-                    <h2 class="gradient-text">Monitorización Avanzada</h2>
-                    <p>Control absoluto sobre los recursos del sistema gracias a la integración nativa con exportadores
-                        de NVIDIA y servidores de métricas. El sistema es transparente y auditable mediante gráficas
-                        enriquecidas.</p>
+                    <h2 class="gradient-text">Agente Encaminador JARVIS</h2>
+                    <p>Pipeline inteligente de 1.498 líneas que analiza cada mensaje y lo dirige al
+                        modo de operación adecuado. 14 categorías de intención con evaluación por prioridad,
+                        Sticky Mode para preguntas de seguimiento y control de acceso departamental.</p>
                     <ul class="feature-list">
-                        <li><i class="fas fa-check-circle"></i> Dashboards Visuales en Grafana</li>
-                        <li><i class="fas fa-check-circle"></i> Telemetría y Latencias en Prometheus</li>
-                        <li><i class="fas fa-check-circle"></i> Control de carga GPU y VRAM (DCGM Exporter)</li>
+                        <li><i class="fas fa-check-circle"></i> RAG, Web Search, Scraping, BOE, OCR, Visión...</li>
+                        <li><i class="fas fa-check-circle"></i> Memoria de sesión por usuario (imágenes, web, decisiones)</li>
+                        <li><i class="fas fa-check-circle"></i> 92% de precisión en encaminamiento (46/50 tests)</li>
                     </ul>
                 </div>
                 <div class="feature-visual glass-panel flex-center"
                     style="flex-direction: column; text-align: center; padding: 2rem;">
-                    <!-- Caja preparada como Placeholder para un Video/GIF -->
+                    <i class="fas fa-robot fa-4x" style="color: #3b82f6; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">14 Modos de Operación</h4>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.5;">
+                        RAG · Chat · Web Search · Scraping · BOE · Visión · OCR · Archivos · Ayuda · Listar Docs · Estado · Sticky Mode · Referencia a imagen/web · Decisión pendiente
+                    </p>
+                </div>
+            </div>
+
+            <div class="feature-row reverse">
+                <div class="feature-text">
+                    <h2 class="gradient-text">Monitorización Avanzada</h2>
+                    <p>Control total sobre los recursos del sistema con 3 dashboards Grafana diseñados
+                        a medida, métricas Prometheus en el backend y telemetría GPU con NVIDIA DCGM Exporter.</p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check-circle"></i> Dashboard Backend: latencia, throughput, distribución de modos</li>
+                        <li><i class="fas fa-check-circle"></i> Dashboard GPU: VRAM, temperatura, utilización CUDA</li>
+                        <li><i class="fas fa-check-circle"></i> Dashboard BBDD: PostgreSQL + Qdrant stats</li>
+                    </ul>
+                </div>
+                <div class="feature-visual glass-panel flex-center"
+                    style="flex-direction: column; text-align: center; padding: 2rem;">
                     <i class="fas fa-chart-line fa-4x" style="color: #10b981; margin-bottom: 1rem;"></i>
-                    <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Dashboard NVIDIA & Grafana</h4>
+                    <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Prometheus + Grafana + DCGM</h4>
                     <p class="text-muted" style="font-size: 0.9rem; margin-top: 1rem; line-height: 1.5;">
-                        <em>(Sustituye esta tarjeta HTML por un <code>&lt;img src="tu_gif.gif"&gt;</code> o un
-                            <code>&lt;iframe&gt;</code> de Youtube donde muestres en movimiento el panel de telemetría
-                            de Grafana y el consumo en vivo)</em>
+                        <em>Latencia RAG ~3.5s · TTFT ~1.2s · Cache hit ~35% · Uptime 99.8%</em>
                     </p>
                 </div>
             </div>
         </section>
 
+        <!-- Estructura del Proyecto -->
+        <section id="estructura" class="section">
+            <div class="section-header text-center">
+                <h2>Estructura del Proyecto</h2>
+                <p class="text-muted">Componentes principales del backend y sus responsabilidades (v2.1).</p>
+            </div>
+            <div class="glass-panel" style="padding: 2rem; border-radius: 16px; overflow-x: auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #334155;">
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">Fichero</th>
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">api/search.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Búsqueda híbrida (dense + BM25 + reranking) con expansión paralela asíncrona y validación JWT</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">api/chat.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Chat RAG con streaming SSE y memoria conversacional en PostgreSQL</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">api/query.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.1</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Endpoint unificado RAG + SQL con auto-routing inteligente (<code>POST /api/v1/query</code>)</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">core/sql_agent.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.1</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Agente NL→SQL: genera y ejecuta SELECT seguros con whitelist, timeout y auto-corrección</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">core/auth.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.1</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Validación JWT Azure AD para multi-tenant (activa con <code>AZURE_JWT_VALIDATION=true</code>)</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/query_processor.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Expansión de queries vía LiteLLM HTTP, detección de intención, extracción de keywords</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/retrieval.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Pipeline híbrido con filtros avanzados (filename, date_range, from_ocr, source_type)</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/memory/manager.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Historial conversacional en PostgreSQL con summarización automática vía LiteLLM</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">processing/embeddings/</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Embeddings MiniLM-L12-v2 con singleton thread-safe (double-checked locking) y caché Redis</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">integrations/boe_connector.py</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Cliente API del BOE con resolución semántica de 35+ nombres coloquiales de leyes</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">integrations/sharepoint/</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Sincronización incremental Microsoft Graph API con delta tokens y soporte multi-site</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Demo Section -->
+        <section id="demo" class="section">
+            <div class="section-header text-center">
+                <h2>Métricas del Sistema</h2>
+                <p class="text-muted">Resultados obtenidos en pruebas con despliegue real durante 30 días.</p>
+            </div>
+            <div class="grid cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#3b82f6;">~3.5s</div>
+                    <p>Latencia RAG <br>(p95)</p>
+                </div>
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#10b981;">~1.2s</div>
+                    <p>Primer Token <br>(TTFT)</p>
+                </div>
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#f59e0b;">99.8%</div>
+                    <p>Uptime <br>(30 días)</p>
+                </div>
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#8b5cf6;">92%</div>
+                    <p>Precisión <br>Encaminamiento</p>
+                </div>
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#ef4444;">0%</div>
+                    <p>Alucinaciones <br>(modo RAG)</p>
+                </div>
+                <div class="card glass-panel tilt-card" style="text-align:center;">
+                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">6.000+</div>
+                    <p>Líneas Python <br>Desarrollo Propio</p>
+                </div>
+            </div>
+        </section>
 
     </main>
 
     <footer class="footer glass-panel">
         <div class="footer-content">
             <div class="footer-left">
-                <h3>Enterprise RAG</h3>
+                <h3>JARVIS — RAG Corporativo</h3>
                 <p>Trabajo de Fin de Grado</p>
-                <p>Universidad Rey Juan Carlos 2026</p>
+                <p>Universidad Rey Juan Carlos — 2026</p>
             </div>
             <div class="footer-right">
                 <p>Autor: <strong>Ángel Ballesteros</strong></p>
@@ -273,4 +384,3 @@
 </body>
 
 </html>
-<!-- GitHub Pages Trigger -->

@@ -42,6 +42,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
     networks:
       - rag-network
     restart: unless-stopped
@@ -60,6 +65,10 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 600m
     networks:
       - rag-network
     restart: unless-stopped
@@ -81,6 +90,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4g
     networks:
       - rag-network
     restart: unless-stopped
@@ -195,6 +209,11 @@ services:
     ports:
       - "4001:4000"
     command: [ "--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0", "--num_workers", "4" ]
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
     networks:
       - rag-network
     restart: unless-stopped
@@ -295,6 +314,9 @@ services:
       - "8002:8000"
     deploy:
       resources:
+        limits:
+          cpus: "4"
+          memory: 8g
         reservations:
           devices:
             - capabilities: [ "gpu" ]
@@ -351,6 +373,11 @@ services:
     ports:
       - "8003:8001"
     command: [ "uvicorn", "app.main:app", "--app-dir", "/app", "--host", "0.0.0.0", "--port", "8001" ]
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4g
     networks:
       - rag-network
     restart: unless-stopped
@@ -417,10 +444,10 @@ services:
       # - ./services/openwebui/static/logo.png:/app/build/static/splash-dark.png
       # - ./services/openwebui/static/logo.png:/app/build/static/favicon.png
       # - ./services/openwebui/static/favicon.svg:/app/build/static/favicon.svg
-      # Custom CSS theme (minimal)
-      - ./services/openwebui/static/europavia-theme.css:/app/build/static/custom.css
+      # Custom CSS theme for the TFG variant
+      - ./services/openwebui/static/urjc-theme.css:/app/build/static/custom.css
     environment:
-      # Multiple OpenAI-compatible API endpoints: LiteLLM + Pipelines (europav-IA)
+      # Multiple OpenAI-compatible API endpoints: LiteLLM + Pipelines (JARVIS)
       OPENAI_API_BASE_URLS: "http://litellm:4000/v1;http://pipelines:9099"
       OPENAI_API_KEYS: "${LITELLM_MASTER_KEY:-sk-1234};0p3n-w3bu!"
       # Fix for missing models/500 logs: Allow OpenWebUI to reach Ollama directly
@@ -435,8 +462,8 @@ services:
       OAUTH_SCOPES: openid profile email
       OPENID_REDIRECT_URI: ${APP_URL:-http://localhost:3000}/oauth/oidc/callback
       DATABASE_URL: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-rag_system}
-      # Set europav-IA as the default and primary model
-      DEFAULT_MODELS: "jarvis"
+      # Set JARVIS as the default and primary model
+      DEFAULT_MODELS: "JARVIS"
       # Force env vars to take precedence over DB config (needed for DEFAULT_MODELS)
       ENABLE_PERSISTENT_CONFIG: "False"
       # Make ALL models visible to ALL users (bypass admin-only visibility)
@@ -467,6 +494,30 @@ services:
       - "--storage.tsdb.path=/prometheus"
     ports:
       - "9091:9090"
+    networks:
+      - rag-network
+    restart: unless-stopped
+
+  # =========================
+  # LOGGING (Loki Stack)
+  # =========================
+  loki:
+    image: grafana/loki:latest
+    container_name: tfg-loki
+    ports:
+      - "3101:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - rag-network
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: tfg-promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/promtail/config.yaml:/etc/promtail/config.yaml:ro
+    command: -config.file=/etc/promtail/config.yaml
     networks:
       - rag-network
     restart: unless-stopped
@@ -509,6 +560,20 @@ services:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/enterprise_rag.json
     ports:
       - "3003:3000"
+    networks:
+      - rag-network
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: tfg-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-rag_system}?sslmode=disable
+    ports:
+      - "9188:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - rag-network
     restart: unless-stopped

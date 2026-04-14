@@ -14,20 +14,20 @@ model_list:
       supports_vision: false
       context_window: 8192
 
-  # Llama 3.1 8B (para uso general)
-  - model_name: llama3.1-8b
+  # Qwen 2.5 32B Q4_K_M (modelo principal para texto, RAG, chat)
+  - model_name: qwen2.5-32b
     litellm_params:
-      model: ollama/llama3.1:8b-instruct-q8_0
+      model: ollama/qwen2.5:32b-instruct-q4_K_M
       api_base: http://ollama:11434
       temperature: 0.7
-      max_tokens: 4096
+      max_tokens: 8192
       stream: true
     model_info:
       mode: chat
-      supports_function_calling: true
       supports_vision: false
+      context_window: 32768
 
-  # Qwen 2.5 VL (Vision Language) - Nuevo modelo detectado
+  # Qwen 2.5 VL (Vision Language) - OCR y análisis de imágenes
   - model_name: qwen2.5vl
     litellm_params:
       model: ollama/qwen2.5vl:7b
@@ -38,32 +38,6 @@ model_list:
     model_info:
       mode: chat
       supports_vision: true
-
-  # Modelo de visión/OCR (Legacy)
-  - model_name: llava
-    litellm_params:
-      model: ollama/llava:13b
-      api_base: http://ollama:11434
-      temperature: 0.3
-      max_tokens: 2048
-      stream: true
-    model_info:
-      mode: chat
-      supports_vision: true
-
-  # Modelo ligero para resúmenes rápidos
-  - model_name: llama3.1-summarize
-    litellm_params:
-      model: ollama/llama3.1:8b-instruct-q4_0
-      api_base: http://ollama:11434
-      temperature: 0.5
-      max_tokens: 1024
-      stream: false
-    model_info:
-      mode: chat
-      supports_function_calling: false
-      supports_vision: false
-      context_window: 4096
 
 litellm_settings:
   set_verbose: false
@@ -77,8 +51,8 @@ litellm_settings:
   per_user_rpm: 60
   per_user_tpm: 30000
 
-  request_timeout: 120
-  num_retries: 3
+  request_timeout: 180
+  num_retries: 1
   retry_backoff: exponential
   retry_backoff_factor: 2
   retry_on_status_codes: [408, 429, 500, 502, 503, 504]
@@ -91,11 +65,16 @@ litellm_settings:
     namespace: "litellm"
 
   enable_cors: true
-  allowed_origins: ["*"]
+  # Restringe CORS a la URL de la app (APP_URL) y localhost para desarrollo
+  allowed_origins:
+    - os.environ/APP_URL
+    - "http://localhost"
+    - "http://localhost:3000"
+    - "https://localhost"
 
-  # 🔴 IMPORTANTE: estas claves se aceptan SIN ir a DB
+  # Claves leídas desde variables de entorno (nunca hardcodeadas)
   proxy_api_keys:
-    - "sk-1234"
+    - os.environ/LITELLM_MASTER_KEY
 
 router_settings:
   routing_strategy: simple-shuffle
@@ -104,9 +83,13 @@ router_settings:
     gpt-4: JARVIS
     gpt-4o: JARVIS
     gpt-4o-mini: JARVIS
+    llama3.1-8b: qwen2.5-32b
+    llama3.1-summarize: qwen2.5-32b
 
   fallbacks:
-    - JARVIS: [llama3.1-summarize]
+    - JARVIS: [qwen2.5-32b]
+    - qwen2.5-32b: [JARVIS]
+    - llama3.1-8b: [JARVIS]
 
   health_check_interval: 10
   health_check_timeout: 3
@@ -120,7 +103,7 @@ general_settings:
     enabled: false          # ⬅️ desactivamos DB totalmente
   store_model_in_db: false  # ⬅️ que no intente guardar modelos en DB
 
-  master_key: "sk-1234"     # ⬅️ coincide con tu .env
+  master_key: os.environ/LITELLM_MASTER_KEY  # Leído del .env, nunca hardcodeado
 
   max_request_body_size: 5000000
   max_response_body_size: 10000000

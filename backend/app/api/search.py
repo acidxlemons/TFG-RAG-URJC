@@ -57,15 +57,23 @@ Respuesta:
 
 from __future__ import annotations
 
+import asyncio
+import os
 import time
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Any
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field, validator
 from prometheus_client import Counter, Histogram, Gauge
 
+# Executor para correr query expansion en un thread sin bloquear el event loop
+_expansion_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="qexpand")
+
 from ..core.retrieval import HybridRetriever, SearchResult
 from ..core.query_processor import QueryProcessor, MultiQueryRetriever, QueryIntent
+from ..core.permissions import get_all_collection_names, resolve_authorized_collections
+from ..core.auth import extract_allowed_collections
 from ..storage.qdrant_client import get_qdrant_client
 from ..processing.embeddings.sentence_transformer import get_embedder
 
@@ -267,8 +275,8 @@ async def get_query_processor() -> QueryProcessor:
         logger.info("Inicializando QueryProcessor global...")
         # En producción, pasar un LLM client real
         _global_processor = QueryProcessor(
-            llm_client=None,  # TODO: Integrar con LiteLLM
-            enable_expansion=False,  # Habilitar cuando LLM esté configurado
+            llm_client=None,
+            enable_expansion=True,  # LiteLLM HTTP se detecta automáticamente via env vars
             max_expansions=3,
         )
         logger.info("✓ QueryProcessor global listo")
@@ -284,6 +292,9 @@ async def get_query_processor() -> QueryProcessor:
 async def search(
     request: SearchRequest,
     tenant_id: str = Depends(get_tenant_id),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
+    x_tenant_ids: Optional[str] = Header(None, alias="X-Tenant-Ids"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     retriever: HybridRetriever = Depends(get_retriever),
     processor: QueryProcessor = Depends(get_query_processor),
 ):
@@ -314,39 +325,71 @@ async def search(
     effective_tenant_id = tenant_id
     
     try:
-        # 1. Procesar query si está habilitado
+        # 1. Detección de intención y keywords (rápido, sin LLM)
         processed_query = None
+        intent = "unknown"
+        keywords: List[str] = []
+        expanded_queries: List[str] = [request.query]
+
         if request.process_query:
+            # Procesar intent/keywords de forma inmediata (sin expansion aún)
             processed_query = processor.process(
                 query=request.query,
-                expand=False,  # Expansión solo en multi-query
+                expand=False,  # La expansion se lanza en paralelo abajo
             )
             intent = processed_query.intent.value
             keywords = processed_query.keywords
-            
-            # Usar sugerencias del processor si no se especificó estrategia
-            if request.strategy == "hybrid":
-                # Podrías ajustar estrategia según intent
-                pass
-        else:
-            intent = "unknown"
-            keywords = []
-        
-        # 2. Ejecutar búsqueda
+
+        # 2. Lanzar expansión LLM en background (si está habilitada)
+        #    y búsqueda con query original en paralelo
+        loop = asyncio.get_event_loop()
+        expansion_future = None
+        if request.process_query and processor.enable_expansion:
+            expansion_future = loop.run_in_executor(
+                _expansion_executor,
+                lambda: processor.expand_query(request.query, num_variations=3),
+            )
+
         logger.info(
             f"Búsqueda: tenant={effective_tenant_id}, query='{request.query[:50]}', "
             f"strategy={request.strategy}, intent={intent}"
         )
-        
-        results = retriever.search(
-            query=request.query,
-            collection_name="documents",  # TODO: Hacer configurable por tenant
-            top_k=request.top_k,
-            tenant_id=effective_tenant_id,
-            strategy=request.strategy,
-            use_reranking=request.use_reranking,
-            filters=request.filters,
-        )
+
+        # Validación JWT: si está activa, las colecciones vienen del token
+        jwt_collections = extract_allowed_collections(authorization)
+        if jwt_collections is not None:
+            if not jwt_collections:
+                raise HTTPException(status_code=403, detail="Token válido pero sin colecciones autorizadas.")
+            collections_to_search = jwt_collections
+        else:
+            collections_to_search = resolve_authorized_collections(
+                qdrant_client=retriever.qdrant,
+                x_tenant_id=x_tenant_id,
+                x_tenant_ids=x_tenant_ids,
+            )
+        tenant_filter = None
+
+        all_results: List[SearchResult] = []
+        for coll in collections_to_search:
+            try:
+                coll_results = retriever.search(
+                    query=request.query,
+                    collection_name=coll,
+                    top_k=request.top_k,
+                    tenant_id=tenant_filter,
+                    strategy=request.strategy,
+                    use_reranking=request.use_reranking,
+                    filters=request.filters,
+                )
+                for r in coll_results:
+                    if r.metadata is not None and "collection" not in r.metadata:
+                        r.metadata["collection"] = coll
+                all_results.extend(coll_results)
+            except Exception as e:
+                logger.warning(f"Error querying collection {coll}: {e}")
+
+        all_results.sort(key=lambda r: r.score, reverse=True)
+        results = all_results[: request.top_k]
         
         # 3. Calcular latencia
         latency = (time.perf_counter() - t0) * 1000  # en ms
@@ -412,6 +455,8 @@ async def search(
 async def multi_query_search(
     request: MultiQueryRequest,
     tenant_id: str = Depends(get_tenant_id),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
+    x_tenant_ids: Optional[str] = Header(None, alias="X-Tenant-Ids"),
     retriever: HybridRetriever = Depends(get_retriever),
     processor: QueryProcessor = Depends(get_query_processor),
 ):
@@ -447,14 +492,33 @@ async def multi_query_search(
         )
         
         # Ejecutar búsqueda multi-query
-        results = multi_retriever.search(
-            query=request.query,
-            collection_name="documents",
-            top_k=request.top_k,
-            tenant_id=tenant_id,
-            strategy="hybrid",
-            use_reranking=True,
+        collections_to_search = resolve_authorized_collections(
+            qdrant_client=retriever.qdrant,
+            x_tenant_id=x_tenant_id,
+            x_tenant_ids=x_tenant_ids,
         )
+        tenant_filter = None
+
+        all_results: List[SearchResult] = []
+        for coll in collections_to_search:
+            try:
+                coll_results = multi_retriever.search(
+                    query=request.query,
+                    collection_name=coll,
+                    top_k=request.top_k,
+                    tenant_id=tenant_filter,
+                    strategy="hybrid",
+                    use_reranking=True,
+                )
+                for r in coll_results:
+                    if r.metadata is not None and "collection" not in r.metadata:
+                        r.metadata["collection"] = coll
+                all_results.extend(coll_results)
+            except Exception as e:
+                logger.warning(f"Error querying collection {coll}: {e}")
+
+        all_results.sort(key=lambda r: r.score, reverse=True)
+        results = all_results[: request.top_k]
         
         # Calcular latencia
         latency = (time.perf_counter() - t0) * 1000

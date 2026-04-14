@@ -35,6 +35,25 @@ Responsabilidades típicas:
 - scraping y procesamiento documental;
 - métricas y endpoints de servicio.
 
+**Estructura de ficheros clave (`backend/app/`)**:
+
+| Fichero | Descripción |
+|---------|-------------|
+| `api/search.py` | Búsqueda híbrida (dense + sparse + reranking) con expansión paralela y validación JWT |
+| `api/chat.py` | Chat RAG con streaming y memoria conversacional |
+| `api/query.py` | (**v2.1**) Endpoint unificado RAG + SQL con auto-routing |
+| `api/documents.py` | Subida, indexación y gestión de documentos |
+| `api/routers/boe.py` | Consulta al BOE con resolución semántica de nombres de leyes |
+| `core/sql_agent.py` | (**v2.1**) Agente NL→SQL: genera y ejecuta SELECT seguros sobre tablas de negocio |
+| `core/auth.py` | (**v2.1**) Validación JWT Azure AD para multi-tenant (activable con `AZURE_JWT_VALIDATION=true`) |
+| `core/query_processor.py` | Expansión de queries con LiteLLM HTTP, detección de intención |
+| `core/retrieval.py` | Pipeline híbrido con filtros avanzados (filename, date_range, from_ocr, source_type) |
+| `core/memory/manager.py` | Historial conversacional en PostgreSQL con summarización vía LiteLLM |
+| `core/rag/retriever.py` | Recuperación semántica con HNSW en Qdrant |
+| `processing/embeddings/sentence_transformer.py` | Embeddings con singleton thread-safe y caché Redis |
+| `integrations/boe_connector.py` | Cliente API del BOE con resolución de 35+ nombres coloquiales |
+| `integrations/sharepoint/` | Sincronización incremental con Microsoft Graph (delta tokens) |
+
 ### `services/`
 
 Agrupa servicios auxiliares que forman parte de la arquitectura desplegable. Según la configuración concreta, aquí pueden residir componentes como el pipeline de OpenWebUI, el indexador o servicios específicos de soporte.

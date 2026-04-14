@@ -2,6 +2,41 @@
 
 **Proyecto**: TFG - Universidad Rey Juan Carlos
 
+## Versión 2.1.0 - SQL Agent, JWT Auth, Fixes Críticos (2026-04-14)
+
+### Nuevas Funcionalidades
+
+**SQL Agent (NL→SQL)**
+- `backend/app/core/sql_agent.py` — nuevo agente para consultas en lenguaje natural sobre datos estructurados (documentos, conversaciones, estado de ingestión)
+- `backend/app/api/query.py` — endpoint unificado `POST /api/v1/query` con auto-routing RAG/SQL
+- Seguridad: solo SELECT, whitelist de tablas, timeout 10s, auto-corrección con el error
+- Endpoints: `POST /api/v1/query`, `POST /api/v1/query/sql`, `GET /api/v1/query/schema`
+
+**JWT Auth para multi-tenant**
+- `backend/app/core/auth.py` — validación de tokens Azure AD (PyJWT + JWKS)
+- Activación via `AZURE_JWT_VALIDATION=true` (desactivado por defecto, retrocompatible)
+- Mapeo de grupos Azure AD → colecciones Qdrant via `AZURE_GROUP_MAP`
+
+### Fixes Críticos
+
+| Fichero | Problema | Fix |
+|---------|---------|-----|
+| `query_processor.py` | `expand_query()` bloqueaba si no había cliente LLM explícito | Verificar también LiteLLM HTTP configurado; implementar `_call_llm()` con fallback HTTP |
+| `search.py` | Query expansion siempre desactivada en `/search` | Activación automática + expansión asíncrona en background thread |
+| `sentence_transformer.py` | Race condition en init del singleton | Double-checked locking + `threading.Lock()` en `get_embedder()` y `get_sparse_embedder()` |
+| `sentence_transformer.py` | Redis crash fatal al fallar `get`/`setex` | Try/except silencioso alrededor de todas las ops Redis |
+| `memory/manager.py` | Summarización fallaba sin `summarizer_llm` explícito | LiteLLM HTTP fallback (opción 2) en `_generate_summary()` |
+| `retrieval.py` | `additional_filters` no implementados (solo tenant_id) | Implementar `filename` (MatchText), `date_range` (Range), `from_ocr`, `source_type`, `source` |
+| `litellm/config.yaml` | `master_key` y `proxy_api_keys` hardcodeados | Leer de `os.environ/LITELLM_MASTER_KEY` |
+| `docker-compose.yml` | Sin resource limits en servicios críticos | `deploy.resources.limits` en postgres, redis, qdrant, litellm, rag-backend, indexer |
+
+### Limpieza de branding
+- Eliminadas todas las referencias a `europav-IA` del código (reemplazado por `JARVIS`)
+- `services/openwebui/pipelines/failed/jarvis.py`: `self.name = "JARVIS"`
+- `docs/TECHNOLOGY_STACK.md`: modelo por defecto actualizado a `"JARVIS"`
+
+---
+
 ## Versión 2.0.1 - Memoria de Visión Mejorada & Fixes (2026-01-20)
 
 ### 🖼️ Memoria de Imágenes "Natural"

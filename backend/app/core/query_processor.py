@@ -33,8 +33,9 @@ Casos de uso:
 from __future__ import annotations
 
 import re
+import os
 import logging
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -139,23 +140,48 @@ class QueryProcessor:
         enable_expansion: bool = True,
         max_expansions: int = 3,
         min_query_length: int = 3,
+        litellm_base_url: Optional[str] = None,
+        litellm_api_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ):
         """
         Inicializa el query processor
-        
+
         Args:
-            llm_client: Cliente LLM para expansión (opcional)
+            llm_client: Cliente LLM para expansión (opcional, puede ser callable o dict)
             enable_expansion: Si habilitar query expansion
             max_expansions: Máximo número de expansiones a generar
             min_query_length: Longitud mínima de query para procesar
+            litellm_base_url: URL de LiteLLM (fallback a LITELLM_URL env var)
+            litellm_api_key: API key de LiteLLM (fallback a LITELLM_API_KEY env var)
+            llm_model: Nombre del modelo (fallback a LLM_MODEL env var)
         """
         self.llm = llm_client
-        self.enable_expansion = enable_expansion and (llm_client is not None)
         self.max_expansions = max_expansions
         self.min_query_length = min_query_length
-        
+
+        # Configuración HTTP para LiteLLM (leída de env vars si no se pasan)
+        self._litellm_url = (
+            litellm_base_url
+            or os.getenv("LITELLM_URL", "http://litellm:4000")
+        ).rstrip("/")
+        self._litellm_key = (
+            litellm_api_key
+            or os.getenv("LITELLM_API_KEY")
+            or os.getenv("LITELLM_MASTER_KEY", "sk-1234")
+        )
+        self._llm_model = llm_model or os.getenv("LLM_MODEL", "JARVIS")
+
+        # Activar expansión si hay cliente explícito O si LiteLLM está configurado
+        litellm_available = bool(self._litellm_url and self._litellm_key)
+        self.enable_expansion = enable_expansion and (llm_client is not None or litellm_available)
+        self.max_expansions = max_expansions
+        self.min_query_length = min_query_length
+
         if self.enable_expansion:
-            logger.info("✓ Query expansion habilitado")
+            logger.info(
+                f"✓ Query expansion habilitado (model={self._llm_model}, url={self._litellm_url})"
+            )
         else:
             logger.info("Query expansion deshabilitado (no LLM client)")
     
@@ -369,10 +395,13 @@ class QueryProcessor:
         Returns:
             Lista de queries (original + variaciones)
         """
-        if not self.llm:
-            logger.warning("No LLM client disponible para expansión")
+        # Verificar que haya alguna forma de llamar al LLM
+        # (self.llm explícito O LiteLLM HTTP configurado)
+        has_llm = self.llm is not None or bool(self._litellm_url and self._litellm_key)
+        if not has_llm:
+            logger.warning("No LLM disponible para expansión (ni cliente ni LiteLLM HTTP)")
             return [query]
-        
+
         try:
             # Prompt para el LLM
             prompt = f"""Genera {num_variations} reformulaciones de la siguiente pregunta que ayuden a encontrar información relacionada en una base de datos de documentos empresariales.
@@ -389,29 +418,38 @@ Instrucciones:
 Reformulaciones:"""
 
             # Llamar al LLM
-            # Nota: Debes adaptar esto a tu cliente LLM específico
-            # Ejemplo para OpenAI/LiteLLM:
             response = self._call_llm(prompt, max_tokens=200)
-            
-            # Parsear respuesta
-            variations = [
-                v.strip()
-                for v in response.split('\n')
-                if v.strip() and len(v.strip()) > 10
-            ]
-            
+
+            if not response:
+                logger.warning("LLM devolvió respuesta vacía para expansion")
+                return [query]
+
+            # Parsear respuesta — limpiar prefijos de lista ("1.", "-", "*", "•")
+            import re as _re
+            raw_lines = response.split('\n')
+            variations = []
+            for line in raw_lines:
+                line = line.strip()
+                # Quitar prefijos de numeración/lista
+                line = _re.sub(r'^[\d]+[.)]\s*', '', line)
+                line = _re.sub(r'^[-*•]\s*', '', line).strip()
+                if line and len(line) > 10:
+                    variations.append(line)
+
             # Filtrar variaciones válidas
             valid_variations = [
                 v for v in variations
                 if v.lower() != query.lower()  # No duplicar original
             ][:num_variations]
-            
+
             # Incluir query original al principio
             result = [query] + valid_variations
-            
-            logger.debug(f"Query expandida: {len(result)} variaciones")
+
+            logger.info(
+                f"Query expandida: '{query[:40]}' → {len(result)} variaciones"
+            )
             return result
-            
+
         except Exception as e:
             logger.error(f"Error expandiendo query: {e}")
             return [query]  # Fallback a query original
@@ -436,19 +474,47 @@ Reformulaciones:"""
         Returns:
             Respuesta del LLM como string
         """
-        # TODO: Implementar según tu LLM client
-        # Ejemplo para LiteLLM:
-        # response = self.llm.completion(
-        #     model="gpt-3.5-turbo",
-        #     messages=[{"role": "user", "content": prompt}],
-        #     max_tokens=max_tokens,
-        #     temperature=temperature
-        # )
-        # return response.choices[0].message.content
-        
-        # Por ahora, retornar vacío
-        logger.warning("_call_llm no implementado, usando query original")
-        return ""
+        # Opción 1: cliente LLM explícito pasado en el constructor
+        if self.llm is not None:
+            try:
+                if callable(self.llm):
+                    return self.llm(prompt)
+                if hasattr(self.llm, "invoke"):
+                    resp = self.llm.invoke(prompt)
+                    return getattr(resp, "content", str(resp))
+                if hasattr(self.llm, "completion"):
+                    resp = self.llm.completion(
+                        model=self._llm_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                    return resp.choices[0].message.content
+            except Exception as e:
+                logger.warning(f"Error usando llm_client explícito: {e}. Intentando LiteLLM HTTP.")
+
+        # Opción 2: LiteLLM via HTTP
+        try:
+            import requests as _req
+            response = _req.post(
+                f"{self._litellm_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._litellm_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self._llm_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.warning(f"LiteLLM HTTP no disponible para query expansion: {e}")
+            return ""
     
     def _suggest_search_params(
         self,

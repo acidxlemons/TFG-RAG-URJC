@@ -6,8 +6,8 @@ Almacena historial en Postgres y genera resúmenes automáticos
 
 from __future__ import annotations
 
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from typing import List, Dict, Optional, Any
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 import logging
 import os
@@ -16,6 +16,7 @@ from sqlalchemy import (
     create_engine,
     Column,
     Integer,
+    BigInteger,
     String,
     Text,
     DateTime,
@@ -24,6 +25,7 @@ from sqlalchemy import (
     Index,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.exc import IntegrityError
 try:
     # Postgres recomendado
     from sqlalchemy.dialects.postgresql import JSONB as JSONType
@@ -149,6 +151,65 @@ class IngestionStatus(Base):
     )
 
 
+class IndexedDocument(Base):
+    """Registro SQL de documentos indexados."""
+    __tablename__ = "indexed_documents"
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(500), nullable=False)
+    source_path = Column(Text, nullable=False)
+    source_type = Column(String(50), nullable=False)
+    file_hash = Column(String(64), unique=True, nullable=False, index=True)
+    file_size = Column(BigInteger, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    page_count = Column(Integer, nullable=True)
+    chunk_count = Column(Integer, nullable=True)
+    from_ocr = Column(Boolean, default=False)
+    indexed_at = Column(DateTime, default=datetime.utcnow)
+    indexed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    meta = Column("metadata", JSONType, default=dict)
+    status = Column(String(50), default="indexed")
+
+    __table_args__ = (
+        Index("ix_indexed_documents_filename", "filename"),
+        Index("ix_indexed_documents_status", "status"),
+        Index("ix_indexed_documents_indexed_at", "indexed_at"),
+    )
+
+
+class SharePointSyncState(Base):
+    """Estado persistido de sincronizaciones SharePoint."""
+    __tablename__ = "sharepoint_sync"
+
+    id = Column(Integer, primary_key=True)
+    site_id = Column(String(255), nullable=False)
+    folder_path = Column(Text, nullable=False)
+    delta_token = Column(Text, nullable=True)
+    last_sync = Column(DateTime, nullable=True)
+    subscription_id = Column(String(255), nullable=True)
+    subscription_expires = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    __table_args__ = (
+        Index("ix_sharepoint_sync_site_folder", "site_id", "folder_path"),
+    )
+
+
+class AuditLog(Base):
+    """Audit log operativo mínimo."""
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(100), nullable=False, index=True)
+    resource_type = Column(String(50), nullable=True, index=True)
+    resource_id = Column(Integer, nullable=True)
+    details = Column(JSONType, default=dict)
+    ip_address = Column(Text, nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 
 # ============================================
 # GESTOR DE MEMORIA
@@ -181,6 +242,9 @@ class MemoryManager:
         summarizer_llm=None,  # LLM para generar resúmenes (opcional)
         max_messages_before_summary: int = 10,
         context_window_size: int = 5,  # Últimos N mensajes siempre incluidos
+        litellm_base_url: Optional[str] = None,
+        litellm_api_key: Optional[str] = None,
+        llm_model: Optional[str] = None,
     ):
         # Conexión a Postgres
         self.engine = create_engine(database_url, pool_pre_ping=True, future=True)
@@ -191,12 +255,92 @@ class MemoryManager:
         self.max_messages_before_summary = max(1, int(max_messages_before_summary))
         self.context_window_size = max(1, int(context_window_size))
 
+        # Configuración HTTP para LiteLLM (fallback de summarizer_llm)
+        self._litellm_url = (
+            litellm_base_url
+            or os.getenv("LITELLM_URL", "http://litellm:4000")
+        ).rstrip("/")
+        self._litellm_key = (
+            litellm_api_key
+            or os.getenv("LITELLM_API_KEY")
+            or os.getenv("LITELLM_MASTER_KEY", "sk-1234")
+        )
+        self._llm_model = llm_model or os.getenv("LLM_MODEL", "JARVIS")
+
         # Permite ajustar cada cuánto se regenera el resumen vía env
         self.summary_ttl_seconds = int(os.getenv("SUMMARY_TTL_SECONDS", str(3600)))
 
         logger.info("MemoryManager inicializado")
 
+    @staticmethod
+    def _coerce_datetime(value: Optional[Any]) -> Optional[datetime]:
+        """Normaliza strings ISO o datetime a UTC naive."""
+        if value is None or value == "":
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo:
+                return value.astimezone(timezone.utc).replace(tzinfo=None)
+            return value
+        try:
+            parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+            if parsed.tzinfo:
+                return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            return parsed
+        except Exception:
+            logger.warning("No se pudo parsear datetime: %s", value)
+            return None
+
+    @staticmethod
+    def _normalize_string_list(values: Optional[Any]) -> List[str]:
+        if values is None or values == "":
+            raw_values: List[Any] = []
+        elif isinstance(values, list):
+            raw_values = values
+        else:
+            raw_values = [values]
+        items = []
+        for value in raw_values:
+            text = str(value or "").strip()
+            if text and text not in items:
+                items.append(text)
+        return items
+
+    @classmethod
+    def _merge_metadata(cls, current: Optional[Dict], incoming: Optional[Dict]) -> Dict:
+        """Merge conservador para metadata JSON."""
+        merged = dict(current or {})
+        for key, value in (incoming or {}).items():
+            if value is None:
+                continue
+            if isinstance(value, list):
+                current_value = merged.get(key, [])
+                if isinstance(current_value, list):
+                    current_list = current_value
+                elif current_value is None or current_value == "":
+                    current_list = []
+                else:
+                    current_list = [current_value]
+                merged[key] = cls._normalize_string_list(
+                    cls._normalize_string_list(current_list) + cls._normalize_string_list(value)
+                )
+            elif isinstance(value, dict) and isinstance(merged.get(key), dict):
+                child = dict(merged.get(key) or {})
+                child.update(value)
+                merged[key] = child
+            else:
+                merged[key] = value
+        return merged
+
     # ==================== GESTIÓN DE USUARIOS ====================
+
+    @staticmethod
+    def _sync_user_fields(user: User, email: Optional[str], name: Optional[str]) -> None:
+        """Actualiza datos volátiles del usuario cuando llegan del IdP o del cliente."""
+        user.last_active = datetime.utcnow()
+        if email and user.email != email:
+            user.email = email
+        if name and user.name != name:
+            user.name = name
 
     def get_or_create_user(self, azure_id: str, email: Optional[str], name: Optional[str]) -> int:
         """
@@ -205,27 +349,102 @@ class MemoryManager:
         """
         session = self.Session()
         try:
+            safe_email = email or f"{azure_id}@unknown.local"
+
             user = session.query(User).filter(User.azure_id == azure_id).one_or_none()
             if user:
-                user.last_active = datetime.utcnow()
-                if email and user.email != email:
-                    user.email = email  # resync si cambia en el IdP
-                if name and user.name != name:
-                    user.name = name
+                self._sync_user_fields(user, safe_email, name)
                 session.commit()
                 return user.id
 
-            # Fallback de email si Azure no lo trae (evita violar NOT NULL/UNIQUE)
-            safe_email = email or f"{azure_id}@unknown.local"
+            user = session.query(User).filter(User.email == safe_email).one_or_none()
+            if user:
+                if user.azure_id != azure_id:
+                    other = session.query(User).filter(User.azure_id == azure_id).one_or_none()
+                    if other and other.id != user.id:
+                        logger.warning(
+                            "Conflicto resolviendo usuario: azure_id %s ya pertenece al user %s; "
+                            "se conserva el registro asociado al email %s",
+                            azure_id,
+                            other.id,
+                            safe_email,
+                        )
+                    else:
+                        user.azure_id = azure_id
+                self._sync_user_fields(user, safe_email, name)
+                session.commit()
+                return user.id
 
             user = User(azure_id=azure_id, email=safe_email, name=name or "")
             session.add(user)
             session.commit()
             logger.info(f"Usuario creado: {safe_email} (ID: {user.id})")
             return user.id
+        except IntegrityError:
+            session.rollback()
+            user = session.query(User).filter(
+                (User.azure_id == azure_id) | (User.email == safe_email)
+            ).one_or_none()
+            if user:
+                if user.azure_id != azure_id and not session.query(User).filter(User.azure_id == azure_id).one_or_none():
+                    user.azure_id = azure_id
+                self._sync_user_fields(user, safe_email, name)
+                session.commit()
+                return user.id
+            raise
         except Exception as e:
             session.rollback()
             logger.error(f"Error get_or_create_user: {e}")
+            raise
+        finally:
+            session.close()
+
+    def ensure_user_reference(self, user_id: int, email: Optional[str] = None, name: Optional[str] = None) -> int:
+        """
+        Garantiza que exista un usuario utilizable a partir de un user_id externo.
+
+        Casos que cubre:
+        - El user_id ya existe en la tabla users.
+        - El cliente manda email pero no azure_id: reutilizamos ese usuario si existe.
+        - El cliente solo manda un user_id numérico: creamos/reutilizamos una identidad local estable.
+        """
+        external_user_id = int(user_id)
+        synthetic_azure_id = f"local-user:{external_user_id}"
+
+        session = self.Session()
+        try:
+            user = session.get(User, external_user_id)
+            if user:
+                self._sync_user_fields(user, email, name)
+                session.commit()
+                return user.id
+
+            if email:
+                user = session.query(User).filter(User.email == email).one_or_none()
+                if user:
+                    self._sync_user_fields(user, email, name)
+                    session.commit()
+                    return user.id
+
+            user = session.query(User).filter(User.azure_id == synthetic_azure_id).one_or_none()
+            if user:
+                self._sync_user_fields(user, email, name)
+                session.commit()
+                return user.id
+
+            safe_email = email or f"user-{external_user_id}@unknown.local"
+            user = User(
+                azure_id=synthetic_azure_id,
+                email=safe_email,
+                name=name or f"User {external_user_id}",
+            )
+            session.add(user)
+            session.commit()
+            logger.info(f"Usuario local creado para user_id externo {external_user_id}: {user.id}")
+            return user.id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error ensure_user_reference: {e}")
             raise
         finally:
             session.close()
@@ -413,30 +632,65 @@ class MemoryManager:
 
     def _generate_summary(self, messages: List[Message]) -> str:
         """
-        Genera resumen de mensajes antiguos usando LLM (si está configurado).
+        Genera resumen de mensajes antiguos usando LLM.
+
+        Orden de preferencia:
+        1. summarizer_llm explícito (LangChain o callable)
+        2. LiteLLM via HTTP (vars de entorno LITELLM_URL / LITELLM_API_KEY)
+        3. Fallback: contador de mensajes (sin LLM disponible)
         """
         if not messages:
             return "Sin mensajes previos."
-        if not self.summarizer_llm:
-            return f"Conversación con {len(messages)} mensajes previos."
 
+        # Construir texto de la conversación (truncado por seguridad)
+        joined = "\n\n".join(
+            f"{m.role.upper()}: {(m.content or '')[:800]}"
+            for m in messages
+        )
+        prompt = (
+            "Resume la siguiente conversación en 2-3 párrafos concisos. "
+            "Destaca: temas principales, preguntas clave del usuario, documentos citados y conclusiones.\n\n"
+            f"Conversación:\n{joined}\n\nResumen:"
+        )
+
+        # Opción 1: cliente LLM explícito
+        if self.summarizer_llm:
+            try:
+                if hasattr(self.summarizer_llm, "invoke"):
+                    raw = self.summarizer_llm.invoke(prompt)
+                elif callable(self.summarizer_llm):
+                    raw = self.summarizer_llm(prompt)
+                else:
+                    raw = None
+                if raw:
+                    summary = self._llm_text(raw)
+                    return summary.strip() or f"Conversación con {len(messages)} mensajes previos."
+            except Exception as e:
+                logger.warning(f"summarizer_llm falló: {e}. Intentando LiteLLM HTTP.")
+
+        # Opción 2: LiteLLM via HTTP
         try:
-            # Construir texto de la conversación (truncado por seguridad)
-            joined = "\n\n".join(
-                f"{m.role.upper()}: {m.content[:1000]}"  # limitar cada mensaje
-                for m in messages
+            import requests as _req
+            response = _req.post(
+                f"{self._litellm_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._litellm_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self._llm_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 400,
+                    "temperature": 0.3,
+                },
+                timeout=30,
             )
-            prompt = (
-                "Resume la siguiente conversación en 2-3 párrafos concisos. "
-                "Destaca: temas principales, preguntas clave del usuario, documentos citados y conclusiones o tareas.\n\n"
-                f"Conversación:\n{joined}\n\nResumen:"
-            )
-            raw = self.summarizer_llm.invoke(prompt)
-            summary = self._llm_text(raw)
+            response.raise_for_status()
+            summary = response.json()["choices"][0]["message"]["content"]
             return summary.strip() if summary else f"Conversación con {len(messages)} mensajes previos."
         except Exception as e:
-            logger.error(f"Error generando resumen: {e}")
-            return f"Conversación con {len(messages)} mensajes previos (resumen no disponible)."
+            logger.warning(f"LiteLLM HTTP no disponible para resumen: {e}")
+            return f"Conversación con {len(messages)} mensajes previos."
 
     # ==================== UTILIDADES ====================
 
@@ -559,6 +813,338 @@ class MemoryManager:
                 "total_messages": total_messages,
                 "member_since": user.created_at.isoformat(),
                 "last_active": user.last_active.isoformat(),
+            }
+        finally:
+            session.close()
+
+    # ==================== REGISTRO DE DOCUMENTOS ====================
+
+    def upsert_document_record(
+        self,
+        *,
+        filename: str,
+        source_path: str,
+        source_type: str,
+        file_hash: str,
+        file_size: Optional[int] = None,
+        mime_type: Optional[str] = None,
+        page_count: Optional[int] = None,
+        chunk_count: Optional[int] = None,
+        from_ocr: bool = False,
+        indexed_by: Optional[int] = None,
+        metadata: Optional[Dict] = None,
+        status: str = "indexed",
+    ) -> Dict[str, Any]:
+        """Inserta o actualiza el registro SQL de un documento indexado."""
+        session = self.Session()
+        try:
+            metadata = dict(metadata or {})
+            collection_name = str(metadata.get("collection_name") or "").strip()
+            active_collections = self._normalize_string_list(metadata.get("active_collections"))
+            if collection_name and collection_name not in active_collections:
+                active_collections.append(collection_name)
+            if active_collections:
+                metadata["active_collections"] = active_collections
+
+            record = (
+                session.query(IndexedDocument)
+                .filter(IndexedDocument.file_hash == file_hash)
+                .one_or_none()
+            )
+
+            if record is None:
+                record = IndexedDocument(
+                    filename=filename,
+                    source_path=source_path,
+                    source_type=source_type,
+                    file_hash=file_hash,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                    page_count=page_count,
+                    chunk_count=chunk_count,
+                    from_ocr=from_ocr,
+                    indexed_by=indexed_by,
+                    meta=metadata,
+                    status=status,
+                )
+                session.add(record)
+            else:
+                record.filename = filename or record.filename
+                record.source_path = source_path or record.source_path
+                record.source_type = source_type or record.source_type
+                record.file_size = file_size if file_size is not None else record.file_size
+                record.mime_type = mime_type or record.mime_type
+                record.page_count = page_count if page_count is not None else record.page_count
+                record.chunk_count = chunk_count if chunk_count is not None else record.chunk_count
+                record.from_ocr = bool(from_ocr)
+                record.indexed_by = indexed_by if indexed_by is not None else record.indexed_by
+                record.status = status or record.status
+                record.meta = self._merge_metadata(record.meta, metadata)
+
+            session.commit()
+            return {
+                "id": record.id,
+                "filename": record.filename,
+                "status": record.status,
+                "active_collections": self._normalize_string_list((record.meta or {}).get("active_collections")),
+            }
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error upsert_document_record: {e}")
+            raise
+        finally:
+            session.close()
+
+    def mark_document_deleted(
+        self,
+        filename: str,
+        *,
+        collection_name: Optional[str] = None,
+        source_path: Optional[str] = None,
+    ) -> int:
+        """Marca un documento como eliminado y actualiza sus colecciones activas."""
+        session = self.Session()
+        try:
+            records = (
+                session.query(IndexedDocument)
+                .filter(IndexedDocument.filename == filename)
+                .all()
+            )
+
+            updated = 0
+            for record in records:
+                if source_path and record.source_path != source_path:
+                    continue
+
+                metadata = dict(record.meta or {})
+                active_collections = self._normalize_string_list(metadata.get("active_collections"))
+                deleted_collections = self._normalize_string_list(metadata.get("deleted_collections"))
+
+                if collection_name:
+                    if active_collections and collection_name not in active_collections:
+                        continue
+                    active_collections = [item for item in active_collections if item != collection_name]
+                    if collection_name not in deleted_collections:
+                        deleted_collections.append(collection_name)
+                else:
+                    active_collections = []
+
+                metadata["active_collections"] = active_collections
+                if deleted_collections:
+                    metadata["deleted_collections"] = deleted_collections
+
+                record.meta = metadata
+                record.status = "deleted" if not active_collections else "indexed"
+                updated += 1
+
+            session.commit()
+            return updated
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error mark_document_deleted: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_document_registry(
+        self,
+        *,
+        limit: int = 100,
+        status: Optional[str] = None,
+        source_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Lista documentos registrados en SQL."""
+        session = self.Session()
+        try:
+            query = session.query(IndexedDocument)
+            if status:
+                query = query.filter(IndexedDocument.status == status)
+            if source_type:
+                query = query.filter(IndexedDocument.source_type == source_type)
+            rows = (
+                query.order_by(IndexedDocument.indexed_at.desc())
+                .limit(max(1, int(limit)))
+                .all()
+            )
+            return [
+                {
+                    "id": row.id,
+                    "filename": row.filename,
+                    "source_path": row.source_path,
+                    "source_type": row.source_type,
+                    "file_hash": row.file_hash,
+                    "file_size": row.file_size,
+                    "mime_type": row.mime_type,
+                    "page_count": row.page_count,
+                    "chunk_count": row.chunk_count,
+                    "from_ocr": row.from_ocr,
+                    "indexed_at": row.indexed_at.isoformat() if row.indexed_at else None,
+                    "status": row.status,
+                    "metadata": row.meta or {},
+                }
+                for row in rows
+            ]
+        finally:
+            session.close()
+
+    # ==================== SHAREPOINT SYNC ====================
+
+    def update_sharepoint_sync_state(
+        self,
+        *,
+        site_id: str,
+        folder_path: str,
+        delta_token: Optional[str] = None,
+        last_sync: Optional[Any] = None,
+        subscription_id: Optional[str] = None,
+        subscription_expires: Optional[Any] = None,
+        is_active: bool = True,
+    ) -> int:
+        """Upsert del estado de sincronización SharePoint."""
+        session = self.Session()
+        try:
+            row = (
+                session.query(SharePointSyncState)
+                .filter(
+                    SharePointSyncState.site_id == site_id,
+                    SharePointSyncState.folder_path == folder_path,
+                )
+                .one_or_none()
+            )
+            if row is None:
+                row = SharePointSyncState(
+                    site_id=site_id,
+                    folder_path=folder_path,
+                )
+                session.add(row)
+
+            if delta_token is not None:
+                row.delta_token = delta_token
+            row.last_sync = self._coerce_datetime(last_sync) or datetime.utcnow()
+            if subscription_id is not None:
+                row.subscription_id = subscription_id
+            if subscription_expires is not None:
+                row.subscription_expires = self._coerce_datetime(subscription_expires)
+            row.is_active = bool(is_active)
+
+            session.commit()
+            return row.id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error update_sharepoint_sync_state: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_sharepoint_sync_states(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Lista estados SharePoint persistidos."""
+        session = self.Session()
+        try:
+            rows = (
+                session.query(SharePointSyncState)
+                .order_by(SharePointSyncState.last_sync.desc())
+                .limit(max(1, int(limit)))
+                .all()
+            )
+            return [
+                {
+                    "id": row.id,
+                    "site_id": row.site_id,
+                    "folder_path": row.folder_path,
+                    "delta_token_present": bool(row.delta_token),
+                    "last_sync": row.last_sync.isoformat() if row.last_sync else None,
+                    "subscription_id": row.subscription_id,
+                    "subscription_expires": row.subscription_expires.isoformat() if row.subscription_expires else None,
+                    "is_active": row.is_active,
+                }
+                for row in rows
+            ]
+        finally:
+            session.close()
+
+    # ==================== AUDITORÍA ====================
+
+    def log_audit_event(
+        self,
+        *,
+        action: str,
+        resource_type: Optional[str] = None,
+        resource_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> int:
+        """Añade un evento al audit log."""
+        session = self.Session()
+        try:
+            row = AuditLog(
+                user_id=user_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details or {},
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            session.add(row)
+            session.commit()
+            return row.id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error log_audit_event: {e}")
+            return 0
+        finally:
+            session.close()
+
+    def get_audit_log(
+        self,
+        *,
+        limit: int = 100,
+        action: Optional[str] = None,
+        resource_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Lista eventos recientes del audit log."""
+        session = self.Session()
+        try:
+            query = session.query(AuditLog)
+            if action:
+                query = query.filter(AuditLog.action == action)
+            if resource_type:
+                query = query.filter(AuditLog.resource_type == resource_type)
+            rows = (
+                query.order_by(AuditLog.created_at.desc())
+                .limit(max(1, int(limit)))
+                .all()
+            )
+            return [
+                {
+                    "id": row.id,
+                    "user_id": row.user_id,
+                    "action": row.action,
+                    "resource_type": row.resource_type,
+                    "resource_id": row.resource_id,
+                    "details": row.details or {},
+                    "ip_address": row.ip_address,
+                    "user_agent": row.user_agent,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                }
+                for row in rows
+            ]
+        finally:
+            session.close()
+
+    def get_operational_counts(self) -> Dict[str, int]:
+        """Conteos ligeros para health checks y paneles operativos."""
+        session = self.Session()
+        try:
+            return {
+                "documents_total": session.query(IndexedDocument).count(),
+                "documents_indexed": session.query(IndexedDocument).filter(IndexedDocument.status == "indexed").count(),
+                "documents_failed": session.query(IndexedDocument).filter(IndexedDocument.status == "failed").count(),
+                "documents_deleted": session.query(IndexedDocument).filter(IndexedDocument.status == "deleted").count(),
+                "sharepoint_sync_rows": session.query(SharePointSyncState).count(),
+                "audit_events": session.query(AuditLog).count(),
             }
         finally:
             session.close()

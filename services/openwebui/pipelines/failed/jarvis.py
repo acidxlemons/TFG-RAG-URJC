@@ -60,7 +60,7 @@ class Pipeline:
         INDEXER_URL: str = "http://rag-indexer:8001"
 
     def __init__(self):
-        self.name = "europav-IA"
+        self.name = "JARVIS"
         self.valves = self.Valves()
         
         # --- MEMORIA DE SESIÓN (Por Usuario) ---

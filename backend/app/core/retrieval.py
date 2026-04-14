@@ -1,6 +1,6 @@
 # backend/app/core/retrieval.py
 """
-Hybrid Retrieval System para Enterprise RAG
+Hybrid Retrieval System para JARVIS RAG
 
 Este módulo implementa un sistema de búsqueda híbrida que combina:
 1. Dense embeddings (búsqueda semántica tradicional)
@@ -19,6 +19,9 @@ Ventajas:
 from __future__ import annotations
 
 import logging
+import os
+import re
+import unicodedata
 from typing import List, Dict, Optional, Any, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
@@ -32,10 +35,22 @@ from qdrant_client.models import (
     NamedVector,
     SparseVector,
 )
+
+try:
+    from qdrant_client.models import Prefetch, FusionQuery, Fusion
+    HYBRID_QUERY_AVAILABLE = True
+except ImportError:
+    Prefetch = None  # type: ignore[assignment]
+    FusionQuery = None  # type: ignore[assignment]
+    Fusion = None  # type: ignore[assignment]
+    HYBRID_QUERY_AVAILABLE = False
 from sentence_transformers import CrossEncoder
 import numpy as np
+from app.processing.embeddings.sentence_transformer import get_sparse_embedder
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 @dataclass
@@ -114,13 +129,16 @@ class HybridRetriever:
         self.encoder = embedding_model
         self.enable_reranking = enable_reranking
         self.default_alpha = default_alpha
+        self.sparse_embedder = get_sparse_embedder()
+        self.reranker_model_name = self._resolve_reranker_model_name(reranker_model_name)
+        self.reranker_device = (os.getenv("RERANKER_DEVICE", "cpu") or "cpu").strip().lower()
         
         # Inicializar reranker si está habilitado
         self.reranker = None
         if enable_reranking:
             try:
-                logger.info(f"Cargando modelo de reranking: {reranker_model_name}")
-                self.reranker = CrossEncoder(reranker_model_name, max_length=512)
+                logger.info(f"Cargando modelo de reranking: {self.reranker_model_name}")
+                self.reranker = self._load_reranker(self.reranker_model_name, self.reranker_device)
                 logger.info("✓ Reranker cargado correctamente")
             except Exception as e:
                 logger.warning(f"No se pudo cargar reranker: {e}. Reranking deshabilitado.")
@@ -130,6 +148,74 @@ class HybridRetriever:
             f"HybridRetriever inicializado (alpha={default_alpha}, "
             f"reranking={'ON' if self.enable_reranking else 'OFF'})"
         )
+
+    @staticmethod
+    def _resolve_reranker_model_name(model_name: str | None) -> str:
+        configured = (model_name or "").strip()
+        if not configured:
+            return DEFAULT_RERANKER_MODEL
+
+        looks_like_path = any(
+            marker in configured for marker in (os.sep, "/", "\\")
+        ) or configured.startswith(".")
+        if looks_like_path and not os.path.exists(configured):
+            logger.warning(
+                "RERANKER_MODEL apunta a '%s' pero no existe. Se usara '%s'.",
+                configured,
+                DEFAULT_RERANKER_MODEL,
+            )
+            return DEFAULT_RERANKER_MODEL
+
+        return configured
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        value = unicodedata.normalize("NFKD", (text or "").strip().lower())
+        return "".join(ch for ch in value if not unicodedata.combining(ch))
+
+    def _dedupe_results(self, results: List[SearchResult]) -> List[SearchResult]:
+        deduped: List[SearchResult] = []
+        seen = set()
+        for result in results:
+            metadata = result.metadata or {}
+            key = (
+                self._normalize_text(str(metadata.get("filename", ""))),
+                int(metadata.get("page") or 0),
+                self._normalize_text(result.text),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(result)
+        return deduped
+
+    def _load_reranker(self, model_name: str, device: str):
+        logger.info(f"Inicializando CrossEncoder en device={device}")
+        try:
+            return CrossEncoder(model_name, max_length=512, device=device)
+        except TypeError:
+            logger.warning("CrossEncoder no soporta parametro 'device'; se usa la configuracion por defecto.")
+            self.reranker_device = "default"
+            return CrossEncoder(model_name, max_length=512)
+
+    def _maybe_fallback_reranker_to_cpu(self, error: Exception) -> bool:
+        if self.reranker_device in {"cpu", "default"}:
+            return False
+
+        error_text = str(error).lower()
+        if "cuda" not in error_text and "cublas" not in error_text and "device-side" not in error_text:
+            return False
+
+        try:
+            logger.warning("Fallo CUDA en HybridRetriever; reintentando reranker en CPU.")
+            self.reranker = self._load_reranker(self.reranker_model_name, "cpu")
+            self.reranker_device = "cpu"
+            return True
+        except Exception as fallback_error:
+            logger.error(f"No se pudo mover el reranker a CPU: {fallback_error}")
+            self.reranker = None
+            self.enable_reranking = False
+            return False
     
     def search(
         self,
@@ -165,9 +251,12 @@ class HybridRetriever:
         # Determinar parámetros
         alpha = alpha if alpha is not None else self.default_alpha
         use_reranking = use_reranking if use_reranking is not None else self.enable_reranking
+        query_ids = self._extract_query_ids(query)
         
         # Para reranking, obtener más resultados inicialmente
         fetch_k = top_k * 3 if use_reranking else top_k
+        if query_ids:
+            fetch_k = max(fetch_k, top_k * 10)
         
         logger.info(
             f"Búsqueda: strategy={strategy}, top_k={top_k}, "
@@ -189,10 +278,30 @@ class HybridRetriever:
             )
         else:
             raise ValueError(f"Estrategia desconocida: {strategy}")
+
+        results = self._dedupe_results(results)
         
         # Reranking si está habilitado
         if use_reranking and self.reranker and len(results) > 1:
             results = self._rerank(query, results)
+
+        # Boost para IDs exactos (ej: M-003, CR-277).
+        if query_ids:
+            # 1. Recuperar proactivamente de Qdrant si no están en los Top-K
+            exact_matches = self._fetch_exact_id_matches(query_ids, collection_name, tenant_id, filters)
+            
+            # Unir evitando duplicados por doc_id
+            existing_ids = {r.id for r in results}
+            for e in exact_matches:
+                if e.id not in existing_ids:
+                    results.append(e)
+                    existing_ids.add(e.id)
+
+            results = self._dedupe_results(results)
+            
+            # Boosters de score
+            results = self._boost_exact_id_matches(results, query_ids)
+
         
         # Retornar top_k finales
         return results[:top_k]
@@ -227,15 +336,25 @@ class HybridRetriever:
             # Construir filtro
             search_filter = self._build_filter(tenant_id, filters)
             
-            # Búsqueda en Qdrant (usando query_points direct args)
-            search_results = self.qdrant.query_points(
-                collection_name=collection_name,
-                query=query_vector,
-                query_filter=search_filter,
-                limit=limit,
-                with_payload=True,
-            ).points
-            
+            # B?squeda en Qdrant (named vector si existe)
+            try:
+                search_results = self.qdrant.query_points(
+                    collection_name=collection_name,
+                    query=NamedVector(name="dense", vector=query_vector),
+                    query_filter=search_filter,
+                    limit=limit,
+                    with_payload=True,
+                ).points
+            except Exception:
+                # Fallback a colecci?n con vector ?nico
+                search_results = self.qdrant.query_points(
+                    collection_name=collection_name,
+                    query=query_vector,
+                    query_filter=search_filter,
+                    limit=limit,
+                    with_payload=True,
+                ).points
+
             # Convertir a SearchResult
             results = []
             for point in search_results:
@@ -274,28 +393,61 @@ class HybridRetriever:
         filters: Optional[Dict],
     ) -> List[SearchResult]:
         """
-        Búsqueda BM25 usando sparse vectors
-        
+        B?squeda BM25 usando sparse vectors
+
         BM25 es excelente para:
-        - Búsqueda por keywords exactas ("ISO 9001", "GDPR")
-        - Términos técnicos específicos
-        - Nombres propios, códigos, referencias
-        
+        - B?squeda por keywords exactas ("ISO 9001", "GDPR")
+        - T?rminos t?cnicos espec?ficos
+        - Nombres propios, c?digos, referencias
+
         Nota: Requiere que Qdrant tenga sparse vectors habilitados
         y que los documentos hayan sido indexados con BM25
         """
         try:
-            # Aquí implementarías la generación de sparse vectors
-            # Por ahora, retornamos lista vacía si no está implementado
-            # TODO: Implementar BM25 tokenization y sparse vector generation
-            
-            logger.warning("Sparse search aún no implementado completamente")
-            return []
-            
+            sparse_gen = list(self.sparse_embedder.embed([query]))[0]
+            sparse_query = SparseVector(
+                indices=sparse_gen.indices.tolist(),
+                values=sparse_gen.values.tolist(),
+            )
+
+            search_filter = self._build_filter(tenant_id, filters)
+
+            search_results = self.qdrant.query_points(
+                collection_name=collection_name,
+                query=sparse_query,
+                using="sparse",
+                query_filter=search_filter,
+                limit=limit,
+                with_payload=True,
+            ).points
+
+            results = []
+            for point in search_results:
+                payload = point.payload
+                metadata = {
+                    "filename": payload.get("filename", "unknown"),
+                    "page": payload.get("page"),
+                    "chunk_index": payload.get("chunk_index", 0),
+                    "from_ocr": payload.get("from_ocr", False),
+                    "source": payload.get("source", ""),
+                    "tenant_id": payload.get("tenant_id"),
+                }
+
+                results.append(SearchResult(
+                    id=str(point.id),
+                    text=payload.get("text", ""),
+                    score=point.score,
+                    metadata=metadata,
+                    sparse_score=point.score,
+                ))
+
+            logger.debug(f"Sparse search: {len(results)} resultados")
+            return results
+
         except Exception as e:
             logger.error(f"Error en sparse search: {e}")
             return []
-    
+
     def _hybrid_search(
         self,
         query: str,
@@ -306,46 +458,81 @@ class HybridRetriever:
         filters: Optional[Dict],
     ) -> List[SearchResult]:
         """
-        Búsqueda híbrida combinando dense + sparse con RRF
-        
-        Reciprocal Rank Fusion (RRF) es un método simple pero efectivo
-        para combinar rankings. La fórmula es:
-        
-        score(doc) = Σ (1 / (k + rank_i))
-        
-        Donde:
-        - k = 60 (constante típica)
-        - rank_i = posición del documento en el ranking i
-        - Σ suma sobre todos los rankings (dense, sparse)
-        
-        Ventajas de RRF:
-        - No requiere normalización de scores
-        - Robusto ante diferencias de escala entre rankings
-        - Simple pero muy efectivo en práctica
+        B?squeda h?brida combinando dense + sparse con RRF
+
+        Usa Prefetch + FusionQuery(RRF) de Qdrant para fusionar rankings.
         """
-        # Obtener resultados de ambas estrategias
-        dense_results = self._dense_search(
-            query, collection_name, limit, tenant_id, filters
-        )
-        sparse_results = self._sparse_search(
-            query, collection_name, limit, tenant_id, filters
-        )
-        
-        # Si sparse no retorna resultados, usar solo dense
-        if not sparse_results:
-            logger.debug("Sparse search sin resultados, usando solo dense")
-            return dense_results
-        
-        # Aplicar Reciprocal Rank Fusion (RRF)
-        fused = self._reciprocal_rank_fusion(
-            result_lists=[dense_results, sparse_results],
-            weights=[alpha, 1 - alpha],
-            k=60  # Constante típica de RRF
-        )
-        
-        logger.debug(f"Hybrid search: fusionados {len(fused)} resultados")
-        return fused
-    
+        if self.sparse_embedder is None:
+            logger.warning("Hybrid search sin sparse embedder. Fallback a dense-only.")
+            return self._dense_search(query, collection_name, limit, tenant_id, filters)
+
+        try:
+            if not HYBRID_QUERY_AVAILABLE:
+                dense_results = self._dense_search(query, collection_name, limit, tenant_id, filters)
+                sparse_results = self._sparse_search(query, collection_name, limit, tenant_id, filters)
+                fused = self._reciprocal_rank_fusion(
+                    [dense_results, sparse_results],
+                    weights=[alpha, 1.0 - alpha],
+                )
+                logger.debug(f"Hybrid search: {len(fused)} resultados (manual RRF fallback)")
+                return fused[:limit]
+
+            query_dense = self.encoder.encode(query)[0].tolist()
+            sparse_gen = list(self.sparse_embedder.embed([query]))[0]
+            sparse_query = SparseVector(
+                indices=sparse_gen.indices.tolist(),
+                values=sparse_gen.values.tolist(),
+            )
+            search_filter = self._build_filter(tenant_id, filters)
+
+            prefetch_requests = [
+                Prefetch(
+                    query=query_dense,
+                    using="dense",
+                    limit=int(limit),
+                    filter=search_filter,
+                ),
+                Prefetch(
+                    query=sparse_query,
+                    using="sparse",
+                    limit=int(limit),
+                    filter=search_filter,
+                ),
+            ]
+
+            search_results = self.qdrant.query_points(
+                collection_name=collection_name,
+                prefetch=prefetch_requests,
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=int(limit),
+                with_payload=True,
+            ).points
+
+            results = []
+            for point in search_results:
+                payload = point.payload
+                metadata = {
+                    "filename": payload.get("filename", "unknown"),
+                    "page": payload.get("page"),
+                    "chunk_index": payload.get("chunk_index", 0),
+                    "from_ocr": payload.get("from_ocr", False),
+                    "source": payload.get("source", ""),
+                    "tenant_id": payload.get("tenant_id"),
+                }
+
+                results.append(SearchResult(
+                    id=str(point.id),
+                    text=payload.get("text", ""),
+                    score=point.score,
+                    metadata=metadata,
+                ))
+
+            logger.debug(f"Hybrid search: {len(results)} resultados (Qdrant RRF)")
+            return results
+        except Exception as e:
+            logger.warning(f"Hybrid search fallback a dense-only: {e}")
+            return self._dense_search(query, collection_name, limit, tenant_id, filters)
+
     def _reciprocal_rank_fusion(
         self,
         result_lists: List[List[SearchResult]],
@@ -452,10 +639,121 @@ class HybridRetriever:
             return reranked
             
         except Exception as e:
+            if self._maybe_fallback_reranker_to_cpu(e) and self.reranker is not None:
+                try:
+                    pairs = [[query, c.text] for c in candidates]
+                    rerank_scores = self.reranker.predict(pairs)
+
+                    for i, candidate in enumerate(candidates):
+                        candidate.rerank_score = float(rerank_scores[i])
+                        candidate.score = candidate.rerank_score
+
+                    return sorted(candidates, key=lambda x: x.rerank_score, reverse=True)
+                except Exception as retry_error:
+                    logger.error(f"Error en reranking tras fallback a CPU: {retry_error}")
+                    return candidates
+
             logger.error(f"Error en reranking: {e}")
             # En caso de error, retornar candidatos sin reranker
             return candidates
     
+
+    def _extract_query_ids(self, query: str) -> List[str]:
+        tokens = re.findall(r"\b[A-Z]{1,8}-\d{2,8}\b", (query or "").upper())
+        return list(dict.fromkeys(tokens))
+
+    def _fetch_exact_id_matches(
+        self,
+        query_ids: List[str],
+        collection_name: str,
+        tenant_id: Optional[str],
+        filters: Optional[Dict],
+    ) -> List[SearchResult]:
+        """
+        Busca proactivamente los documentos que contengan exactamente el ID solicitado
+        para asegurar que entren en el 'candidate pool' del RAG antes del re-ranker.
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchText
+        
+        results = []
+        base_must = []
+        if tenant_id:
+            base_must.append(FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id)))
+        
+        if filters:
+            # TODO: mezclar 'must' adicionales de additional_filters si los hubiera
+            pass
+            
+        for qid in query_ids:
+            query_filter = Filter(
+                must=base_must + [
+                    FieldCondition(
+                        key="filename",
+                        match=MatchText(text=qid)
+                    )
+                ]
+            )
+            
+            try:
+                # Recuperar hasta 10 fragmentos con ese ID exacto
+                points = self.qdrant.scroll(
+                    collection_name=collection_name,
+                    scroll_filter=query_filter,
+                    limit=10,
+                    with_payload=True,
+                    with_vectors=False
+                )[0]
+                
+                logger.debug(f"_fetch_exact_id_matches for '{qid}': found {len(points)} points")
+                
+                for point in points:
+                    payload = point.payload
+                    metadata = {
+                        "filename": payload.get("filename", "unknown"),
+                        "page": payload.get("page"),
+                        "chunk_index": payload.get("chunk_index", 0),
+                        "from_ocr": payload.get("from_ocr", False),
+                        "source": payload.get("source", ""),
+                        "tenant_id": payload.get("tenant_id"),
+                    }
+                    
+                    # Le asignamos un score arbitrario alto temporal
+                    # porque luego _boost_exact_id_matches lo multiplicará
+                    results.append(SearchResult(
+                        id=str(point.id),
+                        text=payload.get("text", ""),
+                        score=1.0, 
+                        metadata=metadata,
+                        dense_score=1.0,
+                    ))
+            except Exception as e:
+                logger.warning(f"Error forzando fetch de ID exacto '{qid}': {e}")
+                
+        return results
+
+    def _has_exact_id(self, text: str, token: str) -> bool:
+        if not text:
+            return False
+        pattern = rf"(?<![A-Z0-9]){re.escape(token.upper())}(?![A-Z0-9])"
+        return re.search(pattern, text.upper()) is not None
+
+    def _boost_exact_id_matches(self, results: List[SearchResult], query_ids: List[str]) -> List[SearchResult]:
+        def _priority(r: SearchResult):
+            meta = r.metadata or {}
+            filename = str(meta.get("filename") or "")
+            source = str(meta.get("source") or "")
+            text = str(r.text or "")[:500]
+
+            fname_hits = sum(1 for t in query_ids if self._has_exact_id(filename, t))
+            source_hits = sum(1 for t in query_ids if self._has_exact_id(source, t))
+            text_hits = sum(1 for t in query_ids if self._has_exact_id(text, t))
+
+            # filename > source > text > score base
+            priority = (fname_hits * 100) + (source_hits * 10) + text_hits
+            return (priority, float(r.score or 0.0))
+
+        return sorted(results, key=_priority, reverse=True)
+
     def _build_filter(
         self,
         tenant_id: Optional[str],
@@ -488,13 +786,60 @@ class HybridRetriever:
                 )
             )
         
-        # Filtros adicionales
-        # TODO: Implementar parsing de additional_filters
-        # Por ahora solo soportamos tenant_id
-        
+        # Filtros adicionales (date_range, source_type, filename, from_ocr, source)
+        if additional_filters:
+            # Filtro por tipo de fuente: sharepoint, upload, scrape, web
+            source_type = additional_filters.get("source_type")
+            if source_type:
+                if isinstance(source_type, list):
+                    # OR: varios tipos permitidos (Qdrant no soporta OR en must directo)
+                    conditions.append(
+                        FieldCondition(key="source_type", match=MatchValue(value=source_type[0]))
+                    )
+                else:
+                    conditions.append(
+                        FieldCondition(key="source_type", match=MatchValue(value=source_type))
+                    )
+
+            # Filtro por nombre de archivo (texto parcial)
+            filename = additional_filters.get("filename")
+            if filename:
+                from qdrant_client.models import MatchText
+                conditions.append(
+                    FieldCondition(key="filename", match=MatchText(text=filename))
+                )
+
+            # Filtro por rango de fechas (epoch seconds: {"gte": 1700000000, "lte": 1800000000})
+            date_range = additional_filters.get("date_range")
+            if date_range and isinstance(date_range, dict):
+                from qdrant_client.models import Range
+                range_kwargs = {}
+                if "gte" in date_range:
+                    range_kwargs["gte"] = float(date_range["gte"])
+                if "lte" in date_range:
+                    range_kwargs["lte"] = float(date_range["lte"])
+                if range_kwargs:
+                    conditions.append(
+                        FieldCondition(key="ingested_at_ts", range=Range(**range_kwargs))
+                    )
+
+            # Excluir o incluir documentos OCR
+            from_ocr = additional_filters.get("from_ocr")
+            if from_ocr is not None:
+                conditions.append(
+                    FieldCondition(key="from_ocr", match=MatchValue(value=bool(from_ocr)))
+                )
+
+            # Filtro por colección de origen
+            source = additional_filters.get("source")
+            if source:
+                conditions.append(
+                    FieldCondition(key="source", match=MatchValue(value=source))
+                )
+
         if not conditions:
             return None
-        
+
         return Filter(must=conditions)
     
     def search_multi_collection(
@@ -534,6 +879,7 @@ class HybridRetriever:
         # Determinar parámetros
         alpha = alpha if alpha is not None else self.default_alpha
         use_reranking = use_reranking if use_reranking is not None else self.enable_reranking
+        query_ids = self._extract_query_ids(query)
         
         # Obtener más resultados por colección si vamos a reranker
         per_collection_k = max(top_k, 5) if use_reranking else top_k

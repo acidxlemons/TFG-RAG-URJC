@@ -9,8 +9,12 @@ from __future__ import annotations
 
 import logging
 import os
+import json
+import hashlib
+import threading
 from typing import List, Union, Optional
 import numpy as np
+import redis
 
 from sentence_transformers import SentenceTransformer
 
@@ -62,6 +66,18 @@ class EmbeddingGenerator:
 
         self.vector_dim = self.model.get_sentence_embedding_dimension()
 
+        # Configurar Redis cache
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        try:
+            self.redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+            self.redis_client.ping()
+            self.use_cache = True
+            logger.info(f"✅ Caché Redis conectada en {redis_url} para embeddings")
+        except Exception as e:
+            self.use_cache = False
+            self.redis_client = None
+            logger.warning(f"⚠️ No se pudo conectar a Redis en {redis_url}, caché deshabilitada: {e}")
+
         logger.info(f"✅ Modelo cargado (dim={self.vector_dim})")
 
     def encode(
@@ -84,17 +100,52 @@ class EmbeddingGenerator:
 
         if not texts:
             return np.array([])
+            
+        vectors = []
+        indices_to_compute = []
+        
+        if self.use_cache:
+            for idx, text in enumerate(texts):
+                cache_key = f"emb:{self.model_name}:{hashlib.md5(text.encode('utf-8')).hexdigest()}"
+                cached_vec = None
+                try:
+                    raw = self.redis_client.get(cache_key)
+                    if raw:
+                        cached_vec = json.loads(raw)
+                except Exception as redis_err:
+                    logger.debug(f"Redis get fallado (bypass silencioso): {redis_err}")
 
-        vectors = self.model.encode(
-            texts,
-            batch_size=self.batch_size,
-            show_progress_bar=show_progress,
-            convert_to_numpy=True,
-            normalize_embeddings=self.normalize,
-            device="cpu",  # reforzamos CPU tambien aqui
-        )
-
-        return vectors
+                if cached_vec is not None:
+                    vectors.append(cached_vec)
+                else:
+                    vectors.append(None)  # Placeholder
+                    indices_to_compute.append((idx, text, cache_key))
+        else:
+            indices_to_compute = [(idx, text, None) for idx, text in enumerate(texts)]
+            vectors = [None] * len(texts)
+            
+        if indices_to_compute:
+            texts_to_compute = [t for _, t, _ in indices_to_compute]
+            new_vectors = self.model.encode(
+                texts_to_compute,
+                batch_size=self.batch_size,
+                show_progress_bar=show_progress,
+                convert_to_numpy=True,
+                normalize_embeddings=self.normalize,
+                device="cpu",  # reforzamos CPU tambien aqui
+            )
+            
+            for i, (orig_idx, _, cache_key) in enumerate(indices_to_compute):
+                vec = new_vectors[i].tolist()
+                vectors[orig_idx] = vec
+                if self.use_cache and cache_key:
+                    try:
+                        # Guardar en caché por 24 horas (86400 segundos)
+                        self.redis_client.setex(cache_key, 86400, json.dumps(vec))
+                    except Exception as redis_err:
+                        logger.debug(f"Redis setex fallado (bypass silencioso): {redis_err}")
+                    
+        return np.array(vectors)
 
     def encode_batch(
         self,
@@ -151,10 +202,15 @@ class EmbeddingGenerator:
 
 
 # ============================================
-# Instancia global (singleton pattern)
+# Instancia global (singleton thread-safe)
 # ============================================
 
 _global_embedder: Optional[EmbeddingGenerator] = None
+_embedder_lock = threading.Lock()
+
+_global_sparse_embedder = None
+_sparse_embedder_unavailable = False
+_sparse_embedder_lock = threading.Lock()
 
 
 def get_embedder(
@@ -162,25 +218,51 @@ def get_embedder(
     force_reload: bool = False,
 ) -> EmbeddingGenerator:
     """
-    Obtiene instancia global del embedder (singleton).
-    
+    Obtiene instancia global del embedder (singleton thread-safe).
+
     Args:
         model_name: Nombre del modelo (si None, usa default)
         force_reload: Fuerza recarga del modelo
-    
+
     Returns:
         EmbeddingGenerator configurado
     """
     global _global_embedder
 
     if _global_embedder is None or force_reload:
-        model = model_name or os.getenv(
-            "EMBEDDING_MODEL",
-            "paraphrase-multilingual-MiniLM-L12-v2"
-        )
-        _global_embedder = EmbeddingGenerator(model_name=model)
+        with _embedder_lock:
+            # Double-checked locking: re-verificar dentro del lock
+            if _global_embedder is None or force_reload:
+                model = model_name or os.getenv(
+                    "EMBEDDING_MODEL",
+                    "paraphrase-multilingual-MiniLM-L12-v2"
+                )
+                _global_embedder = EmbeddingGenerator(model_name=model)
 
     return _global_embedder
+
+
+def get_sparse_embedder():
+    """Obtiene instancia global del embedder disperso BM25 (thread-safe)."""
+    global _global_sparse_embedder, _sparse_embedder_unavailable
+
+    if _global_sparse_embedder is None and not _sparse_embedder_unavailable:
+        with _sparse_embedder_lock:
+            # Double-checked locking
+            if _global_sparse_embedder is None and not _sparse_embedder_unavailable:
+                try:
+                    from fastembed import SparseTextEmbedding
+                except ImportError:
+                    logger.warning(
+                        "fastembed no esta instalado. BM25 sparse deshabilitado; se usara dense-only."
+                    )
+                    _sparse_embedder_unavailable = True
+                    return None
+
+                logger.info("Cargando BM25 Sparse Embedder...")
+                _global_sparse_embedder = SparseTextEmbedding("Qdrant/bm25")
+
+    return _global_sparse_embedder
 
 
 # ============================================
