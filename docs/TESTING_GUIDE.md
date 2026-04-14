@@ -37,7 +37,7 @@
 ### 1.1 Verificar Build Completado
 
 ```powershell
-cd c:\enterprise-tfg-system
+cd c:\TFG-RAG-Clean
 
 # Ver estado de todos los servicios
 docker compose ps
@@ -180,18 +180,20 @@ docker compose exec ollama ollama list
 **Esperado**:
 ```
 NAME                            SIZE
-llama3.1:8b-instruct-q8_0      8.0GB
-llama3.1:8b-instruct-q4_0      4.3GB
-llava:13b                      7.9GB
+qwen2.5:32b-instruct-q4_K_M    19GB
 qwen2.5vl:7b                   6.0GB
+rag-qwen-ft:latest             ~8GB
 ```
 
 **Si falta algún modelo**:
 ```powershell
-docker compose exec ollama ollama pull llama3.1:8b-instruct-q8_0
-docker compose exec ollama ollama pull llava:13b
+docker compose exec ollama ollama pull qwen2.5:32b-instruct-q4_K_M
 docker compose exec ollama ollama pull qwen2.5vl:7b
 ```
+
+**Nota**:
+`rag-qwen-ft:latest` es un modelo ajustado del proyecto. Si no aparece en `ollama list`,
+hay que crearlo explícitamente a partir del modelo base y del adaptador LoRA del proyecto.
 
 ---
 
@@ -461,7 +463,7 @@ Los PDFs escaneados (sin texto seleccionable) **NO funcionan** en chat directo.
 **Solución**: Usar la carpeta `data/watch/`:
 ```powershell
 # 1. Copiar PDF escaneado a watch
-Copy-Item "C:\ruta\pdf_escaneado.pdf" "C:\enterprise-tfg-system\data\watch\"
+Copy-Item "C:\ruta\pdf_escaneado.pdf" "C:\TFG-RAG-Clean\data\watch\"
 
 # 2. Forzar procesamiento con OCR
 Invoke-RestMethod -Method Post -Uri http://localhost:8003/scan
@@ -482,7 +484,7 @@ Start-Sleep 30
 ```powershell
 # Crear archivo de prueba
 $testContent = "Este es un documento de prueba para el sistema RAG."
-Set-Content -Path "C:\enterprise-tfg-system\data\watch\test_ingestion.txt" -Value $testContent
+Set-Content -Path "C:\TFG-RAG-Clean\data\watch\test_ingestion.txt" -Value $testContent
 
 # Forzar escaneo
 Invoke-RestMethod -Method Post -Uri http://localhost:8003/scan
@@ -526,7 +528,7 @@ Cuando eliminas un archivo de `data/watch/`, se elimina automáticamente de Qdra
 
 ```powershell
 # Eliminar archivo
-Remove-Item "C:\enterprise-tfg-system\data\watch\test_ingestion.txt"
+Remove-Item "C:\TFG-RAG-Clean\data\watch\test_ingestion.txt"
 
 # Verificar que se borró de Qdrant
 Invoke-RestMethod -Uri http://localhost:8002/documents/list
@@ -943,7 +945,7 @@ Invoke-RestMethod http://localhost:8002/documents/stats
 # Si points_count = 0, no hay docs
 
 # 2. Copiar PDF de prueba
-Copy-Item "C:\documento.pdf" "c:\enterprise-tfg-system\data\watch\"
+Copy-Item "C:\documento.pdf" "c:\TFG-RAG-Clean\data\watch\"
 
 # 3. Ver logs indexer
 docker compose logs tfg-indexer -f

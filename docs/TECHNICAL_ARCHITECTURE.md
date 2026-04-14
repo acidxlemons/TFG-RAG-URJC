@@ -2572,7 +2572,7 @@ graph TD
 Script de despliegue automatizado para Windows:
 
 ```powershell
-# Ejecutar desde: C:\enterprise-tfg-system
+# Ejecutar desde: C:\TFG-RAG-Clean
 .\deploy.ps1
 ```
 
