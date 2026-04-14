@@ -43,11 +43,11 @@
                     "fields": "",
                     "values": false
                 },
-                "orientation": "horizontal",
+                "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "value",
+                "colorMode": "background",
                 "graphMode": "none",
-                "justifyMode": "center"
+                "justifyMode": "auto"
             },
             "fieldConfig": {
                 "defaults": {

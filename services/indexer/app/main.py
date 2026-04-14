@@ -21,6 +21,7 @@ from typing import Optional, Dict, List
 
 import time
 import requests
+from datetime import datetime
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Header
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
@@ -243,6 +244,88 @@ def _report_status(filename: str, status: str, message: str = ""):
     except Exception as e:
         logger.warning(f"No se pudo reportar status {status} para {filename}: {e}")
 
+
+def _report_sharepoint_sync_state(
+    *,
+    site_id: str,
+    folder_path: str,
+    collection_name: Optional[str] = None,
+    site_name: Optional[str] = None,
+    delta_token: Optional[str] = None,
+    status: str = "success",
+    downloaded_files: int = 0,
+    indexed_files: int = 0,
+    errors: int = 0,
+    message: str = "",
+    is_active: bool = True,
+) -> None:
+    """Persistencia best-effort del estado SharePoint en el backend."""
+    if INDEX_MODE != "backend":
+        return
+    try:
+        requests.post(
+            f"{BACKEND_URL}/documents/sharepoint-sync/report",
+            json={
+                "site_id": site_id,
+                "folder_path": folder_path,
+                "collection_name": collection_name,
+                "site_name": site_name,
+                "delta_token": delta_token,
+                "last_sync": datetime.utcnow().isoformat() + "Z",
+                "status": status,
+                "downloaded_files": downloaded_files,
+                "indexed_files": indexed_files,
+                "errors": errors,
+                "message": message,
+                "is_active": is_active,
+            },
+            timeout=10,
+        )
+    except Exception as e:
+        logger.warning("No se pudo reportar estado SharePoint para %s: %s", site_name or site_id, e)
+
+
+def _ensure_backend_collections(collection_names: List[str]) -> None:
+    """Pide al backend crear colecciones híbridas necesarias para multi-site."""
+    if INDEX_MODE != "backend":
+        return
+
+    names = [c.strip() for c in collection_names if isinstance(c, str) and c.strip()]
+    names = list(dict.fromkeys(names))
+    if not names:
+        return
+
+    payload = {"collections": names}
+    url = f"{BACKEND_URL}/documents/collections/ensure"
+    attempts = 0
+    last_error = None
+
+    while attempts < 3:
+        attempts += 1
+        try:
+            resp = requests.post(url, json=payload, timeout=30)
+            if resp.status_code >= 300:
+                raise RuntimeError(f"{resp.status_code} {resp.text[:300]}")
+            data = resp.json()
+            logger.info(
+                "✓ Colecciones aseguradas en backend: requested=%s created=%s hybrid_ok=%s status=%s",
+                data.get("requested"),
+                data.get("created"),
+                data.get("hybrid_ok"),
+                data.get("status"),
+            )
+            return
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                "No se pudo asegurar colecciones en backend (intento %s/3): %s",
+                attempts,
+                e,
+            )
+            time.sleep(1.5 * attempts)
+
+    logger.error("Fallo asegurando colecciones en backend tras reintentos: %s", last_error)
+
 def _delete_from_backend(filename: str):
     """Solicita borrado al backend"""
     if INDEX_MODE != "backend":
@@ -287,13 +370,17 @@ def _upload_to_backend(file_path: str, filename: str, metadata: Dict, tenant_id:
     """Sube archivo al backend con tenant_id opcional (para multi-site)"""
     effective_tenant = tenant_id or INDEX_TENANT_ID
     logger.info(f"[backend] Enviando '{filename}' al backend (tenant={effective_tenant})")
-    
+
     with open(file_path, "rb") as f:
         content_b64 = base64.b64encode(f.read()).decode("utf-8")
 
     headers = {}
     if effective_tenant:
         headers["X-Tenant-Id"] = effective_tenant
+
+    payload_metadata = dict(metadata or {})
+    payload_metadata.setdefault("source_path", file_path)
+    payload_metadata["collection_name"] = effective_tenant or os.getenv("QDRANT_COLLECTION", "documents")
 
     # Retry suave (red transitoria)
     attempts = 0
@@ -302,7 +389,7 @@ def _upload_to_backend(file_path: str, filename: str, metadata: Dict, tenant_id:
         try:
             resp = requests.post(
                 f"{BACKEND_URL}/documents/upload",
-                json={"filename": filename, "content_base64": content_b64, "metadata": metadata or {}},
+                json={"filename": filename, "content_base64": content_b64, "metadata": payload_metadata},
                 timeout=600,
                 headers=headers or None,
             )
@@ -343,7 +430,7 @@ def process_path(file_path: str, metadata: Optional[Dict] = None, tenant_id: Opt
         logger.debug(f"Saltando archivo interno: {filename}")
         return
     
-    base_meta = {"source": (metadata or {}).get("source")}
+    base_meta = {"source": (metadata or {}).get("source"), "source_path": str(fp)}
     # Añadir site_name si viene en metadata
     if metadata and metadata.get("site"):
         base_meta["site"] = metadata["site"]
@@ -429,6 +516,11 @@ def scheduled_job():
     
     # 2. Multi-site SharePoint sync (NUEVO)
     if multi_sync:
+        try:
+            _ensure_backend_collections(multi_sync.get_collection_names())
+        except Exception as e:
+            logger.warning(f"No se pudieron asegurar colecciones antes del sync: {e}")
+
         logger.info("⏳ Sincronizando múltiples sitios SharePoint...")
         
         # Inicializar métricas para cada sitio
@@ -485,16 +577,34 @@ def scheduled_job():
             for site in multi_sync.sites:
                 site_name = site.name
                 stats = site_stats.get(site_name, {"downloaded": 0, "indexed": 0, "errors": 0})
+                sync_bundle = multi_sync.synchronizers.get(site_name, {})
+                sync_obj = sync_bundle.get("sync")
+                delta_token = sync_obj._load_delta_token() if sync_obj else None
                 
                 # Determinar status del sync
                 if stats["errors"] > 0 and stats["indexed"] == 0:
+                    sync_status = "error"
                     sharepoint_sync_total.labels(site=site_name, status="error").inc()
                 else:
+                    sync_status = "success"
                     sharepoint_sync_total.labels(site=site_name, status="success").inc()
                 
                 sharepoint_sync_in_progress.labels(site=site_name).set(0)
                 sharepoint_last_sync_timestamp.labels(site=site_name).set(time.time())
                 sharepoint_sync_duration.labels(site=site_name).set(sync_duration)
+                _report_sharepoint_sync_state(
+                    site_id=site.site_id,
+                    folder_path=site.folder_path,
+                    collection_name=site.collection_name,
+                    site_name=site_name,
+                    delta_token=delta_token,
+                    status=sync_status,
+                    downloaded_files=stats["downloaded"],
+                    indexed_files=stats["indexed"],
+                    errors=stats["errors"],
+                    message=f"Sync {sync_status}: downloaded={stats['downloaded']} indexed={stats['indexed']} errors={stats['errors']}",
+                    is_active=site.enabled,
+                )
                 
                 if stats["downloaded"] > 0 or stats["indexed"] > 0:
                     logger.info(f"📊 {site_name}: {stats['downloaded']} descargados, {stats['indexed']} indexados, {stats['errors']} errores")
@@ -505,6 +615,22 @@ def scheduled_job():
             for site in multi_sync.sites:
                 sharepoint_sync_total.labels(site=site.name, status="error").inc()
                 sharepoint_sync_in_progress.labels(site=site.name).set(0)
+                sync_bundle = multi_sync.synchronizers.get(site.name, {})
+                sync_obj = sync_bundle.get("sync")
+                delta_token = sync_obj._load_delta_token() if sync_obj else None
+                _report_sharepoint_sync_state(
+                    site_id=site.site_id,
+                    folder_path=site.folder_path,
+                    collection_name=site.collection_name,
+                    site_name=site.name,
+                    delta_token=delta_token,
+                    status="error",
+                    downloaded_files=0,
+                    indexed_files=0,
+                    errors=1,
+                    message=str(e),
+                    is_active=site.enabled,
+                )
     
     # 3. Single-site SharePoint sync (legacy)
     elif sp_sync:
@@ -527,10 +653,36 @@ def scheduled_job():
             sharepoint_sync_in_progress.labels(site="legacy").set(0)
             sharepoint_last_sync_timestamp.labels(site="legacy").set(time.time())
             sharepoint_sync_duration.labels(site="legacy").set(time.time() - sync_start_time)
+            _report_sharepoint_sync_state(
+                site_id=SHAREPOINT_DRIVE_ID or SHAREPOINT_SITE_ID or "legacy",
+                folder_path=SHAREPOINT_FOLDER_PATH,
+                collection_name=INDEX_TENANT_ID or os.getenv("QDRANT_COLLECTION", "documents"),
+                site_name="legacy",
+                delta_token=sp_sync._load_delta_token(),
+                status="success",
+                downloaded_files=len(changes),
+                indexed_files=indexed_count,
+                errors=max(0, len(changes) - indexed_count),
+                message=f"Legacy sync: downloaded={len(changes)} indexed={indexed_count}",
+                is_active=True,
+            )
         except Exception as e:
             logger.error(f"Delta sync SharePoint falló: {e}")
             sharepoint_sync_total.labels(site="legacy", status="error").inc()
             sharepoint_sync_in_progress.labels(site="legacy").set(0)
+            _report_sharepoint_sync_state(
+                site_id=SHAREPOINT_DRIVE_ID or SHAREPOINT_SITE_ID or "legacy",
+                folder_path=SHAREPOINT_FOLDER_PATH,
+                collection_name=INDEX_TENANT_ID or os.getenv("QDRANT_COLLECTION", "documents"),
+                site_name="legacy",
+                delta_token=sp_sync._load_delta_token(),
+                status="error",
+                downloaded_files=0,
+                indexed_files=0,
+                errors=1,
+                message=str(e),
+                is_active=True,
+            )
 
 # =========================
 # Lifecycle
@@ -551,6 +703,14 @@ async def startup_event():
     )
     scheduler.start()
     logger.info(f"✓ Scheduler iniciado (intervalo: {SYNC_INTERVAL}s)")
+
+    # Multi-site: asegurar desde el inicio que todas las colecciones configuradas existen.
+    # Así nuevos documentos se indexan automáticamente sin depender del primer upsert.
+    if multi_sync:
+        try:
+            _ensure_backend_collections(multi_sync.get_collection_names())
+        except Exception as e:
+            logger.warning(f"No se pudieron asegurar colecciones multi-site al inicio: {e}")
 
     if SYNC_ON_START and sp_sync:
         logger.info("FULL sync SharePoint inicial…")

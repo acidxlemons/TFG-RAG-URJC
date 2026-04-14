@@ -35,7 +35,7 @@ async def health_check():
 async def root():
     """Root endpoint"""
     return {
-        "name": "Enterprise RAG System API",
+        "name": "JARVIS RAG System API",
         "version": "2.1.0",
         "docs": "/docs",
     }

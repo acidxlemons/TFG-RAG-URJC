@@ -3,7 +3,7 @@
 Esquemas Pydantic para el endpoint /chat y /chat/stream.
 
 Estos modelos definen la estructura de las peticiones y respuestas del sistema
-de chat del Enterprise RAG System. Se usan tanto en el endpoint síncrono (/chat)
+de chat del sistema JARVIS RAG. Se usan tanto en el endpoint síncrono (/chat)
 como en el endpoint de streaming (/chat/stream).
 """
 

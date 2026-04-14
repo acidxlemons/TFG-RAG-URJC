@@ -45,14 +45,21 @@ pull_model() {
   return 0
 }
 
-# Descargar modelos
-pull_model "llama3.1:8b-instruct-q8_0"
-pull_model "llama3.1:8b-instruct-q4_0"
+# Modelos actualmente usados por la configuración de LiteLLM/OpenWebUI
+pull_model "qwen2.5:32b-instruct-q4_K_M"
+pull_model "qwen2.5vl:7b"
 
-# Modelo de visión (opcional)
-if [ "${DOWNLOAD_VISION_MODEL:-false}" = "true" ]; then
+# Modelos legacy opcionales, por compatibilidad con pruebas antiguas
+if [ "${DOWNLOAD_LEGACY_MODELS:-false}" = "true" ]; then
+  pull_model "llama3.1:8b-instruct-q8_0"
+  pull_model "llama3.1:8b-instruct-q4_0"
   pull_model "llava:13b"
 fi
+
+echo ""
+echo "Nota: el alias principal 'JARVIS' apunta a 'rag-qwen-ft:latest'."
+echo "Si ese modelo fine-tuned no existe en Ollama, debes crearlo manualmente"
+echo "o usar temporalmente qwen2.5:32b-instruct-q4_K_M como modelo principal."
 
 echo ""
 echo "Todos los modelos listos"

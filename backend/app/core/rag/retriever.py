@@ -8,6 +8,7 @@ Implementa búsqueda semántica con sistema de citas obligatorio
 from typing import List, Dict, Optional, Tuple, Union
 from dataclasses import dataclass
 from datetime import datetime
+import re
 
 import logging
 import numpy as np
@@ -16,11 +17,22 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Filter,
     FieldCondition,
+    MatchText,
     MatchValue,
     Range,
+    SparseVector,
 )
 
-from app.processing.embeddings.sentence_transformer import get_embedder
+try:
+    from qdrant_client.models import Prefetch, FusionQuery, Fusion
+    HYBRID_QUERY_AVAILABLE = True
+except ImportError:
+    Prefetch = None  # type: ignore[assignment]
+    FusionQuery = None  # type: ignore[assignment]
+    Fusion = None  # type: ignore[assignment]
+    HYBRID_QUERY_AVAILABLE = False
+
+from app.processing.embeddings.sentence_transformer import get_embedder, get_sparse_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +73,23 @@ class RAGRetriever:
         top_k: int = 5,
         score_threshold: float = 0.7,
         tenant_id: Optional[str] = None,
+        reranker=None,
     ):
         self.client = qdrant_client
         self.collection_name = collection_name
         self.top_k = top_k
         self.score_threshold = score_threshold
         self.tenant_id = tenant_id
+        self.reranker = reranker
 
         # Embeddings compartidos (singleton)
         logger.info(f"Inicializando embedder: {embedding_model}")
         self.embedder = get_embedder(model_name=embedding_model)
+        
+        logger.info(f"Inicializando sparse embedder BM25")
+        self.sparse_embedder = get_sparse_embedder()
+        if self.sparse_embedder is None:
+            logger.warning("Sparse embedder no disponible. RAGRetriever usara dense-only.")
 
         logger.info(f"RAG Retriever inicializado para colección: {collection_name}")
 
@@ -122,12 +141,22 @@ class RAGRetriever:
         log_query = (query or "")[:200].replace("\n", " ")
         logger.info(f"Qdrant.search: '{log_query}…' (collection={target_collection}, k={k}, threshold={self.score_threshold:.2f}, tenant={eff_tenant})")
 
-        # Vectorizar query
+        # Vectorizar query (Dense)
         query_vec = self.embedder.encode(query)[0]  # np.ndarray (dim,)
+        
+        # Vectorizar query (Sparse)
+        sparse_indices: List[int] = []
+        sparse_values: List[float] = []
+        if self.sparse_embedder is not None:
+            sparse_gen = list(self.sparse_embedder.embed([query]))[0]
+            sparse_indices = sparse_gen.indices.tolist()
+            sparse_values = sparse_gen.values.tolist()
 
-        # 1) Búsqueda con umbral
+        # 1) Búsqueda con umbral (Fusión híbrida)
         hits = self._search_raw(
-            query_vector=query_vec.tolist(),
+            query_dense=query_vec.tolist(),
+            sparse_indices=sparse_indices,
+            sparse_values=sparse_values,
             limit=k * 2,
             qdrant_filter=qdrant_filter,
             score_threshold=self.score_threshold,
@@ -138,19 +167,46 @@ class RAGRetriever:
         if not hits:
             logger.info("Sin resultados por encima del score_threshold. Reintentando sin umbral…")
             hits = self._search_raw(
-                query_vector=query_vec.tolist(),
+                query_dense=query_vec.tolist(),
+                sparse_indices=sparse_indices,
+                sparse_values=sparse_values,
                 limit=k * 2,
                 qdrant_filter=qdrant_filter,
                 score_threshold=None,  # sin umbral
                 collection_name=target_collection,
             )
 
-        # Transformar, desduplicar, MMR y truncar
-        results = self._hits_to_results(hits)
-        results = self._dedupe_results(results)
-        results = self.mmr_rerank(query, results, lambda_mult=0.5)[:k]
+        query_ids = self._extract_query_ids(query)
 
-        logger.info(f"Recuperados {len(results)} documentos relevantes tras MMR")
+        # Transformar resultados de búsqueda vectorial.
+        results = self._hits_to_results(hits)
+
+        # Para consultas con IDs explícitos (AL-08, M-003, etc.),
+        # recuperamos proactivamente chunks por coincidencia textual de payload.
+        if query_ids:
+            exact_matches = self._fetch_exact_id_matches(
+                query_ids=query_ids,
+                collection_name=target_collection,
+                tenant_id=eff_tenant,
+                source=filter_by_source,
+                exclude_ocr=exclude_ocr,
+            )
+            if exact_matches:
+                results.extend(exact_matches)
+
+        results = self._dedupe_results(results)
+
+        if getattr(self, "reranker", None) and getattr(self.reranker, "model", None):
+            results = self.reranker.rerank(query, results, top_k=k)
+        else:
+            results = self.mmr_rerank(query, results, lambda_mult=0.5)[:k]
+
+        # Boost determinista para consultas tipo ID (ej: M-003, CR-277).
+        # Evita que MMR o similitud semántica escondan coincidencias exactas.
+        if query_ids:
+            results = self._boost_exact_id_matches(results, query_ids)[:k]
+
+        logger.info(f"Recuperados {len(results)} documentos relevantes tras reranking")
         return results
 
     def retrieve_multi_collection(
@@ -162,31 +218,21 @@ class RAGRetriever:
         tenant_id: Optional[str] = None,
     ) -> List[RetrievalResult]:
         """
-        Recupera documentos de múltiples colecciones simultáneamente.
-        
+        Recupera documentos de m?ltiples colecciones simult?neamente.
+
         Fusiona resultados de todas las colecciones y aplica MMR reranking global.
-        
-        Args:
-            query: Consulta del usuario
-            collections: Lista de nombres de colecciones a buscar
-            top_k: Número total de resultados (None = usar default)
-            filter_by_filenames: Lista de nombres de archivo
-            tenant_id: Forzar tenant
-            
-        Returns:
-            Lista de RetrievalResult fusionados y rerankeados
         """
         k = int(top_k or self.top_k)
         all_results: List[RetrievalResult] = []
-        
+
         if not collections:
             collections = [self.collection_name]
-        
+
         logger.info(f"Buscando en {len(collections)} colecciones: {collections}")
-        
-        # Buscar en cada colección
+
+        # Buscar en cada colecci?n
         per_collection_limit = max(3, k // len(collections) + 2)
-        
+
         for collection in collections:
             try:
                 results = self.retrieve(
@@ -196,65 +242,131 @@ class RAGRetriever:
                     tenant_id=tenant_id,
                     collection_name=collection,
                 )
-                
-                # Agregar metadata de colección para tracking
+
+                # Agregar metadata de colecci?n para tracking
                 for r in results:
-                    # Store collection in source if not already there
                     if not r.source.startswith(f"[{collection}]"):
                         r.source = f"[{collection}] {r.source}"
-                
+
                 all_results.extend(results)
                 logger.debug(f"  - {collection}: {len(results)} resultados")
-                
+
             except Exception as e:
-                logger.warning(f"Error buscando en {collection}: {e}")
-                continue
-        
-        if not all_results:
-            logger.info("Sin resultados en ninguna colección")
-            return []
-        
-        # Desduplicar por contenido similar
-        all_results = self._dedupe_results(all_results)
-        
-        # Aplicar MMR reranking global
+                logger.error(f"Error buscando en colecci?n {collection}: {e}")
+
+        # Aplicar reranking global
         if len(all_results) > 1:
-            all_results = self.mmr_rerank(query, all_results, lambda_mult=0.5)
-        
+            if getattr(self, "reranker", None) and getattr(self.reranker, "model", None):
+                all_results = self.reranker.rerank(query, all_results, top_k=k)
+            else:
+                all_results = self.mmr_rerank(query, all_results, lambda_mult=0.5)[:k]
+
         # Tomar top_k
         final_results = all_results[:k]
-        
+
         logger.info(f"Multi-collection: {len(final_results)} resultados finales de {len(collections)} colecciones")
         return final_results
 
-    # =============================== Búsqueda cruda ===============================
+    # =============================== B?squeda cruda ===============================
 
     def _search_raw(
         self,
         *,
-        query_vector: List[float],
+        query_dense: List[float],
+        sparse_indices: List[int],
+        sparse_values: List[float],
         limit: int,
         qdrant_filter: Optional[Filter],
         score_threshold: Optional[float],
         collection_name: Optional[str] = None,
     ):
         target_collection = collection_name or self.collection_name
+        if not sparse_indices or not sparse_values:
+            try:
+                try:
+                    fallback = self.client.query_points(
+                        collection_name=target_collection,
+                        query=query_dense,
+                        using="dense",
+                        query_filter=qdrant_filter,
+                        limit=int(limit),
+                        score_threshold=float(score_threshold) if score_threshold is not None else None,
+                        with_payload=True,
+                    )
+                except Exception:
+                    fallback = self.client.query_points(
+                        collection_name=target_collection,
+                        query=query_dense,
+                        query_filter=qdrant_filter,
+                        limit=int(limit),
+                        score_threshold=float(score_threshold) if score_threshold is not None else None,
+                        with_payload=True,
+                    )
+                hits = sorted(fallback.points, key=lambda h: h.score or 0.0, reverse=True)
+                return hits
+            except Exception as e:
+                logger.exception(f"Dense-only search failed (collection={target_collection}): {e}")
+                return []
+
         try:
+            if not HYBRID_QUERY_AVAILABLE:
+                raise RuntimeError("Hybrid query API not available in installed qdrant-client")
+
+            prefetch_requests = [
+                Prefetch(
+                    query=query_dense,
+                    using="dense",
+                    limit=int(limit),
+                    filter=qdrant_filter,
+                    score_threshold=float(score_threshold) if score_threshold is not None else None,
+                ),
+                Prefetch(
+                    query=SparseVector(indices=sparse_indices, values=sparse_values),
+                    using="sparse",
+                    limit=int(limit),
+                    filter=qdrant_filter,
+                ),
+            ]
+
             search_results = self.client.query_points(
                 collection_name=target_collection,
-                query=query_vector,
-                query_filter=qdrant_filter,
+                prefetch=prefetch_requests,
+                query=FusionQuery(fusion=Fusion.RRF),
                 limit=int(limit),
                 with_payload=True,
-                score_threshold=float(score_threshold) if score_threshold is not None else None,
             )
-            
-            # Orden descendente por score
+
+            # Orden descendente por score (RRF scores)
             hits = sorted(search_results.points, key=lambda h: h.score or 0.0, reverse=True)
             return hits
         except Exception as e:
             logger.exception(f"Error en Qdrant.search (collection={target_collection}): {e}")
-            return []
+            # Fallback a b?squeda dense-only para colecciones sin h?brido
+            try:
+                try:
+                    fallback = self.client.query_points(
+                        collection_name=target_collection,
+                        query=query_dense,
+                        using="dense",
+                        query_filter=qdrant_filter,
+                        limit=int(limit),
+                        score_threshold=float(score_threshold) if score_threshold is not None else None,
+                        with_payload=True,
+                    )
+                except Exception:
+                    fallback = self.client.query_points(
+                        collection_name=target_collection,
+                        query=query_dense,
+                        query_filter=qdrant_filter,
+                        limit=int(limit),
+                        score_threshold=float(score_threshold) if score_threshold is not None else None,
+                        with_payload=True,
+                    )
+                hits = sorted(fallback.points, key=lambda h: h.score or 0.0, reverse=True)
+                return hits
+            except Exception as e2:
+                logger.exception(f"Fallback dense-only failed (collection={target_collection}): {e2}")
+                return []
 
     # =============================== Filtros ===============================
 
@@ -351,6 +463,167 @@ class RAGRetriever:
             seen.add(key)
             out.append(r)
         return out
+
+    def _extract_query_ids(self, query: str) -> List[str]:
+        tokens = re.findall(r"\b[A-Z]{1,8}-\d{2,8}\b", (query or "").upper())
+        return list(dict.fromkeys(tokens))
+
+    def _fetch_exact_id_matches(
+        self,
+        query_ids: List[str],
+        collection_name: str,
+        tenant_id: Optional[str] = None,
+        source: Optional[str] = None,
+        exclude_ocr: bool = False,
+    ) -> List[RetrievalResult]:
+        """
+        Recupera chunks cuyo payload (filename/source) contiene el ID solicitado.
+        Esto evita falsos negativos cuando la búsqueda semántica no prioriza el doc correcto.
+        """
+        base_must: List[FieldCondition] = []
+        if tenant_id:
+            base_must.append(FieldCondition(key=TENANT_CLAIM, match=MatchValue(value=tenant_id)))
+        if source:
+            base_must.append(FieldCondition(key="source", match=MatchValue(value=source)))
+        if exclude_ocr:
+            base_must.append(FieldCondition(key="from_ocr", match=MatchValue(value=False)))
+
+        exact_results: List[RetrievalResult] = []
+        seen_keys = set()
+
+        def _add_point(point) -> None:
+            payload = point.payload or {}
+            key = (
+                payload.get("filename", "unknown"),
+                payload.get("page"),
+                payload.get("chunk_index", 0),
+            )
+            if key in seen_keys:
+                return
+            seen_keys.add(key)
+            exact_results.append(
+                RetrievalResult(
+                    text=payload.get("text", ""),
+                    score=1.0,
+                    source=payload.get("source", ""),
+                    filename=payload.get("filename", "unknown"),
+                    page=payload.get("page"),
+                    chunk_index=payload.get("chunk_index", 0),
+                    from_ocr=payload.get("from_ocr", False),
+                    ingested_at=self._parse_ingested_at(
+                        payload.get("ingested_at"),
+                        payload.get("ingested_at_ts"),
+                    ),
+                    citation=self._format_citation(
+                        payload.get("filename", "unknown"),
+                        payload.get("page"),
+                    ),
+                )
+            )
+
+        def _payload_matches_token(payload: Dict, token: str) -> bool:
+            filename = str(payload.get("filename", "") or "")
+            source_val = str(payload.get("source", "") or "")
+            text_val = str(payload.get("text", "") or "")[:400]
+            return (
+                self._has_exact_id(filename, token)
+                or self._has_exact_id(source_val, token)
+                or self._has_exact_id(text_val, token)
+            )
+
+        for token in query_ids:
+            points = []
+            try:
+                scroll_filter = Filter(
+                    must=base_must,
+                    should=[
+                        FieldCondition(key="filename", match=MatchText(text=token)),
+                        FieldCondition(key="source", match=MatchText(text=token)),
+                    ],
+                )
+                points, _ = self.client.scroll(
+                    collection_name=collection_name,
+                    scroll_filter=scroll_filter,
+                    limit=20,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except Exception as e:
+                logger.warning(f"Exact ID fetch failed for '{token}' in {collection_name}: {e}")
+                points = []
+
+            # Fallback robusto: escaneo acotado de payload si MatchText no devuelve nada.
+            if not points:
+                try:
+                    offset = None
+                    scanned = 0
+                    max_scan = 15000
+                    batch_size = 512
+                    while scanned < max_scan:
+                        batch, next_offset = self.client.scroll(
+                            collection_name=collection_name,
+                            offset=offset,
+                            limit=batch_size,
+                            with_payload=True,
+                            with_vectors=False,
+                        )
+                        if not batch:
+                            break
+                        scanned += len(batch)
+                        for point in batch:
+                            payload = point.payload or {}
+                            if tenant_id and payload.get(TENANT_CLAIM) != tenant_id:
+                                continue
+                            if source and payload.get("source") != source:
+                                continue
+                            if exclude_ocr and payload.get("from_ocr") is True:
+                                continue
+                            if _payload_matches_token(payload, token):
+                                points.append(point)
+                        if len(points) >= 20 or not next_offset:
+                            break
+                        offset = next_offset
+                except Exception as e:
+                    logger.warning(
+                        f"Fallback exact ID scan failed for '{token}' in {collection_name}: {e}"
+                    )
+
+            for point in points:
+                _add_point(point)
+
+        if exact_results:
+            logger.info(
+                f"Exact ID fetch: {len(exact_results)} chunks para IDs {query_ids} "
+                f"en colección {collection_name}"
+            )
+
+        return exact_results
+
+    def _has_exact_id(self, text: str, token: str) -> bool:
+        if not text:
+            return False
+        pattern = rf"(?<![A-Z0-9]){re.escape(token.upper())}(?![A-Z0-9])"
+        return re.search(pattern, text.upper()) is not None
+
+    def _boost_exact_id_matches(
+        self,
+        results: List[RetrievalResult],
+        query_ids: List[str],
+    ) -> List[RetrievalResult]:
+        def _boost(r: RetrievalResult) -> Tuple[int, float]:
+            filename = (r.filename or "")
+            source = (r.source or "")
+            text = (r.text or "")[:500]
+
+            fname_hits = sum(1 for t in query_ids if self._has_exact_id(filename, t))
+            source_hits = sum(1 for t in query_ids if self._has_exact_id(source, t))
+            text_hits = sum(1 for t in query_ids if self._has_exact_id(text, t))
+
+            # Prioridad: filename > source > text > score original.
+            priority = (fname_hits * 100) + (source_hits * 10) + text_hits
+            return priority, float(r.score or 0.0)
+
+        return sorted(results, key=_boost, reverse=True)
 
     # =============================== Helpers ===============================
 

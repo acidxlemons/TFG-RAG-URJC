@@ -11,12 +11,23 @@ import os
 from typing import Optional
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import Distance, VectorParams, SparseVectorParams
+
+try:
+    from qdrant_client.models import Modifier
+except ImportError:  # qdrant-client >= 1.9 removed Modifier from SparseVectorParams
+    Modifier = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
 
 _qdrant_client: Optional[QdrantClient] = None
+
+
+def _build_sparse_vector_params() -> SparseVectorParams:
+    if Modifier is not None:
+        return SparseVectorParams(modifier=Modifier.IDF)
+    return SparseVectorParams()
 
 
 def get_qdrant_client(force_recreate: bool = False) -> QdrantClient:
@@ -55,16 +66,32 @@ def _ensure_collection(client: QdrantClient) -> None:
     exists = any(c.name == collection_name for c in collections)
 
     if exists:
+        # Validate hybrid config; if mismatched, log and continue (avoid destructive recreate)
+        try:
+            info = client.get_collection(collection_name)
+            vectors = getattr(info.config.params, "vectors", None)
+            sparse_vectors = getattr(info.config.params, "sparse_vectors", None)
+            has_named_dense = isinstance(vectors, dict) and "dense" in vectors
+            has_sparse = bool(sparse_vectors)
+            if not has_named_dense or not has_sparse:
+                logger.warning(
+                    "Collection '%s' exists but is not hybrid (named dense+sparse). "
+                    "Hybrid search will fallback to dense-only until recreated.",
+                    collection_name,
+                )
+        except Exception as exc:
+            logger.warning("Failed to inspect collection '%s': %s", collection_name, exc)
         logger.info("Collection '%s' already exists", collection_name)
         return
 
     vector_dim = _resolve_vector_dim()
-    logger.info("Creating collection '%s' (dim=%s)", collection_name, vector_dim)
+    logger.info("Creating collection '%s' (dim=%s) with hybrid vectors", collection_name, vector_dim)
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=vector_dim, distance=Distance.COSINE),
+        vectors_config={"dense": VectorParams(size=vector_dim, distance=Distance.COSINE)},
+        sparse_vectors_config={"sparse": _build_sparse_vector_params()},
     )
-    logger.info("Collection '%s' created", collection_name)
+    logger.info("Collection '%s' created (hybrid)", collection_name)
 
 
 def _resolve_vector_dim() -> int:

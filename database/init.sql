@@ -1,14 +1,13 @@
 -- ============================================
 -- database/init.sql
--- SCHEMA INICIAL - Sistema RAG
+-- Initial schema for JARVIS RAG
 -- ============================================
 
--- Habilitar extensiones
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================
--- TABLA: USUARIOS
+-- USERS
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS users (
@@ -19,19 +18,18 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(50) DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    preferences JSONB DEFAULT '{}',
+    preferences JSONB DEFAULT '{}'::jsonb,
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- Índices
-CREATE INDEX idx_users_azure_id ON users(azure_id);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_last_active ON users(last_active);
+CREATE INDEX IF NOT EXISTS idx_users_azure_id ON users(azure_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
 
-COMMENT ON TABLE users IS 'Usuarios del sistema (desde Azure AD)';
+COMMENT ON TABLE users IS 'Application users from Azure AD';
 
 -- ============================================
--- TABLA: CONVERSACIONES
+-- CONVERSATIONS
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS conversations (
@@ -43,19 +41,18 @@ CREATE TABLE IF NOT EXISTS conversations (
     is_archived BOOLEAN DEFAULT FALSE,
     summary TEXT,
     summary_generated_at TIMESTAMP,
-    metadata JSONB DEFAULT '{}',
+    metadata JSONB DEFAULT '{}'::jsonb,
     tags TEXT[]
 );
 
--- Índices
-CREATE INDEX idx_conversations_user_id ON conversations(user_id);
-CREATE INDEX idx_conversations_updated_at ON conversations(updated_at DESC);
-CREATE INDEX idx_conversations_archived ON conversations(is_archived);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(is_archived);
 
-COMMENT ON TABLE conversations IS 'Conversaciones de chat por usuario';
+COMMENT ON TABLE conversations IS 'Chat conversations per user';
 
 -- ============================================
--- TABLA: MENSAJES
+-- MESSAGES
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -63,28 +60,30 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
-    sources_used JSONB DEFAULT '[]',
+    sources_used JSONB DEFAULT '[]'::jsonb,
     retrieval_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+    tokens_used INTEGER DEFAULT 0,
+    processing_time_ms INTEGER,
+    metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Índices
-CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
-CREATE INDEX idx_messages_role ON messages(role);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id_created_at ON messages(conversation_id, created_at);
 
-COMMENT ON TABLE messages IS 'Mensajes individuales en conversaciones';
+COMMENT ON TABLE messages IS 'Individual messages in conversations';
 
 -- ============================================
--- TABLA: DOCUMENTOS INDEXADOS
+-- DOCUMENT REGISTRY
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS indexed_documents (
     id SERIAL PRIMARY KEY,
     filename VARCHAR(500) NOT NULL,
     source_path TEXT NOT NULL,
-    source_type VARCHAR(50) NOT NULL CHECK (source_type IN ('upload', 'sharepoint', 'scrape')),
+    source_type VARCHAR(50) NOT NULL CHECK (source_type IN ('upload', 'sharepoint', 'scrape', 'web')),
     file_hash VARCHAR(64) UNIQUE NOT NULL,
     file_size BIGINT,
     mime_type VARCHAR(100),
@@ -93,20 +92,35 @@ CREATE TABLE IF NOT EXISTS indexed_documents (
     from_ocr BOOLEAN DEFAULT FALSE,
     indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     indexed_by INTEGER REFERENCES users(id),
-    metadata JSONB DEFAULT '{}',
+    metadata JSONB DEFAULT '{}'::jsonb,
     status VARCHAR(50) DEFAULT 'indexed' CHECK (status IN ('processing', 'indexed', 'failed', 'deleted'))
 );
 
--- Índices
-CREATE INDEX idx_documents_filename ON indexed_documents(filename);
-CREATE INDEX idx_documents_source_type ON indexed_documents(source_type);
-CREATE INDEX idx_documents_indexed_at ON indexed_documents(indexed_at DESC);
-CREATE INDEX idx_documents_status ON indexed_documents(status);
+CREATE INDEX IF NOT EXISTS idx_documents_filename ON indexed_documents(filename);
+CREATE INDEX IF NOT EXISTS idx_documents_source_type ON indexed_documents(source_type);
+CREATE INDEX IF NOT EXISTS idx_documents_indexed_at ON indexed_documents(indexed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_status ON indexed_documents(status);
 
-COMMENT ON TABLE indexed_documents IS 'Registro de documentos indexados';
+COMMENT ON TABLE indexed_documents IS 'Registry of indexed documents';
 
 -- ============================================
--- TABLA: SHAREPOINT SYNC
+-- INGESTION STATUS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS ingestion_status (
+    filename VARCHAR(255) PRIMARY KEY,
+    status VARCHAR(50) NOT NULL,
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_status_updated_at ON ingestion_status(updated_at DESC);
+
+COMMENT ON TABLE ingestion_status IS 'Current document ingestion status';
+
+-- ============================================
+-- SHAREPOINT SYNC
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS sharepoint_sync (
@@ -120,10 +134,10 @@ CREATE TABLE IF NOT EXISTS sharepoint_sync (
     is_active BOOLEAN DEFAULT TRUE
 );
 
-COMMENT ON TABLE sharepoint_sync IS 'Estado de sincronización con SharePoint';
+COMMENT ON TABLE sharepoint_sync IS 'SharePoint synchronization state';
 
 -- ============================================
--- TABLA: AUDIT LOG
+-- AUDIT LOG
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -132,108 +146,102 @@ CREATE TABLE IF NOT EXISTS audit_log (
     action VARCHAR(100) NOT NULL,
     resource_type VARCHAR(50),
     resource_id INTEGER,
-    details JSONB DEFAULT '{}',
+    details JSONB DEFAULT '{}'::jsonb,
     ip_address INET,
     user_agent TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices
-CREATE INDEX idx_audit_user_id ON audit_log(user_id);
-CREATE INDEX idx_audit_action ON audit_log(action);
-CREATE INDEX idx_audit_created_at ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_log(created_at DESC);
 
-COMMENT ON TABLE audit_log IS 'Log de auditoría de acciones';
+COMMENT ON TABLE audit_log IS 'Audit log for user actions';
 
 -- ============================================
--- FUNCIONES Y TRIGGERS
+-- FUNCTIONS AND TRIGGERS
 -- ============================================
 
--- Función para actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Trigger para conversations
+DROP TRIGGER IF EXISTS update_conversations_updated_at ON conversations;
 CREATE TRIGGER update_conversations_updated_at
     BEFORE UPDATE ON conversations
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_ingestion_status_updated_at ON ingestion_status;
+CREATE TRIGGER update_ingestion_status_updated_at
+    BEFORE UPDATE ON ingestion_status
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
--- VISTAS ÚTILES
+-- VIEWS
 -- ============================================
 
--- Vista: Conversaciones con estadísticas
 CREATE OR REPLACE VIEW conversation_stats AS
-SELECT 
+SELECT
     c.id,
     c.user_id,
     c.title,
     c.created_at,
     c.updated_at,
-    COUNT(m.id) as message_count,
-    MAX(m.created_at) as last_message_at,
-    SUM(m.tokens_used) as total_tokens
+    COUNT(m.id) AS message_count,
+    MAX(m.created_at) AS last_message_at,
+    COALESCE(SUM(m.tokens_used), 0) AS total_tokens
 FROM conversations c
 LEFT JOIN messages m ON c.id = m.conversation_id
 GROUP BY c.id;
 
--- Vista: Actividad de usuarios
 CREATE OR REPLACE VIEW user_activity AS
-SELECT 
+SELECT
     u.id,
     u.name,
     u.email,
-    COUNT(DISTINCT c.id) as conversation_count,
-    COUNT(m.id) as message_count,
-    MAX(m.created_at) as last_activity
+    COUNT(DISTINCT c.id) AS conversation_count,
+    COUNT(m.id) AS message_count,
+    MAX(m.created_at) AS last_activity
 FROM users u
 LEFT JOIN conversations c ON u.id = c.user_id
 LEFT JOIN messages m ON c.id = m.conversation_id
 GROUP BY u.id;
 
--- Vista: Documentos por fuente
 CREATE OR REPLACE VIEW documents_by_source AS
-SELECT 
+SELECT
     source_type,
-    COUNT(*) as document_count,
-    SUM(chunk_count) as total_chunks,
-    SUM(file_size) as total_size,
-    COUNT(CASE WHEN from_ocr THEN 1 END) as ocr_count
+    COUNT(*) AS document_count,
+    COALESCE(SUM(chunk_count), 0) AS total_chunks,
+    COALESCE(SUM(file_size), 0) AS total_size,
+    COUNT(CASE WHEN from_ocr THEN 1 END) AS ocr_count
 FROM indexed_documents
 WHERE status = 'indexed'
 GROUP BY source_type;
 
 -- ============================================
--- DATOS INICIALES
+-- DEFAULT DATA
 -- ============================================
 
--- Usuario admin por defecto (opcional)
-INSERT INTO users (azure_id, email, name, role) 
+INSERT INTO users (azure_id, email, name, role)
 VALUES ('admin-local', 'admin@localhost', 'Administrator', 'admin')
 ON CONFLICT (azure_id) DO NOTHING;
 
 -- ============================================
--- PERMISOS
+-- PERMISSIONS
 -- ============================================
 
--- Revocar acceso público
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 
--- Dar permisos al usuario de la aplicación
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO rag_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO rag_user;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO rag_user;
 
--- ============================================
--- COMENTARIOS FINALES
--- ============================================
-
-COMMENT ON DATABASE rag_system IS 'Base de datos del Sistema RAG Empresarial';
+COMMENT ON DATABASE rag_system IS 'JARVIS RAG system database';

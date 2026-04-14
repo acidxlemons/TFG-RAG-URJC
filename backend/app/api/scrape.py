@@ -10,15 +10,14 @@ Endpoints:
 from __future__ import annotations
 
 import logging
-import re
-from typing import Optional
+from typing import List, Optional
 from enum import Enum
-from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, HttpUrl, Field
 
 from app.integrations.scraper.playwright_scraper import WebScraper
+from app.core.permissions import can_write_without_tenant_header, resolve_authorized_collections
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,6 @@ web_scrapes_duration_seconds = Histogram(
     'web_scrapes_duration_seconds',
     'Tiempo de scraping por URL',
     buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]
-)
-
-# Total de webs indexadas (Gauge - se actualiza al indexar)
-webs_indexed_total = Gauge(
-    'webs_indexed_total',
-    'Total de URLs indexadas en colección webs'
 )
 
 # Errores de scraping por tipo
@@ -77,21 +70,9 @@ class ScrapeMode(str, Enum):
 
 
 class ScrapeRequest(BaseModel):
-    url: str
+    url: HttpUrl
     tenant_id: Optional[str] = None
     mode: ScrapeMode = Field(default=ScrapeMode.INDEX, description="'index' para indexar, 'analyze' para solo devolver contenido")
-
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        """Acepta URLs con caracteres especiales (paréntesis, acentos codificados)."""
-        v = v.strip()
-        parsed = urlparse(v)
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError(f"URL debe empezar con http:// o https://, recibido: {v[:50]}")
-        if not parsed.netloc:
-            raise ValueError(f"URL sin dominio válido: {v[:50]}")
-        return v
 
 
 class ScrapeResponse(BaseModel):
@@ -120,6 +101,50 @@ class AnalyzeResponse(BaseModel):
     scraped_at: str
 
 
+def _resolve_lookup_collections(
+    x_tenant_id: Optional[str],
+    x_tenant_ids: Optional[str],
+    request_tenant_id: Optional[str],
+) -> List[str]:
+    from app.main import app_state
+
+    return resolve_authorized_collections(
+        qdrant_client=app_state.qdrant,
+        x_tenant_id=x_tenant_id or request_tenant_id,
+        x_tenant_ids=x_tenant_ids,
+    )
+
+
+def _scroll_url_points(collection: str, url: str, limit: int = 100, max_points: int = 1000):
+    from app.main import app_state
+    from qdrant_client.http import models
+
+    points = []
+    next_page = None
+
+    while True:
+        batch, next_page = app_state.qdrant.scroll(
+            collection_name=collection,
+            scroll_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="source",
+                        match=models.MatchValue(value=url),
+                    )
+                ]
+            ),
+            limit=limit,
+            offset=next_page,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points.extend(batch)
+        if not next_page or len(points) >= max_points:
+            break
+
+    return points
+
+
 @router.post("", response_model=ScrapeResponse)
 async def scrape_and_index(
     request: ScrapeRequest,
@@ -136,6 +161,9 @@ async def scrape_and_index(
     url = str(request.url)
     tenant_id = x_tenant_id or request.tenant_id
     mode = request.mode
+
+    if mode == ScrapeMode.INDEX and not x_tenant_id and not can_write_without_tenant_header():
+        raise HTTPException(status_code=403, detail="X-Tenant-Id es obligatorio para indexar contenido web")
     
     import time
     start_time = time.time()
@@ -213,23 +241,17 @@ async def scrape_and_index(
         raise
     except Exception as e:
         logger.error(f"Error scrapeando {url}: {e}")
+        # scrape_errors_total.labels(error_type="exception").inc() # Optional
         raise HTTPException(status_code=500, detail=str(e))
 
 
 class RecursiveScrapeRequest(BaseModel):
-    url: str
-    max_depth: int = Field(default=2, ge=1, le=5, description="Profundidad máxima de navegación (default: 2, max: 5)")
-    max_pages: int = Field(default=10, ge=1, le=50, description="Máximo de páginas a scrapear por sitio (default: 10, max: 50)")
+    url: HttpUrl
+    # Límites defensivos: el crawler corre dentro del backend y un fan-out agresivo
+    # puede saturar el contenedor con procesos de navegador.
+    max_depth: int = Field(default=1, ge=1, le=3, description="Profundidad máxima de navegación (default: 1, max: 3)")
+    max_pages: int = Field(default=5, ge=1, le=15, description="Máximo de páginas a scrapear por sitio (default: 5, max: 15)")
     tenant_id: Optional[str] = None
-
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        v = v.strip()
-        parsed = urlparse(v)
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError(f"URL debe empezar con http:// o https://")
-        return v
 
 
 class RecursiveScrapeResponse(BaseModel):
@@ -256,6 +278,9 @@ async def recursive_scrape(
     
     url = str(request.url)
     tenant_id = x_tenant_id or request.tenant_id
+
+    if not x_tenant_id and not can_write_without_tenant_header():
+        raise HTTPException(status_code=403, detail="X-Tenant-Id es obligatorio para iniciar crawling indexado")
     
     # Iniciar crawling en background para no bloquear
     background_tasks.add_task(
@@ -378,58 +403,57 @@ class CheckResponse(BaseModel):
     message: str
 
 @router.post("/check", response_model=CheckResponse)
-async def check_url_in_rag(request: ScrapeRequest):
+async def check_url_in_rag(
+    request: ScrapeRequest,
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
+    x_tenant_ids: Optional[str] = Header(None, alias="X-Tenant-Ids"),
+):
     """
-    Verifica si una URL ya existe en el índice RAG (Qdrant).
+    Verifica si una URL ya existe en las colecciones RAG autorizadas.
     Retorna metadatos si existe.
     """
-    from app.main import app_state
-    from qdrant_client.http import models
-    import os
-    
     url = str(request.url)
-    collection = "webs" # Usar colección específica para web
-    
+
     try:
-        # Buscar puntos con source == url
-        # Limitamos a 1 para verificar existencia
-        search_result = app_state.qdrant.scroll(
-            collection_name=collection,
-            scroll_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="source",
-                        match=models.MatchValue(value=url)
-                    )
-                ]
-            ),
-            limit=1,
-            with_payload=True,
-            with_vectors=False
+        collections = _resolve_lookup_collections(
+            x_tenant_id=x_tenant_id,
+            x_tenant_ids=x_tenant_ids,
+            request_tenant_id=request.tenant_id,
         )
-        
-        points, _ = search_result
-        
-        if not points:
+        if not collections:
             return CheckResponse(
                 exists=False,
                 url=url,
-                message="URL no encontrada en RAG"
+                message="URL no encontrada en colecciones autorizadas",
             )
-        
-        # Encontrado
-        payload = points[0].payload
+
+        for collection in collections:
+            try:
+                points = _scroll_url_points(collection=collection, url=url, limit=1, max_points=1)
+            except Exception as e:
+                logger.warning(f"Error checking URL {url} in collection {collection}: {e}")
+                continue
+
+            if not points:
+                continue
+
+            payload = points[0].payload
+            return CheckResponse(
+                exists=True,
+                url=url,
+                title=payload.get("filename") or payload.get("title"),
+                scraped_at=payload.get("ingested_at") or payload.get("scraped_at"),
+                message="URL encontrada en RAG",
+            )
+
         return CheckResponse(
-            exists=True,
+            exists=False,
             url=url,
-            title=payload.get("filename") or payload.get("title"),
-            scraped_at=payload.get("ingested_at") or payload.get("scraped_at"),
-            message="URL encontrada en RAG"
+            message="URL no encontrada en RAG",
         )
 
     except Exception as e:
         logger.error(f"Error checking URL {url}: {e}")
-        # En caso de error, asumimos que no existe para no bloquear
         return CheckResponse(exists=False, url=url, message=f"Error checking: {str(e)}")
 
 
@@ -441,66 +465,48 @@ class RetrieveResponse(BaseModel):
     chunks_retrieved: int
 
 @router.post("/retrieve", response_model=RetrieveResponse)
-async def retrieve_url_content(request: ScrapeRequest):
+async def retrieve_url_content(
+    request: ScrapeRequest,
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-Id"),
+    x_tenant_ids: Optional[str] = Header(None, alias="X-Tenant-Ids"),
+):
     """
-    Recupera y reconstruye el contenido de una URL desde los chunks de Qdrant.
+    Recupera y reconstruye el contenido de una URL desde las colecciones autorizadas.
     """
-    from app.main import app_state
-    from qdrant_client.http import models
-    import os
-    
     url = str(request.url)
-    collection = "webs" # Usar colección específica para web
-    
+
     try:
-        # Scroll para obtener TODOS los chunks
-        # Nota: Qdrant scroll devuelve paginado, aquí simplificamos asumiendo < 200 chunks (aprox 100k chars)
-        # Para documentos muy grandes habría que iterar el scroll
-        points = []
-        next_page = None
-        
-        while True:
-            result = app_state.qdrant.scroll(
-                collection_name=collection,
-                scroll_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="source",
-                            match=models.MatchValue(value=url)
-                        )
-                    ]
-                ),
-                limit=100,
-                offset=next_page,
-                with_payload=True,
-                with_vectors=False
-            )
-            batch, next_page = result
-            points.extend(batch)
-            
-            if not next_page:
-                break
-            # Safety break
-            if len(points) > 1000:
-                break
-        
-        if not points:
-            raise HTTPException(status_code=404, detail="URL no encontrada en documentos")
-            
-        # Ordenar por chunk_index
-        sorted_points = sorted(points, key=lambda p: p.payload.get("chunk_index", 0))
-        
-        # Reconstruir texto
-        full_text = "\n\n".join([p.payload.get("text", "") for p in sorted_points])
-        first_payload = sorted_points[0].payload
-        
-        return RetrieveResponse(
-            status="success",
-            url=url,
-            title=first_payload.get("filename") or first_payload.get("title"),
-            content=full_text,
-            chunks_retrieved=len(points)
+        collections = _resolve_lookup_collections(
+            x_tenant_id=x_tenant_id,
+            x_tenant_ids=x_tenant_ids,
+            request_tenant_id=request.tenant_id,
         )
+        if not collections:
+            raise HTTPException(status_code=404, detail="URL no encontrada en colecciones autorizadas")
+
+        for collection in collections:
+            try:
+                points = _scroll_url_points(collection=collection, url=url)
+            except Exception as e:
+                logger.warning(f"Error retrieving URL {url} from collection {collection}: {e}")
+                continue
+
+            if not points:
+                continue
+
+            sorted_points = sorted(points, key=lambda p: p.payload.get("chunk_index", 0))
+            full_text = "\n\n".join([p.payload.get("text", "") for p in sorted_points])
+            first_payload = sorted_points[0].payload
+
+            return RetrieveResponse(
+                status="success",
+                url=url,
+                title=first_payload.get("filename") or first_payload.get("title"),
+                content=full_text,
+                chunks_retrieved=len(points),
+            )
+
+        raise HTTPException(status_code=404, detail="URL no encontrada en documentos")
 
     except HTTPException:
         raise
@@ -566,31 +572,83 @@ async def _index_scraped_content(
         # Vectorizar
         model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
         # Usar el embedder compartido que fuerza CPU y evita errores de CUDA
-        from app.processing.embeddings.sentence_transformer import get_embedder
+        from app.processing.embeddings.sentence_transformer import get_embedder, get_sparse_embedder
         embedder = get_embedder(model_name=model_name)
-        
+
         texts = [c["text"] for c in chunks]
         # El wrapper ya devuelve numpy array normalizado
         embeddings = embedder.encode(texts)
-        
-        # Preparar puntos
+
+        collection = (tenant_id or "webs").strip() or "webs"
+        hybrid_ok = True
+        exists = False
+        try:
+            collections = app_state.qdrant.get_collections().collections
+            exists = any(c.name == collection for c in collections)
+        except Exception as e:
+            logger.warning(f"No se pudo listar colecciones Qdrant: {e}")
+
+        if exists:
+            try:
+                info = app_state.qdrant.get_collection(collection)
+                vectors = getattr(info.config.params, "vectors", None)
+                sparse_vectors_cfg = getattr(info.config.params, "sparse_vectors", None)
+                has_named_dense = isinstance(vectors, dict) and "dense" in vectors
+                has_sparse = bool(sparse_vectors_cfg)
+                if not has_named_dense or not has_sparse:
+                    hybrid_ok = False
+                    logger.warning(
+                        "Colecci?n '%s' no est? configurada para b?squeda h?brida. Indexando solo dense.",
+                        collection,
+                    )
+            except Exception:
+                hybrid_ok = False
+                logger.warning(
+                    "No se pudo inspeccionar la colecci?n '%s'. Indexando dense-only.",
+                    collection,
+                )
+        else:
+            logger.info(f"Creando nueva colecci?n h?brida: {collection}")
+            from qdrant_client.models import VectorParams, Distance, SparseVectorParams, Modifier
+            app_state.qdrant.create_collection(
+                collection_name=collection,
+                vectors_config={"dense": VectorParams(size=len(embeddings[0]) if len(embeddings) > 0 else 384, distance=Distance.COSINE)},
+                sparse_vectors_config={"sparse": SparseVectorParams(modifier=Modifier.IDF)},
+            )
+            hybrid_ok = True
+
+        sparse_vectors = None
+        if hybrid_ok:
+            sparse_embedder = get_sparse_embedder()
+            if sparse_embedder is None:
+                logger.warning("Sparse embedder no disponible. Scrape se indexara en dense-only.")
+                hybrid_ok = False
+            else:
+                sparse_gen = list(sparse_embedder.embed(texts))
+                sparse_vectors = [{"indices": v.indices.tolist(), "values": v.values.tolist()} for v in sparse_gen]
+
         now = datetime.utcnow()
         points = []
-        
-        for chunk, embedding in zip(chunks, embeddings):
+
+        for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             # Ajustar metadata para evitar sobreescribir 'source'
             safe_metadata = metadata.copy()
             if "source" in safe_metadata:
                 safe_metadata["ingest_source"] = safe_metadata.pop("source")
-            
+
             # ID determinista para evitar duplicados al reindexar la misma URL
-            # Usamos UUID5 con namespace DNS y la combinación URL+Index
+            # Usamos UUID5 con namespace DNS y la combinaci?n URL+Index
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{url}_{chunk['chunk_index']}"))
-                
+
+            if hybrid_ok and sparse_vectors is not None:
+                vector_payload = {"dense": embedding.tolist(), "sparse": sparse_vectors[idx]}
+            else:
+                vector_payload = embedding.tolist()
+
             points.append(
                 PointStruct(
                     id=point_id,
-                    vector=embedding.tolist(),
+                    vector=vector_payload,
                     payload={
                         "text": chunk["text"],
                         "filename": title or "scraped_content",
@@ -600,37 +658,20 @@ async def _index_scraped_content(
                         "from_ocr": False,
                         "ingested_at": now.isoformat() + "Z",
                         "ingested_at_ts": int(now.timestamp()),
-                        "tenant_id": tenant_id,
+                        "tenant_id": tenant_id or collection,
                         **safe_metadata,
                     }
                 )
-            )
-        
-        # Insertar en Qdrant (Colección 'webs')
-        collection = "webs"
-        
-        # Asegurar que la colección existe
-        try:
-            app_state.qdrant.get_collection(collection)
-        except Exception:
-            logger.info(f"Creando nueva colección: {collection}")
-            from qdrant_client.models import VectorParams, Distance
-            app_state.qdrant.create_collection(
-                collection_name=collection,
-                vectors_config=VectorParams(
-                    size=len(embeddings[0]) if embeddings.shape[0] > 0 else 384,
-                    distance=Distance.COSINE,
-                ),
             )
 
         app_state.qdrant.upsert(
             collection_name=collection,
             points=points,
         )
-        
+
         logger.info(
-            f"✅ Contenido indexado: {url} ({len(points)} chunks en '{collection}')"
+            f"Contenido indexado: {url} ({len(points)} chunks en '{collection}')"
         )
-        
+
     except Exception as e:
         logger.error(f"Error indexando scrape de {url}: {e}")

@@ -163,21 +163,6 @@ class WebScraper:
                     logger.warning(f"No se pudo extraer contenido de: {url}")
                     return None
                 
-                # Verificación: si el título extraído no tiene relación con el dominio,
-                # y la página tiene otro título via page.title(), usar ese en su lugar.
-                # Esto evita el bug de trafilatura extrayendo metadatos incorrectos de SPAs.
-                page_title = await self._get_page_title(page)
-                extracted_title = extracted.get("title", "")
-                domain = urlparse(url).netloc.lower().replace("www.", "")
-                
-                if extracted_title and page_title and page_title != extracted_title:
-                    # Si el título de trafilatura no contiene ninguna palabra del dominio
-                    # pero el título de la página sí, preferir el de la página
-                    domain_parts = domain.split(".")[0]  # ej: "fastapi" de "fastapi.tiangolo.com"
-                    if domain_parts not in extracted_title.lower() and domain_parts in page_title.lower():
-                        logger.info(f"Título corregido: '{extracted_title}' -> '{page_title}' (domain match)")
-                        extracted["title"] = page_title
-                
                 # Extraer enlaces internos (href) para el crawler recursivo
                 _links = await page.evaluate("""
                     () => {
@@ -230,8 +215,8 @@ class WebScraper:
             pass  # Si timeout, continuar de todas formas
         
         try:
-            # 2. Esperar un poco más para JavaScript dinámico (SPAs como FastAPI docs)
-            await page.wait_for_timeout(1500)
+            # 2. Esperar un poco más para JavaScript dinámico
+            await page.wait_for_timeout(500)
             
             # 3. Esperar a que el body tenga contenido
             await page.wait_for_function(

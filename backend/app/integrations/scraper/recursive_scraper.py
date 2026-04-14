@@ -1,125 +1,161 @@
-from typing import Set, List, Dict, Optional
+# backend/app/integrations/scraper/recursive_scraper.py
+"""
+Scraper Recursivo (Spider/Crawler)
+Permite navegar y extraer contenido de múltiples páginas enlazadas dentro de un mismo dominio.
+"""
+
+from __future__ import annotations
+
 import logging
-from urllib.parse import urlparse, urljoin
-import aiohttp
-from bs4 import BeautifulSoup
 import asyncio
+from typing import Set, List, Dict, Optional
+from urllib.parse import urlparse, urljoin
+import re
+
+# Reutilizamos el WebScraper existente para extraer cada página individual
+from .playwright_scraper import WebScraper
 
 logger = logging.getLogger(__name__)
 
 class RecursiveWebScraper:
     """
-    Crawler simple que navega recursivamente un dominio para descubrir y extraer contenido.
-    NO renderiza JS (usa aiohttp + BeautifulSoup) para velocidad en el descubrimiento.
-    """
+    Crawler que navega recursivamente siguiendo enlaces internos.
     
-    def __init__(self, start_url: str, max_depth: int = 2, max_pages: int = 10):
+    Características:
+    - Respeta el dominio original (no sale del sitio).
+    - Evita ciclos (mantiene registro de visitados).
+    - Límite de profundidad (depth) y total de páginas (max_pages).
+    - Extracción asíncrona.
+    """
+
+    def __init__(
+        self,
+        start_url: str,
+        max_depth: int = 1,
+        max_pages: int = 5,
+        concurrency: int = 1
+    ):
         self.start_url = start_url
         self.max_depth = max_depth
         self.max_pages = max_pages
+        self.concurrency = concurrency
         
-        self.base_domain = urlparse(start_url).netloc
+        # Estado del crawler
         self.visited: Set[str] = set()
         self.results: List[Dict] = []
+        self.base_domain = urlparse(start_url).netloc
         
-        # Headers para evitar bloqueos simples
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; EnterpriseRagBot/1.0; +http://your-internal-bot.com)'
-        }
+        # Scraper individual (singleton-ish)
+        self.scraper = WebScraper(
+            timeout=30000, 
+            respect_robots=False # Opcional: activar si se desea ser muy estricto
+        )
 
     async def crawl(self) -> List[Dict]:
-        """Inicia el proceso de crawling desde la URL inicial."""
-        self.visited.clear()
-        self.results.clear()
+        """
+        Inicia el proceso de crawling.
+        Retorna la lista de resultados (páginas scrapeadas).
+        """
+        logger.info(f"🕸️ Iniciando crawl recursivo: {self.start_url} (depth={self.max_depth}, max={self.max_pages})")
         
-        await self._visit(self.start_url, 0)
+        # Cola de trabajo: (url, profundidad_actual)
+        queue = asyncio.Queue()
+        queue.put_nowait((self.start_url, 0))
+        self.visited.add(self.start_url)
+        
+        # Workers
+        workers = [asyncio.create_task(self._worker(queue)) for _ in range(self.concurrency)]
+        
+        # Esperar a que la cola se vacíe
+        await queue.join()
+        
+        # Cancelar workers
+        for w in workers:
+            w.cancel()
+            
+        logger.info(f"🕸️ Crawl finalizado. Páginas extraídas: {len(self.results)}")
         return self.results
 
-    async def _visit(self, url: str, depth: int):
-        """Visita una URL individual, extrae contenido y sigue enlaces."""
-        if depth > self.max_depth:
-            return
-        
-        if len(self.visited) >= self.max_pages:
-            return
+    async def _worker(self, queue: asyncio.Queue):
+        """Worker que procesa URLs de la cola."""
+        while True:
+            # Si ya alcanzamos el límite, vaciamos la cola pendiente y terminamos el worker.
+            if len(self.results) >= self.max_pages:
+                drained = 0
+                while True:
+                    try:
+                        queue.get_nowait()
+                        queue.task_done()
+                        drained += 1
+                    except asyncio.QueueEmpty:
+                        break
+                if drained:
+                    logger.info(f"🧹 Worker drenó {drained} URLs pendientes al alcanzar max_pages={self.max_pages}")
+                return
 
-        # Normalizar URL (quitar fragmentos, etc)
-        url = url.split('#')[0]
-        if url in self.visited:
-            return
-        
-        self.visited.add(url)
-        logger.info(f"🕸️ Crawling (d={depth}): {url}")
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers, timeout=10) as response:
-                    if response.status != 200:
-                        logger.warning(f"⚠️ Status {response.status} al visitar {url}")
-                        return
-                    
-                    if 'text/html' not in response.headers.get('Content-Type', ''):
-                        logger.info(f"⏭️ Omitiendo no-HTML: {url}")
-                        return
-
-                    html = await response.text()
-                    soup = BeautifulSoup(html, 'html.parser')
-                    
-                    # 1. Extraer contenido útil de esta página
-                    # Usamos una limpieza básica aquí, idealmente reusaríamos logic de 'scrape.py' 
-                    # pero para mantenerlo ligero hacemos extracción directa.
-                    title = soup.title.string.strip() if soup.title else "No Title"
-                    
-                    # Eliminar scripts y estilos para texto limpio
-                    for script in soup(["script", "style", "nav", "footer", "header"]):
-                        script.decompose()
-                        
-                    text = soup.get_text(separator='\n\n')
-                    clean_text = "\n".join(
-                        line.strip() for line in text.splitlines() if line.strip()
-                    )
-
-                    self.results.append({
-                        "url": url,
-                        "title": title,
-                        "content": clean_text,
-                        "author": None,
-                        "date": None,
-                        "scraped_at": None, # Se llenará al indexar
-                        "extraction_method": "recursive_bs4"
-                    })
-
-                    # 2. Buscar enlaces para seguir (si no hemos llegado al tope)
-                    if depth < self.max_depth and len(self.visited) < self.max_pages:
-                        links = await self._extract_internal_links(soup, url)
-                        
-                        # Procesamiento de hijos en paralelo (limitado)
-                        # Para no saturar, tomamos los primeros N enlaces nuevos
-                        pending_tasks = []
-                        for link in links:
-                            if len(self.visited) + len(pending_tasks) >= self.max_pages:
-                                break
-                            if link not in self.visited:
-                                pending_tasks.append(self._visit(link, depth + 1))
-                        
-                        if pending_tasks:
-                            await asyncio.gather(*pending_tasks)
-
-        except Exception as e:
-            logger.error(f"❌ Error visitando {url}: {e}")
-
-    async def _extract_internal_links(self, soup: BeautifulSoup, current_url: str) -> Set[str]:
-        """Extrae enlaces que pertenecen al mismo dominio base."""
-        links = set()
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            
-            # Resolver URL absoluta
-            absolute_url = urljoin(current_url, href)
-            parsed = urlparse(absolute_url)
-            
-            # Solo mismo dominio y esquema http/https
-            if parsed.netloc == self.base_domain and parsed.scheme in ['http', 'https']:
-                links.add(absolute_url)
+            try:
+                url, depth = await queue.get()
+            except asyncio.QueueEmpty:
+                break
                 
-        return links
+            try:
+                if len(self.results) >= self.max_pages:
+                    queue.task_done()
+                    continue
+
+                logger.info(f"🕷️ Procesando (d={depth}): {url}")
+                
+                # 1. Scrapear página
+                page_data = await self.scraper.scrape(url)
+                
+                if page_data:
+                    self.results.append(page_data)
+                    
+                    # 2. Si no alcanzamos profundidad máxima, buscar enlaces
+                    if depth < self.max_depth:
+                        links = self._extract_internal_links(page_data.get("content", ""), url)
+                        # También podríamos extraer del HTML raw si el extractor lo guardara, 
+                        # pero por simplicidad buscamos en el texto/markdown extraído o 
+                        # idealmente el scraper debería devolver los hrefs.
+                        
+                        # NOTA: playwrigth_scraper.py devuelve 'content' limpio (texto). 
+                        # Para un crawler real, necesitamos los hrefs del HTML original.
+                        # Como workaround sin modificar mucho el scraper base:
+                        # Vamos a asumir que el scraper NO devuelve los links, así que 
+                        # tendremos que hacer una modificación ligera o inferir.
+                        
+                        # MEJORA: Para no romper el scraper actual, intentaremos 
+                        # extraer URLs del texto si es Markdown, O BIEN (mejor opción),
+                        # modificar el scraper base para que devuelva 'links'.
+                        # Por ahora, usaremos una regex simple sobre el contenido si parece tener links,
+                        # pero lo ideal es modificar el PlaywrightScraper. 
+                        # Vamos a modificar PlaywrightScraper para devolver 'links' extraídos.
+                        
+                        found_links = page_data.get("links", []) 
+                        
+                        for link in found_links:
+                            if link not in self.visited and self._is_internal(link):
+                                if len(self.results) + queue.qsize() < self.max_pages: # Check aproximado
+                                    self.visited.add(link)
+                                    queue.put_nowait((link, depth + 1))
+
+            except Exception as e:
+                logger.error(f"Error en worker con {url}: {e}")
+            finally:
+                queue.task_done()
+
+    def _is_internal(self, url: str) -> bool:
+        """Verifica si la URL pertenece al mismo dominio base."""
+        try:
+            parsed = urlparse(url)
+            # Aceptar dominios exactos o subdominios si se desea (aquí estricto al netloc)
+            return parsed.netloc == self.base_domain
+        except Exception:
+            return False
+
+    def _extract_internal_links(self, content: str, base_url: str) -> List[str]:
+        """
+        Helper legacy si el scraper no devolviera links.
+        (Se espera que modifiquemos playwright_scraper para devolver 'links')
+        """
+        return []

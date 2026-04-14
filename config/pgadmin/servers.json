@@ -2,7 +2,7 @@
     "Servers": {
         "1": {
             "Name": "RAG PostgreSQL",
-            "Group": "Enterprise RAG",
+            "Group": "JARVIS RAG",
             "Host": "postgres",
             "Port": 5432,
             "MaintenanceDB": "rag_system",

@@ -1,4 +1,4 @@
-# Prometheus configuration for Enterprise RAG System
+# Prometheus configuration for JARVIS RAG System
 # Docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/
 
 global:
@@ -43,6 +43,13 @@ scrape_configs:
       - targets: ['dcgm-exporter:9400']
     metrics_path: /metrics
     scrape_interval: 10s
+
+  # PostgreSQL Exporter
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    metrics_path: /metrics
+    scrape_interval: 15s
 
   # Note: The following services don't expose /metrics by default:
   # - litellm: Would need to enable metrics in config

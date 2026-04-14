@@ -1,6 +1,6 @@
 # backend/app/services/__init__.py
 """
-Servicios de lógica de negocio del Enterprise RAG System.
+Servicios de lógica de negocio del sistema JARVIS RAG.
 
 Este paquete contiene la lógica de negocio separada de los endpoints HTTP:
 - mode_detector.py: Detección inteligente del modo de operación del chat.

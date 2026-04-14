@@ -248,31 +248,76 @@ class VectorStore:
         self.client = QdrantClient(url=qdrant_url)
         logger.info(f"Cargando modelo de embeddings: {model_name}")
         self.embedder = SentenceTransformer(model_name)
+        
+        logger.info("Cargando modelo sparse: Qdrant/bm25")
+        from fastembed import SparseTextEmbedding
+        self.sparse_embedder = SparseTextEmbedding("Qdrant/bm25")
+        
         self.collection = collection
+        self.hybrid_ok = True
         self._ensure_collection()
 
     def _ensure_collection(self):
         # Inferir dimension con un ejemplo
         dim = len(self.embedder.encode(["dimension probe"])[0])
+
+        exists = False
         try:
-            _ = self.client.get_collection(self.collection)
+            collections = self.client.get_collections().collections
+            exists = any(c.name == self.collection for c in collections)
+        except Exception as e:
+            logger.warning(f"No se pudo listar colecciones Qdrant: {e}")
+
+        if exists:
+            try:
+                info = self.client.get_collection(self.collection)
+                vectors = getattr(info.config.params, "vectors", None)
+                sparse_vectors_cfg = getattr(info.config.params, "sparse_vectors", None)
+                self.hybrid_ok = isinstance(vectors, dict) and "dense" in vectors and bool(sparse_vectors_cfg)
+                if not self.hybrid_ok:
+                    logger.warning(
+                        f"Colecci?n '{self.collection}' no es h?brida. Indexando dense-only."
+                    )
+            except Exception as e:
+                self.hybrid_ok = False
+                logger.warning(f"No se pudo inspeccionar la colecci?n '{self.collection}': {e}")
+
             logger.info(f"Qdrant collection '{self.collection}' disponible")
-        except Exception:
-            logger.info(f"Creando colecciÃ³n Qdrant '{self.collection}' (dim={dim})")
-            self.client.recreate_collection(
-                collection_name=self.collection,
-                vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
-            )
+            return
 
-    def encode(self, texts: List[str]) -> List[List[float]]:
-        # Normalizamos embeddings para que el score sea coseno (igual que backend/retriever)
+        logger.info(f"Creando colecci?n Qdrant '{self.collection}' (dim={dim}) con ?ndices h?bridos")
+        from qdrant_client.models import SparseVectorParams, Modifier
+
+        self.client.create_collection(
+            collection_name=self.collection,
+            vectors_config={"dense": VectorParams(size=dim, distance=Distance.COSINE)},
+            sparse_vectors_config={"sparse": SparseVectorParams(modifier=Modifier.IDF)},
+        )
+        self.hybrid_ok = True
+
+    def encode(self, texts: List[str]) -> Tuple[List[List[float]], List[Dict]]:
+        # Dense
         vecs = self.embedder.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
-        return [v.astype(np.float32).tolist() for v in vecs]
+        dense_vectors = [v.astype(np.float32).tolist() for v in vecs]
 
-    def upsert_chunks(self, filename: str, chunks: List[Dict], vectors: List[List[float]], base_metadata: Dict):
-        assert len(chunks) == len(vectors)
+        if not self.hybrid_ok:
+            return dense_vectors, [None] * len(texts)
+
+        # Sparse
+        sparse_gen = self.sparse_embedder.embed(texts)
+        sparse_vectors = []
+        for v in sparse_gen:
+            sparse_vectors.append({
+                "indices": v.indices.tolist(),
+                "values": v.values.tolist()
+            })
+
+        return dense_vectors, sparse_vectors
+
+    def upsert_chunks(self, filename: str, chunks: List[Dict], dense_vectors: List[List[float]], sparse_vectors: List[Dict], base_metadata: Dict):
+        assert len(chunks) == len(dense_vectors) == len(sparse_vectors)
         points: List[PointStruct] = []
-        for ch, vec in zip(chunks, vectors):
+        for ch, d_vec, s_vec in zip(chunks, dense_vectors, sparse_vectors):
             payload = {
                 "text": ch["text"],
                 "filename": filename,
@@ -289,7 +334,14 @@ class VectorStore:
                 if k not in payload:
                     payload[k] = v
 
-            points.append(PointStruct(id=str(uuid.uuid4()), vector=vec, payload=payload))
+            if s_vec is None:
+                vector_payload = d_vec
+            else:
+                vector_payload = {
+                    "dense": d_vec,
+                    "sparse": s_vec
+                }
+            points.append(PointStruct(id=str(uuid.uuid4()), vector=vector_payload, payload=payload))
 
             # Upsert por lotes
             if len(points) >= BATCH_UPSERT:
@@ -418,7 +470,7 @@ class LocalRAGProcessor:
         total_chars = sum(len(c["text"]) for c in chunks)
 
         # 3) Embeddings (normalizados)
-        vectors = self.vs.encode([c["text"] for c in chunks])
+        dense_vectors, sparse_vectors = self.vs.encode([c["text"] for c in chunks])
 
         # 4) Upsert Qdrant
         now_ts = int(time.time())
@@ -432,7 +484,7 @@ class LocalRAGProcessor:
         if extra_metadata:
             base_meta.update({k: v for k, v in extra_metadata.items() if v is not None})
 
-        self.vs.upsert_chunks(filename, chunks, vectors, base_meta)
+        self.vs.upsert_chunks(filename, chunks, dense_vectors, sparse_vectors, base_meta)
 
         dt = time.time() - t0
         stats = ProcessStats(

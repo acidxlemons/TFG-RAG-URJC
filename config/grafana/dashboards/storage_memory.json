@@ -1,7 +1,7 @@
 {
     "id": null,
     "uid": "storage-memory",
-    "title": "💾 Storage & Memory Usage",
+    "title": "ðŸ’¾ Storage & Memory Usage",
     "description": "Database storage, memory usage, and resource consumption by component",
     "tags": [
         "storage",
@@ -19,7 +19,7 @@
     "panels": [
         {
             "id": 100,
-            "title": "📚 Guía de Componentes de Almacenamiento",
+            "title": "ðŸ“š GuÃ­a de Componentes de Almacenamiento",
             "type": "text",
             "gridPos": {
                 "h": 5,
@@ -29,12 +29,12 @@
             },
             "options": {
                 "mode": "markdown",
-                "content": "## ¿Qué almacena cada componente?\n\n| Componente | Qué almacena | Escala con... | Tamaño típico |\n|------------|--------------|---------------|---------------|\n| **Qdrant** | Vectores de documentos (embeddings 384-dim) | Nº de chunks de documentos | ~1MB por cada 100 docs |\n| **PostgreSQL** | Conversaciones, usuarios, historial, estados | Nº de conversaciones | Crece lento (~1KB/conversación) |\n| **Redis** | Cache de respuestas LLM, tokens temporales | Requests repetidos | Auto-limpia (TTL 1h) |\n| **Backend** | 4 Workers Python (Modelos ML x4) | Fijo al iniciar | **40-50GB RAM** |\n| **Ollama** | Modelos LLM (llama3.1, llava) en GPU | Modelos descargados | 5-15GB VRAM |\n\n> **Nota**: El Backend Memory alto (45GB) es **NORMAL** con 4 workers (Production Mode)."
+                "content": "## Â¿QuÃ© almacena cada componente?\n\n| Componente | QuÃ© almacena | Escala con... | TamaÃ±o tÃ­pico |\n|------------|--------------|---------------|---------------|\n| **Qdrant** | Vectores de documentos (embeddings 384-dim) | NÂº de chunks de documentos | ~1MB por cada 100 docs |\n| **PostgreSQL** | Conversaciones, usuarios, historial, estados | NÂº de conversaciones | Crece lento (~1KB/conversaciÃ³n) |\n| **Redis** | Cache de respuestas LLM, tokens temporales | Requests repetidos | Auto-limpia (TTL 1h) |\n| **Backend** | 4 Workers Python (Modelos ML x4) | Fijo al iniciar | **40-50GB RAM** |\n| **Ollama** | Modelos LLM (llama3.1, llava) en GPU | Modelos descargados | 5-15GB VRAM |\n\n> **Nota**: El Backend Memory alto (45GB) es **NORMAL** con 4 workers (Production Mode)."
             }
         },
         {
             "id": 1,
-            "title": "🧠 Backend Memory",
+            "title": "ðŸ§  Backend Memory",
             "description": "Memoria RAM del proceso Python (4 Workers)",
             "type": "stat",
             "gridPos": {
@@ -86,7 +86,7 @@
         },
         {
             "id": 2,
-            "title": "🗄️ Qdrant Memory",
+            "title": "ðŸ—„ï¸ Qdrant Memory",
             "description": "Memoria usada por Qdrant para vectores",
             "type": "stat",
             "gridPos": {
@@ -138,7 +138,7 @@
         },
         {
             "id": 3,
-            "title": "📊 Indexer Memory",
+            "title": "ðŸ“Š Indexer Memory",
             "description": "Memoria del indexer (OCR, procesamiento)",
             "type": "stat",
             "gridPos": {
@@ -190,8 +190,8 @@
         },
         {
             "id": 4,
-            "title": "⏱️ Backend Uptime",
-            "description": "Tiempo desde último reinicio",
+            "title": "â±ï¸ Backend Uptime",
+            "description": "Tiempo desde Ãºltimo reinicio",
             "type": "stat",
             "gridPos": {
                 "h": 4,
@@ -238,8 +238,8 @@
         },
         {
             "id": 5,
-            "title": "📈 Memoria Over Time",
-            "description": "Evolución de memoria (detecta memory leaks)",
+            "title": "ðŸ“ˆ Memoria Over Time",
+            "description": "EvoluciÃ³n de memoria (detecta memory leaks)",
             "type": "timeseries",
             "gridPos": {
                 "h": 7,
@@ -289,8 +289,8 @@
         },
         {
             "id": 6,
-            "title": "🗃️ Qdrant IO por Colección",
-            "description": "Bytes leídos/escritos por colección",
+            "title": "ðŸ—ƒï¸ Qdrant IO por ColecciÃ³n",
+            "description": "Bytes leÃ­dos/escritos por colecciÃ³n",
             "type": "bargauge",
             "gridPos": {
                 "h": 7,
@@ -336,7 +336,7 @@
         },
         {
             "id": 7,
-            "title": "💡 Cuándo preocuparse [RTX 5090 Edition]",
+            "title": "ðŸ’¡ CuÃ¡ndo preocuparse [RTX 5090 Edition]",
             "type": "text",
             "gridPos": {
                 "h": 7,
@@ -346,12 +346,12 @@
             },
             "options": {
                 "mode": "markdown",
-                "content": "### ⚠️ Alertas:\n\n**Backend > 80GB**\n- Reiniciar backend\n\n**Memory creciendo**\n- Posible memory leak\n\n**GPU VRAM > 30GB**\n- Límite físico de RTX 5090\n\n---\n\n### ✅ Normal (Producción):\n- Backend: 40-50GB (4 Workers)\n- Indexer: 1-4GB\n- Qdrant: 100-500MB"
+                "content": "### âš ï¸ Alertas:\n\n**Backend > 80GB**\n- Reiniciar backend\n\n**Memory creciendo**\n- Posible memory leak\n\n**GPU VRAM > 30GB**\n- LÃ­mite fÃ­sico de RTX 5090\n\n---\n\n### âœ… Normal (ProducciÃ³n):\n- Backend: 40-50GB (4 Workers)\n- Indexer: 1-4GB\n- Qdrant: 100-500MB"
             }
         },
         {
             "id": 8,
-            "title": "🔄 CPU Usage",
+            "title": "ðŸ”„ CPU Usage",
             "description": "Uso de CPU por proceso",
             "type": "timeseries",
             "gridPos": {
@@ -396,7 +396,7 @@
         },
         {
             "id": 9,
-            "title": "📊 Qdrant Operations",
+            "title": "ðŸ“Š Qdrant Operations",
             "description": "Operaciones realizadas en Qdrant",
             "type": "timeseries",
             "gridPos": {
@@ -436,7 +436,7 @@
         },
         {
             "id": 10,
-            "title": "🐘 PostgreSQL & Redis",
+            "title": "ðŸ˜ PostgreSQL & Redis",
             "type": "text",
             "gridPos": {
                 "h": 4,
@@ -446,12 +446,12 @@
             },
             "options": {
                 "mode": "markdown",
-                "content": "### 📊 Estado de Bases de Datos\n\n| BD | Puerto | Cómo verificar | Notas |\n|----|--------|----------------|-------|\n| **PostgreSQL** | 5432 | `docker compose exec rag-postgres psql -U rag -c \"SELECT pg_database_size('rag');\"` | Conversaciones, estados |\n| **Redis** | 6379 | `docker compose exec rag-redis redis-cli INFO memory` | Cache LLM, auto-limpia |\n\n> **Nota**: PostgreSQL y Redis no exponen métricas Prometheus por defecto. Usa los comandos para verificar."
+                "content": "### ðŸ“Š Estado de Bases de Datos\n\n| BD | Puerto | CÃ³mo verificar | Notas |\n|----|--------|----------------|-------|\n| **PostgreSQL** | 5432 | `docker compose exec rag-postgres psql -U rag -c \"SELECT pg_database_size('rag');\"` | Conversaciones, estados |\n| **Redis** | 6379 | `docker compose exec rag-redis redis-cli INFO memory` | Cache LLM, auto-limpia |\n\n> **Nota**: PostgreSQL y Redis no exponen mÃ©tricas Prometheus por defecto. Usa los comandos para verificar."
             }
         },
         {
             "id": 11,
-            "title": "🎮 GPU Memory Usage",
+            "title": "ðŸŽ® GPU Memory Usage",
             "description": "VRAM usada por Ollama/CUDA",
             "type": "timeseries",
             "gridPos": {
@@ -497,7 +497,7 @@
         },
         {
             "id": 15,
-            "title": "💻 CPU Utilization %",
+            "title": "ðŸ’» CPU Utilization %",
             "description": "Uso total de CPU (normalizado a 12 cores)",
             "type": "gauge",
             "gridPos": {
@@ -552,7 +552,7 @@
         },
         {
             "id": 12,
-            "title": "🔥 GPU Utilization %",
+            "title": "ðŸ”¥ GPU Utilization %",
             "description": "Porcentaje de uso de GPU",
             "type": "gauge",
             "gridPos": {
@@ -607,7 +607,7 @@
         },
         {
             "id": 13,
-            "title": "🌡️ GPU Temperature",
+            "title": "ðŸŒ¡ï¸ GPU Temperature",
             "description": "Temperatura de la GPU",
             "type": "gauge",
             "gridPos": {
@@ -661,8 +661,8 @@
         },
         {
             "id": 14,
-            "title": "⚡ GPU Power Usage",
-            "description": "Consumo de energía de la GPU",
+            "title": "âš¡ GPU Power Usage",
+            "description": "Consumo de energÃ­a de la GPU",
             "type": "timeseries",
             "gridPos": {
                 "h": 6,

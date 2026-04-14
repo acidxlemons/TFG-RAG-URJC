@@ -1,6 +1,6 @@
 """
 title: Web Search Tool
-author: Enterprise RAG Team
+author: JARVIS Team
 author_url: https://github.com/enterprise-rag
 funding_url: https://github.com/enterprise-rag
 version: 0.1.0

@@ -1,6 +1,6 @@
 # backend/app/core/rag/citations.py
 """
-Citations utilities for the Enterprise RAG system.
+Citations utilities for the JARVIS RAG system.
 
 Objetivos:
 - Normalizar citas a una estructura estable: {source_id, filename, page, span, label, uri}
