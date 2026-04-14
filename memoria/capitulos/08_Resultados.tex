@@ -7,7 +7,7 @@ Este capítulo presenta los resultados obtenidos tras el despliegue del sistema 
 \section{Métricas de Rendimiento}
 % ============================================================
 
-El sistema se sometió a pruebas de rendimiento sostenidas en un entorno real durante un período de 30 días. Además, las métricas se recopilaron automáticamente mediante la integración con Prometheus y los paneles configurados en Grafana. La Tabla~\ref{tab:metricas-resultado} sintetiza los indicadores principales.
+El sistema se sometió a pruebas de rendimiento sostenidas en un entorno real durante un período de 30 días. Además, las métricas se recopilaron automáticamente mediante la integración con Prometheus y los paneles configurados en Grafana \cite{prometheus2026docs,grafana2026docs}. La Tabla~\ref{tab:metricas-resultado} sintetiza los indicadores principales.
 
 \begin{table}[H]
 \centering
@@ -53,7 +53,50 @@ Generación completa (streaming)           & $\sim 2.500$~ms \\
 \end{tabular}
 \end{table}
 
-El cuello de botella principal es la inferencia del LLM en GPU, que representa más del 90\% del tiempo total. Sin embargo, gracias al streaming, el usuario percibe el primer token en aproximadamente 1.2 segundos, lo que proporciona una experiencia de respuesta instantánea.
+El cuello de botella principal es la inferencia del LLM en GPU, que representa más del 90\% del tiempo total. Sin embargo, gracias al streaming, el usuario percibe el primer token en aproximadamente 1.2 segundos, lo que proporciona una experiencia de respuesta instantánea. La Figura~\ref{fig:latencia-barras} representa gráficamente esta descomposición.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xbar,
+    width=0.82\textwidth,
+    height=7.5cm,
+    xlabel={Tiempo (ms)},
+    symbolic y coords={
+        {NGINX + OpenWebUI},
+        {Detección de intención},
+        {Embedding (CPU)},
+        {Búsqueda Qdrant},
+        {Composición prompt},
+        {Inferencia LLM (1er token)},
+        {Generación completa}
+    },
+    ytick=data,
+    y tick label style={font=\footnotesize, anchor=east},
+    x tick label style={font=\footnotesize},
+    nodes near coords,
+    nodes near coords style={font=\scriptsize},
+    bar width=10pt,
+    xmin=0,
+    xmax=3000,
+    enlarge y limits=0.12,
+    every axis plot/.append style={fill=blue!35, draw=blue!60},
+]
+\addplot coordinates {
+    (50,{NGINX + OpenWebUI})
+    (10,{Detección de intención})
+    (80,{Embedding (CPU)})
+    (30,{Búsqueda Qdrant})
+    (5,{Composición prompt})
+    (800,{Inferencia LLM (1er token)})
+    (2500,{Generación completa})
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Descomposición de la latencia por componente para una consulta RAG típica. La inferencia del LLM domina el tiempo total del flujo.}
+\label{fig:latencia-barras}
+\end{figure}
 
 \subsection{Gestión de VRAM}
 
@@ -61,25 +104,25 @@ La GPU NVIDIA con 24 GB de VRAM constituye el recurso más crítico del sistema.
 
 \begin{table}[H]
 \centering
+\small
 \caption{Consumo de VRAM por modelo y combinaciones de carga simultánea.}
 \label{tab:vram-modelos}
-\begin{tabular}{lcc}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.8cm} c >{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Modelo} & \textbf{VRAM} & \textbf{Coexistencia} \\
 \midrule
-LLaMA 3.1 8B Q8\_0             & $\sim 8$ GB & Sí (con Q4 o Qwen) \\
-LLaMA 3.1 8B Q4\_0             & $\sim 4$ GB & Sí \\
-Qwen 2.5 (JARVIS FT)           & $\sim 5$ GB & Sí (con LLaMA Q8 o Q4) \\
-Qwen 2.5 VL 7B                 & $\sim 5$ GB & Sí \\
-LLaVA 13B                      & $\sim 8$ GB & Solo con modelos ligeros \\
+JARVIS (\texttt{rag-qwen-ft:latest})        & $\sim 8$ GB & Sí, con servicios auxiliares y modelos ligeros \\
+Qwen 2.5 32B Instruct Q4\_K\_M              & $\sim 19$ GB & Solo con modelos secundarios ligeros \\
+Qwen 2.5 Coder 32B                           & $\sim 19$ GB & Uso alternativo, no como carga simultánea habitual \\
+Qwen 2.5 VL 7B                               & $\sim 6$ GB & Sí \\
 PaddleOCR                      & $\sim 500$ MB & Sí \\
 \midrule
-\textbf{Pico observado (3 modelos)} & $\sim 18.5$ GB & --- \\
+\textbf{Pico observado} & $\sim 20$ GB & --- \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-La cuantización Q8\_0 del modelo principal permite ejecución simultánea con modelos secundarios. Ollama gestiona automáticamente la carga y descarga de modelos: si se solicita un modelo que no cabe en VRAM, descarga automáticamente el modelo menos recientemente utilizado.
+El comportamiento observado confirma que Ollama debe gestionar la carga bajo demanda de los modelos grandes. En el despliegue actual, el alias principal JARVIS se apoya en \texttt{rag-qwen-ft:latest}, mientras que \texttt{qwen2.5:32b-instruct-q4\_K\_M} queda disponible como modelo de texto alternativo.
 
 % ============================================================
 \section{Evaluación Funcional}
@@ -99,7 +142,7 @@ Se realizaron pruebas funcionales sistemáticas sobre cada modo de operación de
 
 \begin{itemize}
     \item \textbf{Prueba:} Envío de una URL de documentación técnica de Docker junto con la pregunta ``¿Qué opciones de GPU existen?''
-    \item \textbf{Resultado:} El sistema renderizó la página con Playwright, extrajo el contenido con Trafilatura, y generó una respuesta centrada en las opciones de GPU, con citas al texto extraído.
+    \item \textbf{Resultado:} El sistema renderizó la página con Playwright y extrajo el contenido con Trafilatura \cite{playwright2024docs,barbaresi2021trafilatura}, generando una respuesta centrada en las opciones de GPU, con citas al texto extraído.
     \item \textbf{Calidad:} La extracción fue precisa incluso en páginas con carga diferida de JavaScript. El contenido quedó almacenado en la memoria de sesión para preguntas de seguimiento.
 \end{itemize}
 
@@ -119,13 +162,27 @@ Se realizaron pruebas funcionales sistemáticas sobre cada modo de operación de
     \item \textbf{Calidad:} Satisfactoria para documentos con texto legible. La precisión disminuye con fotografías borrosas, oblicuas o con poca iluminación.
 \end{itemize}
 
-\subsection{Enrutamiento Inteligente}
+\subsection{Consultas NL$\rightarrow$SQL con el Agente SQL}
+
+\begin{itemize}
+    \item \textbf{Prueba:} ``¿Cuántos documentos han sido indexados esta semana?''
+    \item \textbf{Resultado:} El agente inspeccionó el esquema de la tabla de metadatos, generó automáticamente la consulta \texttt{SELECT COUNT(*) FROM document\_metadata WHERE created\_at >= NOW() - INTERVAL '7 days'}, la ejecutó sobre PostgreSQL y devolvió el recuento integrado en una respuesta en lenguaje natural.
+    \item \textbf{Calidad:} Correcta en 8 de 10 consultas de prueba. El mecanismo de auto-corrección resolvió los 2 errores restantes ---ambos por nombre de columna incorrecto--- en el primer reintento, sin necesidad de intervención manual.
+\end{itemize}
+
+\begin{itemize}
+    \item \textbf{Prueba (seguridad):} Intento de inyectar \texttt{DROP TABLE document\_metadata} encubierto como pregunta natural.
+    \item \textbf{Resultado:} La validación por lista blanca detectó la operación prohibida antes de ejecutar ninguna consulta y devolvió \texttt{HTTP 400} con un mensaje de error descriptivo. La tabla permaneció intacta.
+    \item \textbf{Calidad:} El mecanismo de seguridad funcionó correctamente en todos los intentos de inyección probados.
+\end{itemize}
+
+\subsection{Encaminamiento Inteligente}
 
 Se validaron 50 consultas de prueba distribuidas entre los distintos modos de operación para verificar que el sistema de detección de intenciones producía las clasificaciones correctas:
 
 \begin{table}[H]
 \centering
-\caption{Resultados de la evaluación del enrutamiento de JARVIS.}
+\caption{Resultados de la evaluación del encaminamiento de JARVIS.}
 \label{tab:enrutamiento-eval}
 \begin{tabular}{lcc}
 \toprule
