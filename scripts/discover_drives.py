@@ -12,8 +12,10 @@ AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID")
 AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
 AZURE_CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
 
-# Site ID del sitio Calidad (proporcionado por el usuario)
-SITE_ID = "europavia.sharepoint.com,c6a84532-9c7b-44fc-9682-a6de53d30ec3,17e583b8-2fde-4bf8-be46-8cf4a6f1d93c"
+# Site ID del sitio a explorar — obtén el tuyo desde:
+# GET https://graph.microsoft.com/v1.0/sites?search=<nombre-sitio>
+# o desde Graph Explorer: https://developer.microsoft.com/en-us/graph/graph-explorer
+SITE_ID = os.getenv("SHAREPOINT_SITE_ID", "tuempresa.sharepoint.com,XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX,YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY")
 
 def get_access_token():
     """Obtiene token de acceso de Azure AD"""
@@ -55,7 +57,7 @@ def main():
         print(f"        Web URL: {drive.get('webUrl')}")
     
     print("\n" + "=" * 60)
-    print("USA el 'Drive ID' de 'Biblioteca Calidad' en la configuracion")
+    print("USA el 'Drive ID' correspondiente en la configuracion (sharepoint_sites.json)")
     print("=" * 60)
 
 if __name__ == "__main__":

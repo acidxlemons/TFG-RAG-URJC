@@ -94,7 +94,7 @@ Para encontrar el **Object ID** de un grupo de SharePoint/Teams:
 
 ### 2.3 Investigando IDs de Sitios (Reverse Lookup)
 
-Si tienes un **Site ID** (ej. `europavia.sharepoint.com,7460...`) y quieres saber a qué sitio web corresponde:
+Si tienes un **Site ID** (ej. `tuempresa.sharepoint.com,XXXXXXXX-XXXX,YYYYYYYY-YYYY...`) y quieres saber a qué sitio web corresponde:
 
 1. Abre **[Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer)**.
 2. Haz una petición GET a:
@@ -110,17 +110,16 @@ Imagina que creamos un sitio nuevo "Recursos Humanos".
 
 **Paso 1: Crear Grupo en Azure AD**
 - Crear grupo `RRHH_RAG_Access`.
-- **Copiar el Object ID** del grupo (ej. `7573b3c1-eeb0-4e3b-...`).
+- **Copiar el Object ID** del grupo (ej. `XXXXXXXX-XXXX-XXXX-...`).
 
 **Paso 2: Actualizar el Mapeo en el Pipeline**
 Editar archivo: `services/openwebui/pipelines/jarvis.py`
 
 ```python
 DEPARTMENT_MAPPING: Dict[str, str] = {
-    "CIVEX2": "documents_CIVEX2",
     # NUEVO GRUPO
-    "7573b3c1-eeb0-4e3b-...": "documents_RRHH",  # Object ID -> Colección
-    "RRHH_RAG_Access": "documents_RRHH"          # Nombre -> Colección (opcional)
+    "XXXXXXXX-XXXX-XXXX-...": "documents_RRHH",  # Object ID -> Colección
+    "RRHH_RAG_Access": "documents_RRHH"           # Nombre -> Colección (opcional)
 }
 ```
 

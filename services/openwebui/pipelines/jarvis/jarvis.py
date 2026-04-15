@@ -53,11 +53,12 @@ class Pipeline:
         VISION_MODEL: str = "qwen2.5vl"       # Qwen 2.5 VL 7B - OCR y análisis de imágenes
         TEXT_MODEL: str = "JARVIS"
         DEPARTMENT_MAPPING: Dict[str, str] = {
-            # CIVEX2 - Grupo Microsoft 365 (ID verificado en Azure AD)
-            "CIVEX2": "documents_CIVEX2",
-            "7573b3c1-eeb0-4e3b-8c41-08b749a1dffd": "documents_CIVEX2",  # ID del grupo CIVEX2 en Azure AD
-            
-            # Nota: documents_CALIDAD es global (ver _get_user_departments)
+            # Mapeo nombre/UUID de grupo Azure AD → colección Qdrant
+            # Ejemplo: "NombreGrupo": "documents_NombreGrupo"
+            # o bien con UUID: "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX": "documents_NombreGrupo"
+            # Configura aquí los grupos de tu organización según sharepoint_sites.json
+
+            # Nota: la colección "documents" es global (acceso a todos los usuarios)
             # Añadir más grupos aquí cuando se configuren en Azure AD
         }
         # Colección por defecto si no hay grupos o multi-tenant deshabilitado
@@ -71,7 +72,7 @@ class Pipeline:
         FILE_CHUNK_SIZE: int = 1200
         FILE_CHUNK_OVERLAP: int = 200
         FILE_TOP_K: int = 5
-        GLOBAL_READ_COLLECTIONS: List[str] = ["documents", "documents_CALIDAD", "webs"]
+        GLOBAL_READ_COLLECTIONS: List[str] = ["documents", "webs"]
         
         # URL del servicio Indexer para status checks
         INDEXER_URL: str = "http://rag-indexer:8001"
@@ -160,10 +161,9 @@ class Pipeline:
         for builtin_collection in [self.valves.DEFAULT_COLLECTION, *self.valves.GLOBAL_READ_COLLECTIONS]:
             register_collection_aliases(builtin_collection)
 
-        mapping["calidad"] = "documents_CALIDAD"
-        mapping["quality"] = "documents_CALIDAD"
-        mapping["documentos_calidad"] = "documents_CALIDAD"
-        mapping["documentos calidad"] = "documents_CALIDAD"
+        # Alias adicionales de colecciones para resolución por nombre natural
+        # Añadir aquí aliases específicos de los departamentos configurados
+        # Ejemplo: mapping["nombre_departamento"] = "documents_NombreDepartamento"
         register_collection_aliases("webs")
 
         self._department_mapping = mapping
@@ -2261,7 +2261,7 @@ class Pipeline:
         
         # Intentar extraer colección específica
         # Intentar extraer colección específica
-        # Ej: "que docs tengo en CIVEX2", "docs de civex2", "documentos en documents_CIVEX2"
+        # Ej: "que docs tengo en Proyecto1", "docs de proyecto1", "documentos en documents_Proyecto1"
         # Regex mejorada para soportar acentos y caracteres especiales básicos
         collection_pattern = r"(?:en|de|dentro de|about)\s+([a-zA-Z0-9_\-\u00C0-\u00FF]+)"
         collection_match = re.search(collection_pattern, message_lower)

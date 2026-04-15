@@ -42,11 +42,12 @@ class Pipeline:
         TEXT_MODEL: str = "llama3.1-8b"       # LLaMA 3.1 8B Q8 - Conversación y RAG
         VISION_MODEL: str = "llava"           # LLaVA 13B - OCR y análisis de imágenes
         DEPARTMENT_MAPPING: Dict[str, str] = {
-            # CIVEX2 - Grupo Microsoft 365 (ID verificado en Azure AD)
-            "CIVEX2": "documents_CIVEX2",
-            "7573b3c1-eeb0-4e3b-8c41-08b749a1dffd": "documents_CIVEX2",  # ID del grupo CIVEX2 en Azure AD
-            
-            # Nota: documents_CALIDAD es global (ver _get_user_departments)
+            # Mapeo nombre/UUID de grupo Azure AD → colección Qdrant
+            # Ejemplo: "NombreGrupo": "documents_NombreGrupo"
+            # o bien con UUID: "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX": "documents_NombreGrupo"
+            # Configura aquí los grupos de tu organización según sharepoint_sites.json
+
+            # Nota: la colección "documents" es global (acceso a todos los usuarios)
             # Añadir más grupos aquí cuando se configuren en Azure AD
         }
         # Colección por defecto si no hay grupos o multi-tenant deshabilitado

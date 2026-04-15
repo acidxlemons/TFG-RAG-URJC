@@ -2348,14 +2348,14 @@ LLM RESPONDE:
 
 ## Apéndice A: Configuración de Referencia Azure
 
-**App Registration**: `tfg-indexer`
-- **Tenant ID**: `280471b9-5e0b-4ec4-b55a-3fd36e4f1d46`
-- **Client ID**: `1e015b63-5f03-4345-a93a-2a89e8fa3ac3`
-- **Secret**: `gxj...` (Ver .env o AZURE_CREDENTIALS.md original para valor completo)
+**App Registration**: crea la tuya en [portal.azure.com](https://portal.azure.com) > Azure Active Directory > App registrations.
+- **Tenant ID**: `YOUR_TENANT_ID` (ej. `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`)
+- **Client ID**: `YOUR_CLIENT_ID` (ej. `YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY`)
+- **Secret**: generado en Certificates & secrets → guárdalo en `.env` como `AZURE_CLIENT_SECRET`
 
-**Sitios SharePoint**:
+**Sitios SharePoint** (ejemplos, configura los tuyos en `config/sharepoint_sites.json`):
 1. **DeptA**: Colección `documents_deptA`.
-2. **Calidad**: Colección `documents_CALIDAD`.
+2. **DeptB**: Colección `documents_deptB`.
 
 ---
 

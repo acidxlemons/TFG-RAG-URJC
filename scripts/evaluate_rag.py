@@ -46,8 +46,8 @@ def load_golden_dataset(path: str, limit: int = None) -> List[Dict]:
     print(f"[*] Loaded {len(data)} examples from {path}")
     return data
 
-# All collections to search
-COLLECTIONS = ["documents", "documents_CALIDAD", "documents_CIVEX2"]
+# Colecciones Qdrant a evaluar — ajustar según la configuración del despliegue
+COLLECTIONS = ["documents"]
 
 
 def call_rag_backend(question: str) -> Dict[str, Any]:
