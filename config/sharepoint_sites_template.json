@@ -1,0 +1,30 @@
+{
+    "description": "Plantilla de configuración de sitios SharePoint para sincronización RAG. Copia este fichero a sharepoint_sites.json y rellena con los datos de tu organización.",
+    "sync_settings": {
+        "interval_seconds": 300,
+        "full_sync_on_startup": false,
+        "delete_local_on_remote_delete": true
+    },
+    "sites": [
+        {
+            "_comment": "Ejemplo de sitio — elimina este bloque y añade los tuyos reales",
+            "name": "NombreSitio",
+            "site_id": "tuempresa.sharepoint.com,XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX,YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY",
+            "folder_path": "Documentos/RAG",
+            "collection_name": "documents_NombreSitio",
+            "enabled": false,
+            "description": "Descripción del sitio",
+            "azure_groups": [
+                "NombreGrupo-Members"
+            ]
+        }
+    ],
+    "shared_collection": {
+        "enabled": false,
+        "name": "documents_Compartido"
+    },
+    "permission_mapping": {
+        "description": "Mapeo de grupos Azure AD a colecciones Qdrant",
+        "mappings": {}
+    }
+}

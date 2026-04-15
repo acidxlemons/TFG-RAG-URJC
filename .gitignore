@@ -13,6 +13,8 @@
 .env
 .env.*
 *.env
+# Excepción: el .env.example SÍ debe rastrearse (es plantilla pública sin secretos)
+!.env.example
 .env.local
 .env.production
 .env.development

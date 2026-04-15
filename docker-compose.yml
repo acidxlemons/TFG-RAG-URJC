@@ -347,7 +347,7 @@ services:
     volumes:
       - ./services/indexer/app:/app/app
       - ./backend/app/integrations:/app/app/integrations
-      - ./config/sharepoint_sites.json:/app/config/sharepoint_sites.json:ro
+      - ${SHAREPOINT_SITES_FILE:-./config/sharepoint_sites_template.json}:/app/config/sharepoint_sites.json:ro
       - ocr_cache:/app/cache
       - ./data/watch:/app/watch
       - ./models:/workspace/models:ro # Fine-tuned models
