@@ -39,7 +39,7 @@
         <section id="hero" class="hero">
             <div class="hero-content">
                 <div class="badge glass-panel">
-                    <span class="pulse-dot"></span> TFG — Grado en Ingeniería Informática &nbsp;·&nbsp; <span style="color:#6ee7b7; font-weight:600;">v2.2</span>
+                    <span class="pulse-dot"></span> TFG — Grado en Ingeniería Informática &nbsp;·&nbsp; <span style="color:#6ee7b7; font-weight:600;">v2.3.0</span>
                 </div>
                 <h1 class="hero-title">
                     Inteligencia Corporativa <br>
@@ -114,11 +114,12 @@
                     BACKEND --> REDIS[(Redis :6380)]:::db
                     BACKEND --> MINIO[(MinIO S3 :9002)]:::db
 
-                    BACKEND --> LITELLM[LiteLLM Proxy :4001]
+                    BACKEND --> QP[QueryProcessor v2.3]
+                    QP -->|Intent detection| LITELLM[LiteLLM Proxy :4001]
                     EMBED((MiniLM-L12-v2 384d)):::model
                     LITELLM -.->|Embeddings| EMBED
-                    LITELLM -.->|Chat principal| LLM1((JARVIS rag-qwen-ft)):::model
-                    LITELLM -.->|Alternativo| LLM2((Qwen 2.5 32B Q4)):::model
+                    LITELLM -.->|FACTUAL · PROCEDURAL| LLM1((JARVIS rag-qwen-ft)):::model
+                    LITELLM -.->|ANALYTICAL · Summarización| LLM2((Qwen 2.5 32B Q4)):::model
 
                     subgraph Observabilidad [Monitorizacion]
                     GRAF[Grafana :3003]:::monitor
@@ -267,6 +268,31 @@
                 </div>
             </div>
 
+            <div class="feature-row">
+                <div class="feature-text">
+                    <h2 class="gradient-text">Query Processor — Routing Inteligente <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:3px 8px; border-radius:6px; margin-left:6px; vertical-align:middle;">v2.3</span></h2>
+                    <p>Cada consulta pasa por el <strong>QueryProcessor</strong> antes de llegar a Qdrant.
+                        Detecta la intención (FACTUAL, PROCEDURAL, ANALYTICAL), elige el modelo LLM óptimo
+                        y genera variaciones de la pregunta para ampliar el recall semántico.</p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check-circle"></i> JARVIS para consultas rápidas y precisas (&lt;3s)</li>
+                        <li><i class="fas fa-check-circle"></i> qwen2.5-32b para análisis comparativo multi-documento</li>
+                        <li><i class="fas fa-check-circle"></i> ×3 variantes de query → fusión → reranker final</li>
+                    </ul>
+                </div>
+                <div class="feature-visual glass-panel flex-center"
+                    style="flex-direction: column; text-align: center; padding: 2rem;">
+                    <i class="fas fa-code-branch fa-4x" style="color: #6ee7b7; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Smart Model Routing</h4>
+                    <p class="text-muted" style="font-family:monospace; font-size:0.82rem; margin-top:0.5rem; line-height:2; text-align:left;">
+                        FACTUAL &nbsp;&nbsp; → JARVIS (rápido)<br>
+                        PROCEDURAL → JARVIS (citas OK)<br>
+                        ANALYTICAL → qwen2.5-32b (32K)<br>
+                        Resumen &nbsp;&nbsp; → qwen2.5-32b (síntesis)
+                    </p>
+                </div>
+            </div>
+
             <div class="feature-row reverse">
                 <div class="feature-text">
                     <h2 class="gradient-text">Monitorización Avanzada</h2>
@@ -293,7 +319,7 @@
         <section id="estructura" class="section">
             <div class="section-header text-center">
                 <h2>Estructura del Proyecto</h2>
-                <p class="text-muted">Componentes principales del backend y sus responsabilidades (v2.2).</p>
+                <p class="text-muted">Componentes principales del backend y sus responsabilidades (v2.3.0).</p>
             </div>
             <div class="glass-panel" style="padding: 2rem; border-radius: 16px; overflow-x: auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
@@ -308,9 +334,9 @@
                             <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">api/search.py</td>
                             <td style="padding:0.6rem 1rem; color:#cbd5e1;">Búsqueda híbrida (dense + BM25 + reranking) con expansión paralela asíncrona y validación JWT</td>
                         </tr>
-                        <tr style="border-bottom:1px solid #1e293b;">
-                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">api/chat.py</td>
-                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Chat RAG con streaming SSE y memoria conversacional en PostgreSQL</td>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">api/chat.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.3</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Chat RAG con streaming SSE, QueryProcessor integrado (intent → expansion → routing) y memoria conversacional</td>
                         </tr>
                         <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
                             <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">api/query.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.1</span></td>
@@ -324,17 +350,17 @@
                             <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">core/auth.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.1</span></td>
                             <td style="padding:0.6rem 1rem; color:#cbd5e1;">Validación JWT Azure AD para multi-tenant (activa con <code>AZURE_JWT_VALIDATION=true</code>)</td>
                         </tr>
-                        <tr style="border-bottom:1px solid #1e293b;">
-                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/query_processor.py</td>
-                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Expansión de queries vía LiteLLM HTTP, detección de intención, extracción de keywords</td>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">core/query_processor.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.3</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;"><strong>Intent detection</strong> (FACTUAL/PROCEDURAL/ANALYTICAL) → <strong>smart model routing</strong> (JARVIS vs qwen2.5-32b) → <strong>query expansion</strong> (×3 variantes vía LLM, fusión y dedup)</td>
                         </tr>
                         <tr style="border-bottom:1px solid #1e293b;">
                             <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/retrieval.py</td>
                             <td style="padding:0.6rem 1rem; color:#cbd5e1;">Pipeline híbrido con filtros avanzados (filename, date_range, from_ocr, source_type)</td>
                         </tr>
-                        <tr style="border-bottom:1px solid #1e293b;">
-                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">core/memory/manager.py</td>
-                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Historial conversacional en PostgreSQL con summarización automática vía LiteLLM</td>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">core/memory/manager.py <span style="font-size:0.7rem; background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; margin-left:4px;">v2.3</span></td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Historial conversacional en PostgreSQL con summarización automática usando <strong>qwen2.5-32b</strong> (32K ctx, mejor síntesis)</td>
                         </tr>
                         <tr style="border-bottom:1px solid #1e293b;">
                             <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">processing/embeddings/</td>
@@ -381,7 +407,7 @@
                     <p>Alucinaciones <br>(modo RAG)</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">7.000+</div>
+                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">8.000+</div>
                     <p>Líneas Python <br>Desarrollo Propio</p>
                 </div>
             </div>
@@ -428,7 +454,7 @@
                             <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">qwen2.5:32b-q4_K_M</td>
                             <td style="padding:0.6rem 1rem;"><span style="background:#064e3b; color:#6ee7b7; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Actual ✓</span></td>
                             <td style="padding:0.6rem 1rem; color:#3b82f6;">~19 GB</td>
-                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Fallback y análisis complejo. Contexto 32K tokens.</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Consultas <strong>ANALYTICAL</strong> (routing automático) + summarización de historial largo. 32K ctx.</td>
                         </tr>
                         <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
                             <td style="padding:0.6rem 1rem; color:#8b5cf6; font-family:monospace;">qwen2.5vl:7b</td>
@@ -445,8 +471,9 @@
                     </tbody>
                 </table>
                 <p style="margin-top:1rem; font-size:0.8rem; color:#64748b;">
-                    * La migración de Llama → Qwen se realizó en diciembre 2025 (v3.5). Qwen 2.5 superó a Llama 3.1 en
-                    comprensión del español (+23%), seguimiento de instrucciones complejas y contexto largo. Documentado en <code>docs/FINE_TUNING_GUIDE.md</code>.
+                    * La migración de Llama → Qwen se realizó en diciembre 2025. Qwen 2.5 superó a Llama 3.1 en
+                    comprensión del español (+23%), seguimiento de instrucciones complejas y contexto largo.
+                    En v2.3.0 se añadió smart model routing: JARVIS para consultas rápidas/precisas, qwen2.5-32b para análisis complejos. Documentado en <code>docs/FINE_TUNING_GUIDE.md</code>.
                 </p>
             </div>
         </section>
