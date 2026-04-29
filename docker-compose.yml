@@ -54,7 +54,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: tfg-redis
-    command: [ "redis-server", "--appendonly", "yes" ]
+    command: [ "redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru" ]
     volumes:
       - redis_data:/data
     ports:
@@ -287,6 +287,7 @@ services:
     <<: *default-env
     volumes:
       - ./backend/app:/workspace/app
+      - ./config:/workspace/config  # Configuración sitios SharePoint y permisos
       - ocr_cache:/workspace/app/cache
       - ocr_cache:/root/.paddleocr
       - ./models:/workspace/models # Fine-tuned models
@@ -295,7 +296,8 @@ services:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379
       LITELLM_URL: http://litellm:4000
-      LITELLM_API_KEY: sk-1234
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-1234}
+      LLM_MODEL: ${LLM_MODEL:-JARVIS}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
@@ -305,10 +307,12 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-/workspace/models/finetuned_embeddings}
       # Fine-tuned reranker (cross-encoder for better ranking)
       RERANKER_MODEL: ${RERANKER_MODEL:-/workspace/models/finetuned_reranker}
-      OCR_NUM_WORKERS: "6"
+      RERANKER_DEVICE: ${RERANKER_DEVICE:-cpu}
+      OCR_NUM_WORKERS: ${BACKEND_OCR_NUM_WORKERS:-2}
       OCR_USE_GPU: "true"
       LOG_LEVEL: INFO
       PADDLE_HOME: /root/.paddleocr
+      SHAREPOINT_SITES_CONFIG: /workspace/config/sharepoint_sites.json
       PYTHONPATH: /workspace
     ports:
       - "8002:8000"
@@ -466,8 +470,9 @@ services:
       DEFAULT_MODELS: "JARVIS"
       # Force env vars to take precedence over DB config (needed for DEFAULT_MODELS)
       ENABLE_PERSISTENT_CONFIG: "False"
-      # Make ALL models visible to ALL users (bypass admin-only visibility)
-      BYPASS_MODEL_ACCESS_CONTROL: "True"
+      # Control de acceso a modelos: False = respetar visibilidad por rol (producción)
+      BYPASS_MODEL_ACCESS_CONTROL: "False"
+      DEFAULT_USER_ROLE: "user"
       ENABLE_RAG_WEB_SEARCH: "false"
       ENABLE_IMAGE_GENERATION: "false"
       RAG_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2

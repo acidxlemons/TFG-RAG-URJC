@@ -20,6 +20,8 @@ from app.core.agent.base import RAGAgent
 from app.processing.ocr.paddle_ocr import OCRPipeline
 from app.processing.chunking.smart_chunker import SmartChunker
 from app.integrations.sharepoint.client import SharePointClient
+from app.integrations.sharepoint.permissions import sync_permissions, get_cached_group_map, get_global_collections
+from app.core.auth import update_group_map, update_global_collections
 
 # Routers
 from app.api import scrape as scrape_api
@@ -123,7 +125,12 @@ async def lifespan(app: FastAPI):
     postgres_url = os.getenv("POSTGRES_URL")
     if not postgres_url:
         logger.warning("POSTGRES_URL no establecido. MemoryManager intentará conectarse con valor vacío.")
-    app_state.memory = MemoryManager(database_url=postgres_url)
+    app_state.memory = MemoryManager(
+        database_url=postgres_url,
+        litellm_base_url=os.getenv("LITELLM_URL", "http://litellm:4000"),
+        litellm_api_key=os.getenv("LITELLM_API_KEY") or os.getenv("LITELLM_MASTER_KEY", "sk-1234"),
+        llm_model=os.getenv("LLM_MODEL", "JARVIS"),
+    )
     logger.info("✓ Memory Manager inicializado")
 
     # ===== Agente clásico
@@ -151,19 +158,63 @@ async def lifespan(app: FastAPI):
     )
     logger.info("✓ Smart Chunker inicializado")
 
-    # ===== SharePoint (opcional)
+    # ===== SharePoint Client
+    # Usa AZURE_TENANT_ID/CLIENT_ID/SECRET (credenciales del app registration principal)
     app_state.sharepoint = None
-    if os.getenv("SHAREPOINT_TENANT_ID"):
+    _sp_tenant = os.getenv("AZURE_TENANT_ID") or os.getenv("SHAREPOINT_TENANT_ID")
+    _sp_client = os.getenv("AZURE_CLIENT_ID") or os.getenv("SHAREPOINT_CLIENT_ID")
+    _sp_secret = os.getenv("AZURE_CLIENT_SECRET") or os.getenv("SHAREPOINT_CLIENT_SECRET")
+
+    if _sp_tenant and _sp_client and _sp_secret:
         app_state.sharepoint = SharePointClient(
-            tenant_id=os.getenv("SHAREPOINT_TENANT_ID"),
-            client_id=os.getenv("SHAREPOINT_CLIENT_ID"),
-            client_secret=os.getenv("SHAREPOINT_CLIENT_SECRET"),
-            site_id=os.getenv("SHAREPOINT_SITE_ID"),
+            tenant_id=_sp_tenant,
+            client_id=_sp_client,
+            client_secret=_sp_secret,
+            site_id=os.getenv("SHAREPOINT_SITE_ID") or None,
             folder_path=os.getenv("SHAREPOINT_FOLDER_PATH", "Documents"),
         )
         logger.info("✓ SharePoint Client inicializado")
 
-    logger.info("✅ Aplicación lista (Refactorizada y Modular)")
+        # ===== Sincronización automática de permisos
+        # Resuelve los nombres de grupos Azure AD definidos en sharepoint_sites.json
+        # a sus UUIDs reales y actualiza el group map para validación JWT.
+        # Los UUIDs se cachean en disco; solo se llama a Graph API para grupos nuevos.
+        if _bool_env("AZURE_JWT_VALIDATION"):
+            # Registrar colecciones globales (accesibles a todos los usuarios autenticados)
+            global_colls = get_global_collections()
+            if global_colls:
+                update_global_collections(global_colls)
+                logger.info(f"✓ Colecciones globales registradas: {global_colls}")
+
+            try:
+                group_map = sync_permissions(app_state.sharepoint)
+                if group_map:
+                    update_group_map(group_map)
+                    logger.info(f"✓ Permisos sincronizados: {len(group_map)} grupos mapeados")
+                else:
+                    logger.warning(
+                        "sync_permissions no devolvió grupos. "
+                        "Verifica site_id en sharepoint_sites.json y permisos Group.Read.All en Azure AD."
+                    )
+            except Exception as e:
+                # Fallo no crítico: intenta usar UUIDs cacheados en disco
+                logger.error(f"Error en sync_permissions: {e}. Intentando usar caché local...")
+                cached = get_cached_group_map()
+                if cached:
+                    update_group_map(cached)
+                    logger.info(f"✓ Group map cargado desde caché: {len(cached)} grupos")
+                else:
+                    logger.error(
+                        "Sin group map disponible. La validación JWT no podrá filtrar por colecciones. "
+                        "Añade azure_group_ids manualmente a sharepoint_sites.json o configura AZURE_GROUP_MAP en .env."
+                    )
+    else:
+        logger.warning(
+            "AZURE_TENANT_ID/CLIENT_ID/SECRET no configurados. "
+            "SharePoint Client y sincronización de permisos desactivados."
+        )
+
+    logger.info("✅ Aplicación lista (JARVIS v2.2.0)")
     yield
 
 

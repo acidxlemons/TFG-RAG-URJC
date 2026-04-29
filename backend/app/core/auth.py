@@ -33,15 +33,48 @@ _AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "")
 _JWT_ENABLED = os.getenv("AZURE_JWT_VALIDATION", "false").lower() in {"1", "true", "yes"}
 
 # Mapeo de group IDs de Azure AD a nombres de colección Qdrant.
-# Formato en .env: AZURE_GROUP_MAP=<group-uuid>=documents_CALIDAD,<group-uuid>=documents_HELIAP2
-# Si no se configura, cualquier token válido accede a todas las colecciones del tenant.
+# Se construye automáticamente desde sharepoint_sites.json al arrancar
+# (ver main.py → sync_permissions). Puede complementarse con AZURE_GROUP_MAP en .env:
+#   AZURE_GROUP_MAP=<group-uuid>=documents_CALIDAD,<group-uuid>=documents_HELIAP2
 _GROUP_MAP: dict[str, str] = {}
+
+# Colecciones con acceso global: accesibles para cualquier usuario autenticado
+# sin necesidad de pertenecer a un grupo concreto.
+# Se pobla desde sharepoint_sites.json (global_access: true) al arrancar.
+_GLOBAL_COLLECTIONS: List[str] = []
+
+# Cargar mapeo manual desde .env como semilla inicial (si existe)
 _raw_map = os.getenv("AZURE_GROUP_MAP", "")
 if _raw_map.strip():
     for pair in _raw_map.split(","):
         if "=" in pair:
             gid, coll = pair.split("=", 1)
             _GROUP_MAP[gid.strip()] = coll.strip()
+
+
+def update_group_map(new_map: dict[str, str]) -> None:
+    """
+    Actualiza el mapeo grupo_uuid → colección en tiempo de ejecución.
+
+    Llamado desde main.py después de que sync_permissions() resuelve
+    los UUIDs de los grupos de Azure AD definidos en sharepoint_sites.json.
+    Los grupos del .env (AZURE_GROUP_MAP) se mantienen y los nuevos se añaden.
+    """
+    global _GROUP_MAP
+    _GROUP_MAP.update(new_map)
+    logger.info(f"Group map actualizado: {len(_GROUP_MAP)} entradas totales")
+
+
+def update_global_collections(collections: List[str]) -> None:
+    """
+    Registra las colecciones con acceso global (global_access: true en sharepoint_sites.json).
+
+    Llamado desde main.py al arrancar. Estas colecciones se añaden automáticamente
+    a cualquier usuario autenticado válido, independientemente de sus grupos JWT.
+    """
+    global _GLOBAL_COLLECTIONS
+    _GLOBAL_COLLECTIONS = list(collections)
+    logger.info(f"Colecciones globales registradas: {_GLOBAL_COLLECTIONS}")
 
 
 # ── JWKS client con caché (rota automáticamente) ───────────
@@ -108,28 +141,35 @@ def extract_allowed_collections(authorization_header: Optional[str]) -> Optional
     # 1. Claim personalizado "tenant_collections" (más sencillo si el frontend lo mete)
     custom = payload.get("tenant_collections")
     if custom:
+        result: List[str] = []
         if isinstance(custom, str):
-            return [c.strip() for c in custom.split(",") if c.strip()]
-        if isinstance(custom, list):
-            return [str(c).strip() for c in custom if c]
+            result = [c.strip() for c in custom.split(",") if c.strip()]
+        elif isinstance(custom, list):
+            result = [str(c).strip() for c in custom if c]
+        # Añadir colecciones globales aunque venga claim personalizado
+        return list(dict.fromkeys(result + _GLOBAL_COLLECTIONS))
 
     # 2. Roles de la aplicación → mapear a colecciones
     app_roles: List[str] = payload.get("roles", []) or []
     collections_from_roles = [r for r in app_roles if r.startswith("documents_")]
     if collections_from_roles:
-        return collections_from_roles
+        return list(dict.fromkeys(collections_from_roles + _GLOBAL_COLLECTIONS))
 
-    # 3. Grupos de Azure AD → mapear via AZURE_GROUP_MAP
+    # 3. Grupos de Azure AD → mapear via group_map
     if _GROUP_MAP:
         user_groups: List[str] = payload.get("groups", []) or []
         mapped = [_GROUP_MAP[g] for g in user_groups if g in _GROUP_MAP]
-        if mapped:
-            return mapped
-        # Usuario autenticado pero sin grupos mapeados
-        logger.info(f"Usuario con sub={payload.get('sub','?')} no tiene grupos mapeados a colecciones")
-        return []
+        # Siempre incluir colecciones globales para usuarios autenticados
+        all_collections = list(dict.fromkeys(mapped + _GLOBAL_COLLECTIONS))
+        if not mapped and not _GLOBAL_COLLECTIONS:
+            logger.info(f"Usuario sub={payload.get('sub','?')} sin grupos mapeados a colecciones")
+        return all_collections
 
-    # 4. Sin mapeo configurado → usuario válido, acceso a todas las colecciones
+    # 4. Sin mapeo configurado pero hay colecciones globales → devolver solo las globales
+    if _GLOBAL_COLLECTIONS:
+        return list(_GLOBAL_COLLECTIONS)
+
+    # 5. Sin ningún mapeo → usuario válido, acceso a todas las colecciones
     #    (mantiene comportamiento actual; el administrador puede añadir mapeo después)
     return None
 
