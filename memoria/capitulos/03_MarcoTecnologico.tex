@@ -135,32 +135,60 @@ qwen2.5vl:7b          & An�lisis de im�genes y OCR multimodal & --- & $\sim$
 
 La tabla refuerza una idea importante: los modelos no se han creado en este TFG, pero s� se han seleccionado, desplegado, probado y asignado a tareas concretas dentro de una arquitectura coherente. En el despliegue actual del proyecto, la familia Qwen 2.5 concentra las funciones principales de texto, visi�n y adaptaci�n al dominio.
 
-\subsection{Evoluci\'on del modelo principal: de Llama~3.1 a Qwen~2.5}
+\subsection{Evoluci\'on del modelo principal: trayectoria de cuatro etapas}
 \label{subsec:evolucion-modelos}
 
-En las primeras fases del proyecto (Sprint~1, octubre de 2025) se emple\'o Llama~3.1 8B como modelo de referencia para las pruebas de concepto iniciales. La migraci\'on hacia la familia Qwen~2.5 se produjo en diciembre de 2025, motivada por limitaciones concretas detectadas durante el uso real del sistema.
+El sistema no lleg\'o al modelo de producci\'on actual en un \'unico paso. La elecci\'on del LLM evolucion\'o a lo largo del proyecto en cuatro etapas, cada una motivada por limitaciones reales detectadas durante el uso en el entorno corporativo.
 
 \begin{table}[H]
 \centering
-\caption{Comparativa entre los modelos LLM utilizados en el proyecto.}
+\caption{Trayectoria completa de LLMs empleados en el proyecto, desde el prototipo hasta producci\'on.}
 \label{tab:evolucion-modelos}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lll}
+\begin{tabular}{clllcl}
 \toprule
-\textbf{Caracter\'istica} & \textbf{Llama 3.1 8B (prototipo)} & \textbf{Qwen 2.5 14B FT (actual)} \\
+\textbf{Etapa} & \textbf{Modelo} & \textbf{Per\'iodo} & \textbf{Contexto} & \textbf{VRAM} & \textbf{Raz\'on del cambio} \\
 \midrule
-Ventana de contexto        & 4\,K tokens           & 32\,K tokens \\
-Comprensi\'on del espa\~nol & Limitada              & Mejorada ($+$23\,\% en evaluaci\'on interna) \\
-Instrucciones complejas    & Moderada              & Alta \\
-VRAM necesaria             & $\sim$8\,GB (Q8)      & $\sim$8\,GB (LoRA FT) \\
-Fine-tuning realizado      & No                    & S\'i (LoRA sobre dominio corporativo) \\
-Identificador en LiteLLM   & \texttt{llama3.1:8b-instruct-q4\_0} & \texttt{rag-qwen-ft:latest} (alias JARVIS) \\
+1 & \texttt{llama3.1:8b-instruct-q4\_0}  & Oct 2025 (Sprint~1) & 4\,K  & $\sim$5\,GB & Calidad de respuesta insuficiente (Q4) \\
+2 & \texttt{llama3.1:8b-instruct-q8\_0}  & Nov--Dic 2025       & 4\,K  & $\sim$8\,GB & Contexto 4\,K y espa\~nol limitados; generaci\'on repetitiva \\
+3 & Qwen 2.5 14B (base)                   & Dic 2025 (evaluaci\'on) & 32\,K & $\sim$8\,GB & \textit{Model loop}: tokens de parada incompatibles \\
+4 & \texttt{rag-qwen-ft:latest} (LoRA FT) & Dic 2025 -- actualidad & 32\,K & $\sim$8\,GB & \textbf{Modelo en producci\'on (TFG y sistema empresarial)} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-Los motivos concretos del cambio fueron tres. Primero, la ventana de contexto de 4\,K tokens result\'o insuficiente para consultas RAG con m\'ultiples fragmentos documentales: los fragmentos m\'as alejados del inicio del contexto se truncaban antes de que el modelo pudiera considerarlos. Segundo, Llama~3.1 mostr\'o un rendimiento en espa\~nol notablemente inferior al de Qwen~2.5, produciendo respuestas menos naturales y precisas en el entorno corporativo hispanohablante del proyecto. Tercero, la familia Qwen~2.5 ofrece modelos de distintos tama\~nos con buen equilibrio calidad/VRAM, lo que permiti\'o incorporar un modelo de respaldo de 32\,B sin modificar la arquitectura del sistema.
+\paragraph{Etapa 1 --- Llama 3.1 8B Q4 (prototipo r\'apido, octubre 2025).}
+La cuantizaci\'on Q4 (4 bits) reduc\'ia el consumo de VRAM a $\sim$5\,GB, lo que facilitaba pruebas \'agiles sobre el hardware disponible. Sin embargo, la calidad de las respuestas en espa\~nol era notablemente inferior a la de variantes de mayor precisi\'on, y las respuestas largas perd\'ian coherencia con frecuencia.
+
+\paragraph{Etapa 2 --- Llama 3.1 8B Q8 (prototipo de mayor calidad, noviembre--diciembre 2025).}
+La migraci\'on a la variante Q8 (8 bits) mejor\'o la precisi\'on de forma apreciable. Durante las primeras semanas de uso real en el entorno corporativo se identificaron dos limitaciones estructurales: la ventana de contexto de 4\,K tokens era insuficiente para consultas RAG con m\'ultiples fragmentos documentales ---los fragmentos m\'as alejados se truncaban antes de que el modelo pudiera considerarlos--- y el rendimiento en espa\~nol continuaba siendo inferior al esperado para un asistente empresarial hispanohablante.
+
+\paragraph{Etapa 3 --- Qwen 2.5 14B base (evaluaci\'on, diciembre 2025).}
+La familia Qwen~2.5, desarrollada por Alibaba Cloud, ofrec\'ia ventana de contexto de 32\,K tokens y mejor rendimiento en espa\~nol. Sin embargo, durante la integraci\'on se detect\'o un problema t\'ecnico cr\'itico: el modelo generaba respuestas sin fin (\textit{model loop}). La causa era una incompatibilidad en los \textit{tokens de parada}: mientras Llama~3.1 utiliza \texttt{</s>} para indicar el fin de la respuesta, el formato ChatML de Qwen~2.5 emplea \texttt{<|im\_end|>}. Fue necesario reconstruir el Modelfile de Ollama declarando expl\'icitamente los stop tokens correctos antes de poder usar el modelo de forma fiable.
+
+\paragraph{Etapa 4 --- rag-qwen-ft:latest con LoRA (producci\'on, diciembre 2025 -- actualidad).}
+Resuelto el problema de los stop tokens, se realiz\'o el ajuste fino con LoRA sobre la documentaci\'on corporativa del proyecto. El adaptador resultante, \texttt{rag-qwen-ft:latest}, concentra el vocabulario interno, la terminolog\'ia procedimental y el estilo de respuesta esperado en el entorno de destino. Este modelo es el que est\'a en producci\'on en los dos sistemas derivados del TFG: en la versi\'on acad\'emica bajo el alias \textbf{JARVIS} y en el sistema empresarial desplegado en piloto bajo el alias \textbf{europav-IA} \cite{qwen2024qwen25blog,hu2021lora}.
+
+\begin{table}[H]
+\centering
+\caption{Stack LLM completo en producci\'on (versi\'on TFG y sistema empresarial).}
+\label{tab:stack-llm-produccion}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllcc}
+\toprule
+\textbf{Alias LiteLLM} & \textbf{Modelo Ollama} & \textbf{Rol} & \textbf{VRAM} & \textbf{Contexto} \\
+\midrule
+JARVIS / europav-IA & \texttt{rag-qwen-ft:latest}            & Chat RAG principal con fine-tuning LoRA & $\sim$8\,GB  & 32\,K \\
+qwen2.5-32b         & \texttt{qwen2.5:32b-instruct-q4\_K\_M} & Fallback y an\'alisis complejos         & $\sim$19\,GB & 32\,K \\
+qwen2.5vl           & \texttt{qwen2.5vl:7b}                  & Visi\'on e interpretaci\'on de im\'agenes & $\sim$6\,GB  & 32\,K \\
+Embeddings          & \texttt{paraphrase-multilingual-MiniLM-L12-v2} & Vectorizaci\'on de texto (CPU) & ---         & 512 tokens \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+El stack de producci\'on cubre tres capacidades con modelos especializados e independientes para no saturar la VRAM: el modelo fine-tuned para RAG corporativo, un modelo de 32\,B como respaldo para consultas de an\'alisis complejo, y un modelo multimodal para visi\'on. LiteLLM act\'ua como proxy unificado con enrutamiento autom\'atico, cach\'e Redis y fallback entre modelos. Cabe destacar que la configuraci\'on del sistema empresarial mantiene adem\'as aliases de compatibilidad hacia atr\'as (\texttt{llama3.1-8b}~$\rightarrow$~\texttt{qwen2.5-32b}) para preservar la compatibilidad con integraciones anteriores que todav\'ia referencian los nombres originales.
 
 % ============================================================
 \section{Qdrant: base de datos vectorial}
