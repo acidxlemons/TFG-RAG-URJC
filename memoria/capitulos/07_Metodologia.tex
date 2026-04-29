@@ -34,8 +34,9 @@ El proyecto se dividió en iteraciones incrementales de tipo sprint, cada una en
 4 & Ene 2026 & Agente JARVIS Pipeline. Web scraping con Playwright. Búsqueda DuckDuckGo. & 40 h \\
 5 & Feb 2026 & Servidor MCP del BOE. Fine-tuning LoRA (Qwen). Stack Prometheus/Grafana. & 30 h \\
 6 & Mar--Abr 2026 & Agente SQL (NL$\rightarrow$SQL) con lista blanca y auto-corrección. Validación JWT Azure AD en backend. Corrección de expansión de consulta asíncrona (v2.2.0). & 25 h \\
+7 & May 2026 & \texttt{QueryProcessor}: intent detection, smart model routing (JARVIS/qwen2.5-32b) y query expansion multi-variante. Summarización con 32B en \texttt{MemoryManager} (v2.3.0). & 20 h \\
 \midrule
- & & \textbf{Total desarrollo técnico} & \textbf{185 h} \\
+ & & \textbf{Total desarrollo técnico} & \textbf{205 h} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -56,21 +57,23 @@ La distribución temporal del proyecto se representa en el diagrama de GANTT de 
     bar label font=\footnotesize,
     title label font=\footnotesize,
     group label font=\footnotesize\bfseries
-]{1}{28}
+]{1}{32}
 \gantttitle{Oct}{4}
 \gantttitle{Nov}{4}
 \gantttitle{Dic}{4}
 \gantttitle{Ene}{4}
 \gantttitle{Feb}{4}
 \gantttitle{Mar}{4}
-\gantttitle{Abr}{4} \\
+\gantttitle{Abr}{4}
+\gantttitle{May}{4} \\
 \ganttbar{Infraestructura Docker}{1}{4} \\
 \ganttbar{Backend FastAPI + RAG}{5}{8} \\
 \ganttbar{SharePoint + OCR}{9}{12} \\
 \ganttbar{JARVIS + Scraping}{13}{16} \\
 \ganttbar{BOE + LoRA + Grafana}{17}{20} \\
 \ganttbar{SQL + JWT + v2.2.0}{21}{28} \\
-\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{28}
+\ganttbar{QueryProcessor + v2.3.0}{29}{32} \\
+\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{32}
 \end{ganttchart}
 }
 \caption{Diagrama de GANTT del proyecto.}
@@ -181,9 +184,9 @@ Licencias de software & --- & 0 \euro{} (Open Source) \\
 Dominio y certificados SSL & 15 \euro{}/año & 15 \euro{} \\
 Electricidad servidor 24/7 (año) & $\sim$50 \euro{}/mes & 600 \euro{} \\
 \midrule
-Horas de desarrollo (200h $\times$ 25 \euro{}/h) & 25 \euro{}/h & 5.000 \euro{} \\
+Horas de desarrollo (205h $\times$ 25 \euro{}/h) & 25 \euro{}/h & 5.125 \euro{} \\
 \midrule
-\multicolumn{2}{r}{\textbf{Total estimado}} & \textbf{9.615 \euro{}} \\
+\multicolumn{2}{r}{\textbf{Total estimado}} & \textbf{9.740 \euro{}} \\
 \bottomrule
 \end{tabular}%
 }

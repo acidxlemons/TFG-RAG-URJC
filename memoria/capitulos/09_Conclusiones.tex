@@ -54,6 +54,9 @@ Monitorización del sistema & \checkmark \\
 Caché de respuestas & \checkmark \\
 Exploración de fine-tuning con LoRA & \checkmark \\
 Agente SQL (consultas en lenguaje natural sobre datos estructurados) & \checkmark \\
+Query expansion multi-variante para mayor recall semántico & \checkmark \\
+Smart model routing (JARVIS vs.\ qwen2.5-32b según intención) & \checkmark \\
+Summarización de historial con modelo de 32B & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -84,6 +87,7 @@ Las lecciones más importantes del proyecto pueden resumirse en los siguientes p
     \item \textit{La GPU es un recurso crítico}: cuantización, carga bajo demanda y monitorización han sido esenciales para mantener el sistema operativo.
     \item \textit{Las fuentes documentales corporativas cambian}: por eso la sincronización incremental y el foco en SharePoint han sido piezas centrales del proyecto.
     \item \textit{Guiar al usuario también es una decisión técnica}: en este tipo de sistemas, una buena experiencia no depende solo de acertar la respuesta, sino de dejar claro qué está haciendo el sistema y en qué documentos se basa.
+    \item \textit{El modelo más grande no siempre es la mejor opción}: el fine-tuning domina en consultas de recuperación precisa con citas, mientras que un modelo base de mayor tamaño destaca en razonamiento analítico. Usar ambos adaptándose a la intención de la query es más eficiente que elegir uno solo.
 \end{itemize}
 
 % ============================================================
@@ -98,11 +102,11 @@ Las lecciones más importantes del proyecto pueden resumirse en los siguientes p
 \toprule
 \textbf{Concepto} & \textbf{Horas} \\
 \midrule
-Desarrollo técnico (6 sprints) & 185 h \\
+Desarrollo técnico (7 sprints) & 205 h \\
 Aprendizaje y pruebas previas & 30 h \\
 Redacción y maquetación de la memoria & 40 h \\
 \midrule
-\textbf{Total estimado} & \textbf{255 horas} \\
+\textbf{Total estimado} & \textbf{275 horas} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -120,6 +124,7 @@ El proyecto abre varias líneas de evolución razonables:
     \item \textit{Ampliar tipos de contenido}: incluir hojas de cálculo, audio y otros formatos documentales empresariales.
     \item \textit{Refinar la adaptación al dominio}: seguir explorando embeddings especializados y técnicas de ajuste fino cuando aporten valor real.
     \item \textit{Generalizar el control de acceso}: ampliar la compatibilidad con otros proveedores de identidad y políticas más detalladas.
+    \item \textit{Evaluación cuantitativa del Query Processor}: medir el impacto real de la expansión de consultas y el smart routing con métricas como RAGAS o MRR, usando un conjunto de preguntas etiquetadas sobre los documentos corporativos.
 \end{enumerate}
 
 % ============================================================

@@ -1,33 +1,19 @@
-# backend/app/core/query_processor.py
 """
-Query Processor - Procesamiento inteligente de queries
+backend/app/core/query_processor.py
 
-Este módulo mejora las queries del usuario antes de la búsqueda mediante:
+Procesamiento inteligente de queries para el pipeline RAG.
 
-1. Query Expansion (Expansión de Queries):
-   - Genera variaciones de la query usando LLM
-   - Mejora recall (encontrar más documentos relevantes)
-   - Ejemplo: "ISO 9001" → "norma ISO 9001 certificación calidad"
+1. Intent Detection — clasifica la query en FACTUAL / PROCEDURAL / ANALYTICAL / CONVERSATIONAL
+   y sugiere top_k y estrategia de búsqueda adaptados a cada tipo.
 
-2. Intent Detection (Detección de Intención):
-   - Clasifica el tipo de pregunta del usuario
-   - Permite adaptar la estrategia de búsqueda
-   - Tipos: factual, procedural, analytical, conversational
+2. Query Expansion — genera variaciones de la query via LLM para mejorar el recall.
+   Ejemplo: "normas escaleras" → +2 reformulaciones con sinónimos técnicos.
 
-3. Keyword Extraction (Extracción de Keywords):
-   - Identifica términos clave en la query
-   - Útil para filtrado y highlighting
-   - Remueve stopwords automáticamente
+3. Smart Model Routing — elige el modelo LLM adecuado para generar la respuesta final:
+   - JARVIS  (rag-qwen-ft:latest): consultas simples/factuales — rápido, formato de citas
+   - qwen2.5-32b: consultas analíticas/complejas — mayor contexto y razonamiento
 
-4. Multi-Query Retrieval:
-   - Busca con múltiples variaciones de la query
-   - Fusiona y deduplica resultados
-   - Mejora robustez ante queries ambiguas
-
-Casos de uso:
-- Query corta ("auditoría") → Expansión a "auditoría interna proceso requisitos"
-- Query ambigua → Múltiples interpretaciones y búsqueda paralela
-- Query técnica → Detección de intent para usar más keyword matching
+4. Multi-Query Retrieval — combina resultados de todas las variaciones y deduplica.
 """
 
 from __future__ import annotations
@@ -35,7 +21,7 @@ from __future__ import annotations
 import re
 import os
 import logging
-from typing import List, Dict, Optional, Set, Any
+from typing import List, Dict, Optional, Set, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -44,29 +30,12 @@ logger = logging.getLogger(__name__)
 
 class QueryIntent(str, Enum):
     """
-    Tipos de intención de query
-    
-    Cada tipo sugiere una estrategia de búsqueda diferente:
-    
-    FACTUAL: Busca un hecho específico
-        - Ejemplo: "¿Qué es ISO 9001?"
-        - Estrategia: Priorizar dense search (semántica)
-        - Top-k: Menor (3-5 resultados)
-    
-    PROCEDURAL: Busca cómo hacer algo
-        - Ejemplo: "¿Cómo realizar una auditoría?"
-        - Estrategia: Buscar documentos con pasos/procedimientos
-        - Top-k: Mayor (5-10 resultados) para ver proceso completo
-    
-    ANALYTICAL: Requiere análisis/comparación
-        - Ejemplo: "Diferencias entre ISO 9001 e ISO 14001"
-        - Estrategia: Multi-query, buscar múltiples documentos
-        - Top-k: Mayor (10-15) para análisis comprensivo
-    
-    CONVERSATIONAL: Chat general, no requiere RAG
-        - Ejemplo: "Hola, ¿cómo estás?"
-        - Estrategia: Responder directamente sin RAG
-        - Top-k: 0 (sin búsqueda)
+    Intención de la query.
+
+    FACTUAL       → hecho puntual;         top_k=5,  strategy=dense,  model=JARVIS
+    PROCEDURAL    → cómo hacer algo;        top_k=8,  strategy=hybrid, model=JARVIS
+    ANALYTICAL    → análisis/comparación;   top_k=12, strategy=hybrid, model=qwen2.5-32b
+    CONVERSATIONAL → saludo/chat general;   top_k=0,  strategy=none,   model=JARVIS
     """
     FACTUAL = "factual"
     PROCEDURAL = "procedural"
@@ -76,26 +45,15 @@ class QueryIntent(str, Enum):
 
 @dataclass
 class ProcessedQuery:
-    """
-    Query procesada con información enriquecida
-    
-    Attributes:
-        original: Query original del usuario
-        expanded: Variaciones expandidas de la query
-        keywords: Keywords extraídas
-        intent: Intención detectada
-        suggested_top_k: Top-k sugerido según intent
-        suggested_strategy: Estrategia de búsqueda sugerida
-    """
     original: str
     expanded: List[str]
     keywords: List[str]
     intent: QueryIntent
     suggested_top_k: int
     suggested_strategy: str
-    
+    suggested_model: str          # alias LiteLLM a usar para generar la respuesta
+
     def to_dict(self) -> Dict:
-        """Convierte a diccionario"""
         return {
             "original": self.original,
             "expanded": self.expanded,
@@ -103,25 +61,21 @@ class ProcessedQuery:
             "intent": self.intent.value,
             "suggested_top_k": self.suggested_top_k,
             "suggested_strategy": self.suggested_strategy,
+            "suggested_model": self.suggested_model,
         }
 
 
 class QueryProcessor:
     """
-    Procesador inteligente de queries
-    
-    Mejora las queries del usuario antes de la búsqueda mediante:
-    - Expansión con LLM
-    - Detección de intención
-    - Extracción de keywords
-    
-    Configuración:
-    - enable_expansion: Activar expansión (requiere LLM, +latencia)
-    - max_expansions: Máximo de variaciones a generar
-    - min_query_length: Longitud mínima para procesar
+    Procesador inteligente de queries.
+
+    Parámetros clave:
+      enable_expansion   — activar expansión LLM (+latencia, mejor recall)
+      max_expansions     — variaciones adicionales a generar (default 2)
+      primary_model      — alias LiteLLM para queries simples  (default: env LLM_MODEL → JARVIS)
+      analytical_model   — alias LiteLLM para queries analíticas (default: qwen2.5-32b)
     """
-    
-    # Stopwords en español (palabras a filtrar)
+
     SPANISH_STOPWORDS: Set[str] = {
         'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'ser', 'se', 'no',
         'haber', 'por', 'con', 'su', 'para', 'como', 'estar', 'tener',
@@ -131,562 +85,183 @@ class QueryProcessor:
         'qué', 'sobre', 'mi', 'alguno', 'mismo', 'yo', 'también', 'hasta',
         'año', 'dos', 'querer', 'entre', 'así', 'primero', 'desde', 'grande',
         'eso', 'ni', 'nos', 'llegar', 'pasar', 'tiempo', 'ella', 'les',
-        'tal', 'uno', 'es', 'son', 'del', 'los', 'las', 'al', 'una', 'unos', 'unas'
+        'tal', 'uno', 'es', 'son', 'del', 'los', 'las', 'al', 'una', 'unos', 'unas',
     }
-    
+
     def __init__(
         self,
-        llm_client: Optional[Any] = None,
         enable_expansion: bool = True,
-        max_expansions: int = 3,
+        max_expansions: int = 2,
         min_query_length: int = 3,
         litellm_base_url: Optional[str] = None,
         litellm_api_key: Optional[str] = None,
-        llm_model: Optional[str] = None,
+        primary_model: Optional[str] = None,
+        analytical_model: Optional[str] = None,
     ):
-        """
-        Inicializa el query processor
-
-        Args:
-            llm_client: Cliente LLM para expansión (opcional, puede ser callable o dict)
-            enable_expansion: Si habilitar query expansion
-            max_expansions: Máximo número de expansiones a generar
-            min_query_length: Longitud mínima de query para procesar
-            litellm_base_url: URL de LiteLLM (fallback a LITELLM_URL env var)
-            litellm_api_key: API key de LiteLLM (fallback a LITELLM_API_KEY env var)
-            llm_model: Nombre del modelo (fallback a LLM_MODEL env var)
-        """
-        self.llm = llm_client
-        self.max_expansions = max_expansions
-        self.min_query_length = min_query_length
-
-        # Configuración HTTP para LiteLLM (leída de env vars si no se pasan)
-        self._litellm_url = (
-            litellm_base_url
-            or os.getenv("LITELLM_URL", "http://litellm:4000")
-        ).rstrip("/")
+        self._litellm_url = (litellm_base_url or os.getenv("LITELLM_URL", "http://litellm:4000")).rstrip("/")
         self._litellm_key = (
             litellm_api_key
             or os.getenv("LITELLM_API_KEY")
             or os.getenv("LITELLM_MASTER_KEY", "sk-1234")
         )
-        self._llm_model = llm_model or os.getenv("LLM_MODEL", "JARVIS")
+        self._primary_model = primary_model or os.getenv("LLM_MODEL", "JARVIS")
+        self._analytical_model = analytical_model or os.getenv("ANALYTICAL_MODEL", "qwen2.5-32b")
 
-        # Activar expansión si hay cliente explícito O si LiteLLM está configurado
-        litellm_available = bool(self._litellm_url and self._litellm_key)
-        self.enable_expansion = enable_expansion and (llm_client is not None or litellm_available)
+        self.enable_expansion = enable_expansion and bool(self._litellm_url and self._litellm_key)
         self.max_expansions = max_expansions
         self.min_query_length = min_query_length
 
         if self.enable_expansion:
             logger.info(
-                f"✓ Query expansion habilitado (model={self._llm_model}, url={self._litellm_url})"
+                f"✓ QueryProcessor listo "
+                f"(primary={self._primary_model}, analytical={self._analytical_model}, "
+                f"expansion=ON, max_expansions={max_expansions})"
             )
         else:
-            logger.info("Query expansion deshabilitado (no LLM client)")
-    
-    def process(
-        self,
-        query: str,
-        expand: Optional[bool] = None,
-    ) -> ProcessedQuery:
+            logger.info(f"✓ QueryProcessor listo (expansion=OFF, primary={self._primary_model})")
+
+    # ── API pública ───────────────────────────────────────────
+
+    def process(self, query: str, expand: Optional[bool] = None) -> ProcessedQuery:
         """
-        Procesa una query completamente
-        
-        Args:
-            query: Query del usuario
-            expand: Override para habilitar/deshabilitar expansión
-        
-        Returns:
-            ProcessedQuery con toda la información procesada
+        Procesa una query completamente:
+          1. Detecta intención
+          2. Extrae keywords
+          3. Sugiere parámetros de búsqueda y modelo LLM
+          4. Expande la query si está habilitado
         """
-        # Validar query
         query = query.strip()
-        if len(query) < self.min_query_length:
-            logger.warning(f"Query muy corta: '{query}'")
-        
-        # Detectar intención
         intent = self.detect_intent(query)
-        
-        # Extraer keywords
         keywords = self.extract_keywords(query)
-        
-        # Expandir query si está habilitado
-        should_expand = expand if expand is not None else self.enable_expansion
-        expanded = []
-        if should_expand and intent != QueryIntent.CONVERSATIONAL:
-            expanded = self.expand_query(query, num_variations=self.max_expansions)
-        else:
-            expanded = [query]  # Solo la query original
-        
-        # Sugerir parámetros de búsqueda según intent
         suggested_top_k, suggested_strategy = self._suggest_search_params(intent)
-        
-        result = ProcessedQuery(
+        suggested_model = self._suggest_model(intent)
+
+        should_expand = (expand if expand is not None else self.enable_expansion)
+        if should_expand and intent != QueryIntent.CONVERSATIONAL and len(query) >= self.min_query_length:
+            expanded = self.expand_query(query)
+        else:
+            expanded = [query]
+
+        logger.info(
+            f"QueryProcessor: intent={intent.value}, model={suggested_model}, "
+            f"top_k={suggested_top_k}, expansions={len(expanded)}"
+        )
+        return ProcessedQuery(
             original=query,
             expanded=expanded,
             keywords=keywords,
             intent=intent,
             suggested_top_k=suggested_top_k,
             suggested_strategy=suggested_strategy,
+            suggested_model=suggested_model,
         )
-        
-        logger.info(
-            f"Query procesada: intent={intent.value}, "
-            f"keywords={len(keywords)}, expansions={len(expanded)}"
-        )
-        
-        return result
-    
+
     def detect_intent(self, query: str) -> QueryIntent:
-        """
-        Detecta la intención de la query usando patrones regex
-        
-        Esta es una implementación basada en reglas (rule-based).
-        Para mayor precisión, se podría usar un clasificador entrenado.
-        
-        Args:
-            query: Query del usuario
-        
-        Returns:
-            QueryIntent detectado
-        """
-        query_lower = query.lower()
-        
-        # Patrones para cada tipo de intent
-        factual_patterns = [
-            r'\bqu[eé] es\b',
-            r'\bqu[eé] significa\b',
-            r'\bcu[aá]ndo\b',
-            r'\bcu[aá]nto\b',
-            r'\bqui[eé]n\b',
-            r'\bd[oó]nde\b',
-            r'\bdefinici[oó]n de\b',
-            r'\bdefine\b',
+        """Clasifica la intención de la query usando patrones regex."""
+        q = query.lower()
+
+        conversational = [
+            r'^hola\b', r'^buenos d[ií]as\b', r'^buenas tardes\b',
+            r'\bc[oó]mo est[aá]s\b', r'\bgracias\b', r'\badi[oó]s\b', r'\bhasta luego\b',
         ]
-        
-        procedural_patterns = [
-            r'\bc[oó]mo\b',
-            r'\bpasos para\b',
-            r'\bproceso de\b',
-            r'\bprocedimiento\b',
-            r'\bgu[ií]a\b',
-            r'\binstrucciones\b',
-            r'\bmanual\b',
-            r'\brealizar\b',
-            r'\bhacer\b',
+        analytical = [
+            r'\bcompara\b', r'\bcomparaci[oó]n\b', r'\bdiferencia\b',
+            r'\bventajas\b', r'\bdesventajas\b', r'\ban[aá]lisis\b',
+            r'\bevaluaci[oó]n\b', r'\bversus\b', r'\bvs\b', r'\bentre .+ y\b',
+            r'\bresume\b', r'\bresumen\b', r'\bexplica\b', r'\bdetalla\b',
         ]
-        
-        analytical_patterns = [
-            r'\bcompara\b',
-            r'\bcomparaci[oó]n\b',
-            r'\bdiferencia\b',
-            r'\bventajas\b',
-            r'\bdesventajas\b',
-            r'\ban[aá]lisis\b',
-            r'\bevaluaci[oó]n\b',
-            r'\bversus\b',
-            r'\bvs\b',
-            r'\bentre .+ y\b',
+        procedural = [
+            r'\bc[oó]mo\b', r'\bpasos para\b', r'\bproceso de\b',
+            r'\bprocedimiento\b', r'\bgu[ií]a\b', r'\binstrucciones\b',
+            r'\brealizar\b', r'\bhacer\b',
         ]
-        
-        conversational_patterns = [
-            r'^hola\b',
-            r'^buenos d[ií]as\b',
-            r'^buenas tardes\b',
-            r'\bc[oó]mo est[aá]s\b',
-            r'\bgracias\b',
-            r'\badi[oó]s\b',
-            r'\bhasta luego\b',
+        factual = [
+            r'\bqu[eé] es\b', r'\bqu[eé] significa\b', r'\bcu[aá]ndo\b',
+            r'\bcu[aá]nto\b', r'\bqui[eé]n\b', r'\bd[oó]nde\b',
+            r'\bdefinici[oó]n de\b', r'\bdefine\b',
         ]
-        
-        # Evaluar patrones en orden de prioridad
-        # (conversational primero para evitar false positives)
-        if any(re.search(p, query_lower) for p in conversational_patterns):
+
+        if any(re.search(p, q) for p in conversational):
             return QueryIntent.CONVERSATIONAL
-        
-        if any(re.search(p, query_lower) for p in analytical_patterns):
+        if any(re.search(p, q) for p in analytical):
             return QueryIntent.ANALYTICAL
-        
-        if any(re.search(p, query_lower) for p in procedural_patterns):
+        if any(re.search(p, q) for p in procedural):
             return QueryIntent.PROCEDURAL
-        
-        if any(re.search(p, query_lower) for p in factual_patterns):
+        if any(re.search(p, q) for p in factual):
             return QueryIntent.FACTUAL
-        
-        # Default: asumir factual si hay signos de interrogación, sino analytical
-        if '?' in query:
-            return QueryIntent.FACTUAL
-        
-        return QueryIntent.ANALYTICAL
-    
-    def extract_keywords(
-        self,
-        query: str,
-        min_length: int = 3,
-        max_keywords: int = 10,
-    ) -> List[str]:
-        """
-        Extrae keywords relevantes de la query
-        
-        Proceso:
-        1. Tokenización (separar palabras)
-        2. Normalización (lowercase)
-        3. Filtrado de stopwords
-        4. Filtrado por longitud mínima
-        5. Ordenar por relevancia (longitud, frecuencia)
-        
-        Args:
-            query: Query del usuario
-            min_length: Longitud mínima de keyword
-            max_keywords: Máximo número de keywords a retornar
-        
-        Returns:
-            Lista de keywords ordenadas por relevancia
-        """
-        # Tokenizar: extraer palabras (alfanuméricas)
+        return QueryIntent.FACTUAL if '?' in query else QueryIntent.ANALYTICAL
+
+    def extract_keywords(self, query: str, min_length: int = 3, max_keywords: int = 10) -> List[str]:
+        """Extrae términos clave filtrando stopwords."""
         words = re.findall(r'\b\w+\b', query.lower())
-        
-        # Filtrar stopwords y palabras muy cortas
-        keywords = [
-            w for w in words
-            if w not in self.SPANISH_STOPWORDS and len(w) >= min_length
-        ]
-        
-        # Eliminar duplicados manteniendo orden
-        seen = set()
-        unique_keywords = []
+        keywords = [w for w in words if w not in self.SPANISH_STOPWORDS and len(w) >= min_length]
+        seen: Set[str] = set()
+        unique: List[str] = []
         for kw in keywords:
             if kw not in seen:
                 seen.add(kw)
-                unique_keywords.append(kw)
-        
-        # Ordenar por longitud (palabras más largas suelen ser más específicas)
-        unique_keywords.sort(key=len, reverse=True)
-        
-        return unique_keywords[:max_keywords]
-    
-    def expand_query(
-        self,
-        query: str,
-        num_variations: int = 3,
-    ) -> List[str]:
+                unique.append(kw)
+        unique.sort(key=len, reverse=True)
+        return unique[:max_keywords]
+
+    def expand_query(self, query: str) -> List[str]:
         """
-        Expande la query generando variaciones usando LLM
-        
-        La expansión ayuda a:
-        - Mejorar recall (encontrar más documentos relevantes)
-        - Manejar sinónimos y términos relacionados
-        - Reformular queries ambiguas
-        
-        Ejemplo:
-        Input: "requisitos ISO 9001"
-        Output: [
-            "requisitos ISO 9001",
-            "norma ISO 9001 requisitos certificación",
-            "documentación necesaria ISO 9001",
-            "estándares calidad ISO 9001"
-        ]
-        
-        Args:
-            query: Query original
-            num_variations: Número de variaciones a generar
-        
-        Returns:
-            Lista de queries (original + variaciones)
+        Genera variaciones de la query via LiteLLM para ampliar recall.
+
+        Usa JARVIS (modelo primario) porque es rápido y suficiente para reformular.
+        Timeout corto (12 s) para no bloquear el pipeline si LiteLLM está ocupado.
         """
-        # Verificar que haya alguna forma de llamar al LLM
-        # (self.llm explícito O LiteLLM HTTP configurado)
-        has_llm = self.llm is not None or bool(self._litellm_url and self._litellm_key)
-        if not has_llm:
-            logger.warning("No LLM disponible para expansión (ni cliente ni LiteLLM HTTP)")
-            return [query]
-
-        try:
-            # Prompt para el LLM
-            prompt = f"""Genera {num_variations} reformulaciones de la siguiente pregunta que ayuden a encontrar información relacionada en una base de datos de documentos empresariales.
-
-Pregunta original: {query}
-
-Instrucciones:
-- Mantén el significado original
-- Usa sinónimos y términos relacionados
-- Sé conciso (máximo 15 palabras por reformulación)
-- No numeres las reformulaciones
-- Una reformulación por línea
-
-Reformulaciones:"""
-
-            # Llamar al LLM
-            response = self._call_llm(prompt, max_tokens=200)
-
-            if not response:
-                logger.warning("LLM devolvió respuesta vacía para expansion")
-                return [query]
-
-            # Parsear respuesta — limpiar prefijos de lista ("1.", "-", "*", "•")
-            import re as _re
-            raw_lines = response.split('\n')
-            variations = []
-            for line in raw_lines:
-                line = line.strip()
-                # Quitar prefijos de numeración/lista
-                line = _re.sub(r'^[\d]+[.)]\s*', '', line)
-                line = _re.sub(r'^[-*•]\s*', '', line).strip()
-                if line and len(line) > 10:
-                    variations.append(line)
-
-            # Filtrar variaciones válidas
-            valid_variations = [
-                v for v in variations
-                if v.lower() != query.lower()  # No duplicar original
-            ][:num_variations]
-
-            # Incluir query original al principio
-            result = [query] + valid_variations
-
-            logger.info(
-                f"Query expandida: '{query[:40]}' → {len(result)} variaciones"
-            )
-            return result
-
-        except Exception as e:
-            logger.error(f"Error expandiendo query: {e}")
-            return [query]  # Fallback a query original
-    
-    def _call_llm(
-        self,
-        prompt: str,
-        max_tokens: int = 200,
-        temperature: float = 0.7,
-    ) -> str:
-        """
-        Llama al LLM (wrapper genérico)
-        
-        Debes implementar esto según tu cliente LLM específico.
-        Ejemplo para LiteLLM, OpenAI, etc.
-        
-        Args:
-            prompt: Prompt para el LLM
-            max_tokens: Tokens máximos a generar
-            temperature: Temperatura (creatividad)
-        
-        Returns:
-            Respuesta del LLM como string
-        """
-        # Opción 1: cliente LLM explícito pasado en el constructor
-        if self.llm is not None:
-            try:
-                if callable(self.llm):
-                    return self.llm(prompt)
-                if hasattr(self.llm, "invoke"):
-                    resp = self.llm.invoke(prompt)
-                    return getattr(resp, "content", str(resp))
-                if hasattr(self.llm, "completion"):
-                    resp = self.llm.completion(
-                        model=self._llm_model,
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                    )
-                    return resp.choices[0].message.content
-            except Exception as e:
-                logger.warning(f"Error usando llm_client explícito: {e}. Intentando LiteLLM HTTP.")
-
-        # Opción 2: LiteLLM via HTTP
         try:
             import requests as _req
-            response = _req.post(
+            prompt = (
+                f"Genera {self.max_expansions} reformulaciones breves (máx. 15 palabras) "
+                f"de la siguiente pregunta para buscar en documentos empresariales.\n"
+                f"Usa sinónimos y términos técnicos relacionados. Una por línea. Sin numeración.\n\n"
+                f"Pregunta: {query}\n\nReformulaciones:"
+            )
+            resp = _req.post(
                 f"{self._litellm_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self._litellm_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {self._litellm_key}", "Content-Type": "application/json"},
                 json={
-                    "model": self._llm_model,
+                    "model": self._primary_model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
+                    "max_tokens": 150,
+                    "temperature": 0.7,
                 },
-                timeout=15,
+                timeout=12,
             )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"]
+            lines: List[str] = []
+            for line in raw.split("\n"):
+                line = re.sub(r'^[\d]+[.)]\s*', '', line.strip())
+                line = re.sub(r'^[-*•]\s*', '', line).strip()
+                if line and len(line) > 8 and line.lower() != query.lower():
+                    lines.append(line)
+            variations = lines[:self.max_expansions]
+            result = [query] + variations
+            logger.info(f"Query expandida: '{query[:50]}' → {len(result)} variaciones")
+            return result
         except Exception as e:
-            logger.warning(f"LiteLLM HTTP no disponible para query expansion: {e}")
-            return ""
-    
-    def _suggest_search_params(
-        self,
-        intent: QueryIntent,
-    ) -> tuple[int, str]:
-        """
-        Sugiere parámetros de búsqueda según el intent
-        
-        Diferentes intents requieren diferentes estrategias:
-        
-        FACTUAL: 
-            - Top-k: Bajo (3-5) - Solo necesita la respuesta
-            - Strategy: Dense - Búsqueda semántica precisa
-        
-        PROCEDURAL:
-            - Top-k: Medio (5-10) - Necesita ver el proceso completo
-            - Strategy: Hybrid - Combinar semántica + keywords
-        
-        ANALYTICAL:
-            - Top-k: Alto (10-15) - Necesita múltiples documentos
-            - Strategy: Hybrid - Máxima cobertura
-        
-        CONVERSATIONAL:
-            - Top-k: 0 - No requiere búsqueda
-            - Strategy: None - Responder directamente
-        
-        Args:
-            intent: Intent detectado
-        
-        Returns:
-            Tupla (top_k, strategy)
-        """
-        params_map = {
-            QueryIntent.FACTUAL: (5, "dense"),
-            QueryIntent.PROCEDURAL: (8, "hybrid"),
-            QueryIntent.ANALYTICAL: (12, "hybrid"),
-            QueryIntent.CONVERSATIONAL: (0, "none"),
-        }
-        
-        return params_map.get(intent, (10, "hybrid"))
+            logger.warning(f"Query expansion falló (usando solo original): {e}")
+            return [query]
 
+    # ── Helpers privados ──────────────────────────────────────
 
-# ============================================
-# MULTI-QUERY RETRIEVAL
-# ============================================
+    def _suggest_search_params(self, intent: QueryIntent) -> Tuple[int, str]:
+        return {
+            QueryIntent.FACTUAL:        (5,  "dense"),
+            QueryIntent.PROCEDURAL:     (8,  "hybrid"),
+            QueryIntent.ANALYTICAL:     (12, "hybrid"),
+            QueryIntent.CONVERSATIONAL: (0,  "none"),
+        }.get(intent, (8, "hybrid"))
 
-class MultiQueryRetriever:
-    """
-    Retriever que usa múltiples variaciones de la query
-    
-    Proceso:
-    1. Expandir query en variaciones
-    2. Buscar con cada variación
-    3. Fusionar resultados eliminando duplicados
-    4. Reranker final
-    
-    Ventaja: Más robusto ante queries ambiguas
-    Desventaja: Mayor latencia (múltiples búsquedas)
-    """
-    
-    def __init__(
-        self,
-        base_retriever: Any,
-        query_processor: QueryProcessor,
-    ):
+    def _suggest_model(self, intent: QueryIntent) -> str:
         """
-        Args:
-            base_retriever: HybridRetriever u otro retriever base
-            query_processor: QueryProcessor para expansión
+        Smart model routing:
+        - ANALYTICAL → qwen2.5-32b (32 K contexto, razonamiento superior)
+        - resto       → JARVIS      (fine-tuned, rápido, formato de citas correcto)
         """
-        self.retriever = base_retriever
-        self.processor = query_processor
-    
-    def search(
-        self,
-        query: str,
-        collection_name: str,
-        top_k: int = 10,
-        **kwargs,
-    ) -> List[Any]:
-        """
-        Búsqueda multi-query
-        
-        Args:
-            query: Query original
-            collection_name: Colección en Qdrant
-            top_k: Resultados finales
-            **kwargs: Argumentos adicionales para el retriever
-        
-        Returns:
-            Lista de resultados deduplicados y fusionados
-        """
-        # Procesar query
-        processed = self.processor.process(query, expand=True)
-        
-        # Si no hay expansiones, usar búsqueda normal
-        if len(processed.expanded) == 1:
-            return self.retriever.search(
-                query=query,
-                collection_name=collection_name,
-                top_k=top_k,
-                **kwargs
-            )
-        
-        # Buscar con cada variación
-        all_results = []
-        for expanded_query in processed.expanded:
-            results = self.retriever.search(
-                query=expanded_query,
-                collection_name=collection_name,
-                top_k=top_k * 2,  # Obtener más para fusionar
-                **kwargs
-            )
-            all_results.extend(results)
-        
-        # Deduplicar por ID
-        seen_ids = set()
-        unique_results = []
-        for result in all_results:
-            if result.id not in seen_ids:
-                seen_ids.add(result.id)
-                unique_results.append(result)
-        
-        # Reordenar por score y retornar top_k
-        unique_results.sort(key=lambda x: x.score, reverse=True)
-        
-        logger.info(
-            f"Multi-query: {len(processed.expanded)} queries → "
-            f"{len(all_results)} resultados → {len(unique_results)} únicos"
-        )
-        
-        return unique_results[:top_k]
-
-
-# ============================================
-# EJEMPLO DE USO
-# ============================================
-
-if __name__ == "__main__":
-    """
-    Ejemplos de uso del QueryProcessor
-    """
-    
-    # Crear processor (sin LLM para el ejemplo)
-    processor = QueryProcessor(
-        llm_client=None,  # En producción, pasar cliente LLM real
-        enable_expansion=False,
-    )
-    
-    # Ejemplo 1: Query factual
-    print("=== Ejemplo 1: Query Factual ===")
-    result = processor.process("¿Qué es ISO 9001?")
-    print(f"Intent: {result.intent.value}")
-    print(f"Keywords: {result.keywords}")
-    print(f"Sugerido: top_k={result.suggested_top_k}, strategy={result.suggested_strategy}\n")
-    
-    # Ejemplo 2: Query procedural
-    print("=== Ejemplo 2: Query Procedural ===")
-    result = processor.process("¿Cómo realizar una auditoría interna?")
-    print(f"Intent: {result.intent.value}")
-    print(f"Keywords: {result.keywords}")
-    print(f"Sugerido: top_k={result.suggested_top_k}, strategy={result.suggested_strategy}\n")
-    
-    # Ejemplo 3: Query analytical
-    print("=== Ejemplo 3: Query Analytical ===")
-    result = processor.process("Diferencias entre ISO 9001 e ISO 14001")
-    print(f"Intent: {result.intent.value}")
-    print(f"Keywords: {result.keywords}")
-    print(f"Sugerido: top_k={result.suggested_top_k}, strategy={result.suggested_strategy}\n")
-    
-    # Ejemplo 4: Conversational
-    print("=== Ejemplo 4: Conversational ===")
-    result = processor.process("Hola, ¿cómo estás?")
-    print(f"Intent: {result.intent.value}")
-    print(f"Sugerido: top_k={result.suggested_top_k}, strategy={result.suggested_strategy}\n")
+        if intent == QueryIntent.ANALYTICAL:
+            return self._analytical_model
+        return self._primary_model

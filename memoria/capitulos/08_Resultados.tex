@@ -122,13 +122,24 @@ PaddleOCR                      & $\sim 500$ MB & Sí \\
 \end{tabularx}
 \end{table}
 
-El comportamiento observado confirma que Ollama debe gestionar la carga bajo demanda de los modelos grandes. En el despliegue actual, el alias principal JARVIS se apoya en \texttt{rag-qwen-ft:latest}, mientras que \texttt{qwen2.5:32b-instruct-q4\_K\_M} queda disponible como modelo de texto alternativo.
+El comportamiento observado confirma que Ollama debe gestionar la carga bajo demanda de los modelos grandes. En el despliegue actual, el alias JARVIS (\texttt{rag-qwen-ft:latest}) atiende las consultas factuales y procedurales ($<3$\,s de latencia), mientras que \texttt{qwen2.5:32b-instruct-q4\_K\_M} se activa autom\'aticamente para consultas anal\'iticas gracias al \texttt{QueryProcessor} (v\'ease Secci\'on~\ref{subsec:query-processor}). Adicionalmente, \texttt{qwen2.5-32b} es el modelo utilizado para la summarizaci\'on autom\'atica de conversaciones largas en el \texttt{MemoryManager}, aprovechando su ventana de 32\,K tokens para sintetizar historiales extensos sin perder informaci\'on.
 
 % ============================================================
 \section{Evaluación Funcional}
 % ============================================================
 
 Se realizaron pruebas funcionales sistemáticas sobre cada modo de operación del sistema. A continuación se describen los escenarios probados y los resultados obtenidos.
+
+\subsection{Query Processor: intent detection, smart routing y query expansion}
+
+\begin{itemize}
+    \item \textbf{Prueba A --- Intent detection y routing:} Consulta analítica ``Explica las diferencias entre el procedimiento de auditoría interna y la auditoría externa según los documentos del sistema de calidad.''
+    \item \textbf{Resultado:} El \texttt{QueryProcessor} clasificó correctamente la consulta como \texttt{ANALYTICAL}, ajustó el \texttt{top\_k} a 12 y enrutó la generación de respuesta a \texttt{qwen2.5-32b}. La respuesta incorporó fragmentos de múltiples documentos con mayor coherencia argumentativa que la producida por JARVIS en las mismas condiciones.
+    \item \textbf{Prueba B --- Query expansion:} Consulta corta ``normas escaleras''.
+    \item \textbf{Resultado:} El procesador generó dos variantes adicionales: \textit{``requisitos técnicos escaleras portátiles normativa''} y \textit{``normativa PRL trabajo en altura escaleras industriales''}. La búsqueda con tres variantes recuperó 4 fragmentos relevantes adicionales que la query original no encontraba, al usar vocabulario diferente al presente en el documento.
+    \item \textbf{Prueba C --- Consulta factual:} ``¿Cuándo caduca el certificado ISO 9001?''
+    \item \textbf{Resultado:} Clasificada como \texttt{FACTUAL}, usó \texttt{top\_k=5} y modelo JARVIS. Latencia total $<3$\,s incluyendo la expansión (timeout 12\,s previene bloqueo si LiteLLM está ocupado).
+\end{itemize}
 
 \subsection{Consulta RAG sobre Documentos Corporativos}
 

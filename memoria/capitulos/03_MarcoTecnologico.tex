@@ -188,7 +188,40 @@ Embeddings          & \texttt{paraphrase-multilingual-MiniLM-L12-v2} & Vectoriza
 }
 \end{table}
 
-El stack de producci\'on cubre tres capacidades con modelos especializados e independientes para no saturar la VRAM: el modelo fine-tuned para RAG corporativo, un modelo de 32\,B como respaldo para consultas de an\'alisis complejo, y un modelo multimodal para visi\'on. LiteLLM act\'ua como proxy unificado con enrutamiento autom\'atico, cach\'e Redis y fallback entre modelos. Cabe destacar que la configuraci\'on del sistema empresarial mantiene adem\'as aliases de compatibilidad hacia atr\'as (\texttt{llama3.1-8b}~$\rightarrow$~\texttt{qwen2.5-32b}) para preservar la compatibilidad con integraciones anteriores que todav\'ia referencian los nombres originales.
+El stack de producci\'on cubre tres capacidades con modelos especializados e independientes para no saturar la VRAM: el modelo fine-tuned para RAG corporativo, un modelo de 32\,B para consultas de an\'alisis complejo, y un modelo multimodal para visi\'on. LiteLLM act\'ua como proxy unificado con enrutamiento autom\'atico, cach\'e Redis y fallback entre modelos. Cabe destacar que la configuraci\'on del sistema empresarial mantiene adem\'as aliases de compatibilidad hacia atr\'as (\texttt{llama3.1-8b}~$\rightarrow$~\texttt{qwen2.5-32b}) para preservar la compatibilidad con integraciones anteriores que todav\'ia referencian los nombres originales.
+
+\subsection{Query Processor: enrutamiento inteligente y expansi\'on de consultas}
+\label{subsec:query-processor}
+
+El \texttt{QueryProcessor} (\texttt{core/query\_processor.py}) es un componente transversal que intercepta cada consulta del usuario antes de que llegue a la base de datos vectorial, enriqueci\'endola en tres dimensiones:
+
+\paragraph{Detecci\'on de intenci\'on (\textit{Intent Detection}).}
+Clasifica la consulta en cuatro tipos mediante expresiones regulares sobre el texto en espa\~nol:
+\begin{itemize}
+    \item \textbf{FACTUAL} --- pregunta puntual (``¿qu\'e es...?'', ``¿cu\'ando...?''): \texttt{top\_k=5}, b\'usqueda densa.
+    \item \textbf{PROCEDURAL} --- c\'omo hacer algo (``¿c\'omo...?'', ``pasos para...''): \texttt{top\_k=8}, b\'usqueda h\'ibrida.
+    \item \textbf{ANALYTICAL} --- an\'alisis o comparaci\'on (``diferencia entre...``, ``resume...``): \texttt{top\_k=12}, b\'usqueda h\'ibrida.
+    \item \textbf{CONVERSATIONAL} --- saludo o chat general: \texttt{top\_k=0}, sin b\'usqueda RAG.
+\end{itemize}
+
+\paragraph{Enrutamiento de modelos (\textit{Smart Model Routing}).}
+La intenci\'on detectada determina qu\'e modelo LLM genera la respuesta final:
+\begin{itemize}
+    \item Consultas FACTUAL y PROCEDURAL $\rightarrow$ \textbf{JARVIS} (\texttt{rag-qwen-ft:latest}): modelo fine-tuned, r\'apido ($<3$\,s), formato de citas correcto.
+    \item Consultas ANALYTICAL $\rightarrow$ \textbf{qwen2.5-32b}: ventana de 32\,K tokens, mayor capacidad de razonamiento y s\'intesis multi-documento.
+\end{itemize}
+Este dise\~no aplica el principio de \textit{right tool for the job}: el modelo fine-tuned es superior en recuperaci\'on precisa con citas, mientras que el modelo base de mayor tama\~no destaca en razonamiento complejo y comparaci\'on de m\'ultiples fuentes.
+
+\paragraph{Expansi\'on de consultas (\textit{Query Expansion}).}
+Para consultas no conversacionales, el \texttt{QueryProcessor} genera dos reformulaciones adicionales usando JARVIS como LLM auxiliar (con timeout de 12\,s para no bloquear el pipeline). Las tres variantes se lanzan en paralelo contra Qdrant, y los resultados se fusionan eliminando duplicados antes de pasarlos al reranker. Esto mejora el \textit{recall} sem\'antico, especialmente cuando el usuario usa terminolog\'ia diferente a la del documento:
+
+\begin{center}
+\textit{``normas seguridad escaleras''} $\xrightarrow{\text{expansi\'on}}$
+\textit{``requisitos t\'ecnicos escaleras port\'atiles''},
+\textit{``normativa PRL trabajo en altura escaleras''}
+\end{center}
+
+La combinaci\'on de los tres mecanismos ---intent detection, model routing y query expansion--- convierte el pipeline RAG en un sistema adaptativo que ajusta autom\'aticamente su estrategia de recuperaci\'on y generaci\'on seg\'un la naturaleza de cada pregunta, sin requerir ninguna intervenci\'on del usuario.
 
 % ============================================================
 \section{Qdrant: base de datos vectorial}

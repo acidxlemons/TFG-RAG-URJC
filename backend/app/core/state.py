@@ -8,6 +8,7 @@ from slowapi.util import get_remote_address
 from app.core.rag.retriever import RAGRetriever
 from app.core.memory.manager import MemoryManager
 from app.core.agent.base import RAGAgent
+from app.core.query_processor import QueryProcessor
 from app.processing.ocr.paddle_ocr import OCRPipeline
 from app.processing.chunking.smart_chunker import SmartChunker
 from app.integrations.sharepoint.client import SharePointClient
@@ -39,6 +40,7 @@ class AppState:
     retriever: RAGRetriever
     memory: MemoryManager
     agent: RAGAgent
+    query_processor: QueryProcessor
     ocr_pipeline: OCRPipeline
     chunker: SmartChunker
     sharepoint: Optional[SharePointClient]

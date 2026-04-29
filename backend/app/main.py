@@ -22,6 +22,7 @@ from app.processing.chunking.smart_chunker import SmartChunker
 from app.integrations.sharepoint.client import SharePointClient
 from app.integrations.sharepoint.permissions import sync_permissions, get_cached_group_map, get_global_collections
 from app.core.auth import update_group_map, update_global_collections
+from app.core.query_processor import QueryProcessor
 
 # Routers
 from app.api import scrape as scrape_api
@@ -129,7 +130,8 @@ async def lifespan(app: FastAPI):
         database_url=postgres_url,
         litellm_base_url=os.getenv("LITELLM_URL", "http://litellm:4000"),
         litellm_api_key=os.getenv("LITELLM_API_KEY") or os.getenv("LITELLM_MASTER_KEY", "sk-1234"),
-        llm_model=os.getenv("LLM_MODEL", "JARVIS"),
+        # qwen2.5-32b para summarización: 32K contexto y mejor síntesis que el modelo fine-tuned
+        llm_model=os.getenv("SUMMARY_MODEL", "qwen2.5-32b"),
     )
     logger.info("✓ Memory Manager inicializado")
 
@@ -150,6 +152,17 @@ async def lifespan(app: FastAPI):
         use_gpu=_bool_env("OCR_USE_GPU", True),
     )
     logger.info("✓ OCR Pipeline inicializado")
+
+    # ===== Query Processor (expansion + intent + smart routing)
+    app_state.query_processor = QueryProcessor(
+        enable_expansion=_bool_env("QUERY_EXPANSION_ENABLED", True),
+        max_expansions=int(os.getenv("QUERY_MAX_EXPANSIONS", "2")),
+        litellm_base_url=os.getenv("LITELLM_URL", "http://litellm:4000"),
+        litellm_api_key=os.getenv("LITELLM_API_KEY") or os.getenv("LITELLM_MASTER_KEY", "sk-1234"),
+        primary_model=os.getenv("LLM_MODEL", "JARVIS"),
+        analytical_model=os.getenv("ANALYTICAL_MODEL", "qwen2.5-32b"),
+    )
+    logger.info("✓ Query Processor inicializado (expansion + intent + smart routing)")
 
     # ===== Chunker
     app_state.chunker = SmartChunker(
@@ -214,7 +227,7 @@ async def lifespan(app: FastAPI):
             "SharePoint Client y sincronización de permisos desactivados."
         )
 
-    logger.info("✅ Aplicación lista (JARVIS v2.2.0)")
+    logger.info("✅ Aplicación lista (JARVIS v2.3.0)")
     yield
 
 

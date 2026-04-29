@@ -115,11 +115,13 @@ config/nginx/ssl/          # Certificados SSL
 
 **Modelos instalados**:
 
-| Modelo | Uso | VRAM |
-|--------|-----|------|
-| `rag-qwen-ft:latest` | RAG principal (JARVIS) — Qwen 2.5 14B + LoRA FT | ~8GB |
-| `qwen2.5:32b-instruct-q4_K_M` | Fallback y análisis complejo | ~19GB |
-| `qwen2.5vl:7b` | Análisis de imágenes y OCR asistido | ~6GB |
+| Modelo | Alias LiteLLM | Uso | VRAM |
+|--------|---------------|-----|------|
+| `rag-qwen-ft:latest` | `JARVIS` | RAG principal, consultas factuales y procedurales | ~8GB |
+| `qwen2.5:32b-instruct-q4_K_M` | `qwen2.5-32b` | Consultas analíticas (auto-routing), summarización de historial | ~19GB |
+| `qwen2.5vl:7b` | `qwen2.5vl` | Análisis de imágenes y OCR asistido | ~6GB |
+
+**Smart Model Routing** (v2.3.0): El `QueryProcessor` detecta automáticamente la intención de cada consulta y enruta al modelo óptimo — JARVIS para consultas rápidas/precisas, qwen2.5-32b para análisis complejos multi-documento.
 
 **Puerto**: `11435`
 
@@ -150,15 +152,17 @@ config/nginx/ssl/          # Certificados SSL
 | Endpoint | Función |
 |----------|---------|
 | `/api/v1/search` | Búsqueda híbrida (semántica + léxica) |
-| `/api/v1/chat` | Chat con contexto RAG |
+| `/api/v1/chat` | Chat con contexto RAG + smart routing |
 | `/scrape/url` | Scrapea y indexa URLs |
 | `/documents/list` | Lista documentos indexados |
 | `/boe/*` | Endpoints del BOE |
 
-**Tecnologías internas**:
+**Componentes clave del pipeline RAG** (v2.3.0):
+- **QueryProcessor** (`core/query_processor.py`): Intent detection → query expansion (×3 variantes) → smart model routing (JARVIS/qwen2.5-32b).
 - **Sentence Transformers**: Embeddings multilingües.
 - **PaddleOCR**: OCR con GPU para PDFs escaneados.
 - **LangChain**: Chunking semántico.
+- **MemoryManager**: Historial conversacional con summarización automática vía qwen2.5-32b.
 
 **Puerto**: `8002`
 

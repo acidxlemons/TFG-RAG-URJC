@@ -9,8 +9,10 @@ import re
 import unicodedata
 import uuid
 
-from app.core.state import app_state, llm_client, LLM_MODEL, limiter
+from app.core.state import app_state, llm_client, LLM_MODEL, LITELLM_BASE_URL, LITELLM_API_KEY, limiter
 from app.core.permissions import resolve_authorized_collections
+from app.core.query_processor import QueryIntent
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -418,7 +420,11 @@ async def chat(
                 processing_time=time.time() - start,
             )
 
-        # 0) Detección de referencias explícitas para anclar la recuperación por filename.
+        # 0) QueryProcessor: intent detection + query expansion + smart model routing
+        processed_query = app_state.query_processor.process(chat_request.message)
+        response_model = processed_query.suggested_model  # JARVIS o qwen2.5-32b
+
+        # 0b) Detección de referencias explícitas para anclar la recuperación por filename.
         query_ids = _extract_query_ids(chat_request.message)
         explicit_filename_hints = _extract_filename_mentions(chat_request.message)
         filename_hints = list(explicit_filename_hints)
@@ -428,33 +434,43 @@ async def chat(
                 filename_hints = list(dict.fromkeys(filename_hints + id_hints))
                 logger.info(f"/chat filename hints by ID {query_ids}: {filename_hints[:8]}")
         multi_document_request = len(filename_hints) > 1 or len(query_ids) > 1
-        retrieval_top_k = 8 if multi_document_request else 5
 
-        # 1) RAG mode: Recuperar contexto desde Qdrant (multi-tenant)
+        # top_k adaptativo: si hay hints explícitos usamos 8, si no el sugerido por intent
+        retrieval_top_k = 8 if multi_document_request else processed_query.suggested_top_k or 5
+
+        # 1) RAG mode: Recuperar contexto desde Qdrant con multi-query expansion
         all_results = []
+        queries_to_run = processed_query.expanded  # [original] + variaciones LLM
         for coll in tenant_collections:
             try:
-                coll_results = app_state.retriever.retrieve(
-                    query=chat_request.message,
-                    top_k=retrieval_top_k,
-                    filter_by_source=None,
-                    filter_by_filenames=filename_hints or None,
-                    exclude_ocr=False,
-                    collection_name=coll,  # The multi-site architecture uses completely separate collections
-                    tenant_id="",
-                )
-                # Si el filtro por filename dejó la colección sin resultados, fallback semántico.
-                if not coll_results and filename_hints:
+                seen_texts: set = set()
+                for q_variant in queries_to_run:
                     coll_results = app_state.retriever.retrieve(
-                        query=chat_request.message,
+                        query=q_variant,
                         top_k=retrieval_top_k,
                         filter_by_source=None,
-                        filter_by_filenames=None,
+                        filter_by_filenames=filename_hints or None,
                         exclude_ocr=False,
                         collection_name=coll,
                         tenant_id="",
                     )
-                all_results.extend(coll_results)
+                    # Si el filtro por filename dejó la colección sin resultados, fallback semántico.
+                    if not coll_results and filename_hints and q_variant == chat_request.message:
+                        coll_results = app_state.retriever.retrieve(
+                            query=q_variant,
+                            top_k=retrieval_top_k,
+                            filter_by_source=None,
+                            filter_by_filenames=None,
+                            exclude_ocr=False,
+                            collection_name=coll,
+                            tenant_id="",
+                        )
+                    # Deduplicar entre variaciones por texto
+                    for r in coll_results:
+                        key = (getattr(r, "filename", ""), (getattr(r, "text", "") or "")[:120])
+                        if key not in seen_texts:
+                            seen_texts.add(key)
+                            all_results.append(r)
             except Exception as e:
                 logger.warning(f"Error querying collection {coll}: {e}")
         all_results = _dedupe_results(all_results)
@@ -594,9 +610,16 @@ CONTEXT:
              
         user_prompt = f"{history}CURRENT QUESTION:\n{chat_request.message}"
 
-        # 3) Llamar LLM
-        completion = llm_client.chat.completions.create(
-            model=LLM_MODEL,
+        # 3) Llamar LLM (smart routing: JARVIS para factual/procedural, qwen2.5-32b para analytical)
+        if response_model != LLM_MODEL:
+            # Crear cliente puntual para el modelo analítico
+            _routed_client = OpenAI(base_url=f"{LITELLM_BASE_URL}/v1", api_key=LITELLM_API_KEY)
+            _active_client = _routed_client
+        else:
+            _active_client = llm_client
+        logger.info(f"/chat → model={response_model} (intent={processed_query.intent.value})")
+        completion = _active_client.chat.completions.create(
+            model=response_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
