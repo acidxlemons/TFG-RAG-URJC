@@ -7,11 +7,13 @@ Health and metrics endpoints.
 from typing import Dict
 import logging
 import os
+import time
 
+import requests as _requests
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from app.core.state import app_state
+from app.core.state import app_state, LITELLM_BASE_URL, LITELLM_API_KEY
 
 router = APIRouter(tags=["health"])
 logger = logging.getLogger(__name__)
@@ -113,6 +115,50 @@ async def detailed_health() -> Dict:
             "status": "unhealthy",
             "error": str(e),
         }
+
+    # Redis ping
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
+        import redis as _redis
+        r = _redis.from_url(redis_url, socket_connect_timeout=2)
+        r.ping()
+        health_status["services"]["redis"] = {"status": "healthy", "url": redis_url}
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["redis"] = {"status": "unhealthy", "error": str(e)}
+
+    # LiteLLM / Ollama — modelos disponibles
+    try:
+        t0 = time.time()
+        resp = _requests.get(
+            f"{LITELLM_BASE_URL}/v1/models",
+            headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        model_ids = [m["id"] for m in resp.json().get("data", [])]
+        health_status["services"]["litellm"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - t0) * 1000),
+            "models": model_ids,
+        }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["litellm"] = {"status": "unhealthy", "error": str(e)}
+
+    # QueryProcessor state
+    try:
+        qp = app_state.query_processor
+        health_status["services"]["query_processor"] = {
+            "status": "healthy",
+            "expansion_enabled": qp.enable_expansion,
+            "max_expansions": qp.max_expansions,
+            "primary_model": qp._primary_model,
+            "analytical_model": qp._analytical_model,
+        }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["query_processor"] = {"status": "unhealthy", "error": str(e)}
 
     secret_warnings = _get_default_secret_warnings()
     health_status["security"] = {

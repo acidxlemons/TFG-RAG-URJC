@@ -298,15 +298,19 @@ services:
       LITELLM_URL: http://litellm:4000
       LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-1234}
       LLM_MODEL: ${LLM_MODEL:-JARVIS}
+      ANALYTICAL_MODEL: ${ANALYTICAL_MODEL:-qwen2.5-32b}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-qwen2.5-32b}
+      QUERY_EXPANSION_ENABLED: ${QUERY_EXPANSION_ENABLED:-true}
+      QUERY_MAX_EXPANSIONS: ${QUERY_MAX_EXPANSIONS:-2}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
       MINIO_BUCKET: ${MINIO_BUCKET:-documents}
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tenant-default}
-      # Fine-tuned embedding model (fallback to base if not found)
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-/workspace/models/finetuned_embeddings}
-      # Fine-tuned reranker (cross-encoder for better ranking)
-      RERANKER_MODEL: ${RERANKER_MODEL:-/workspace/models/finetuned_reranker}
+      # Embedding model: usa la variable de .env; si no existe, el modelo HuggingFace base
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+      # Reranker: usa fine-tuned si existe en /workspace/models, si no cross-encoder base
+      RERANKER_MODEL: ${RERANKER_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
       RERANKER_DEVICE: ${RERANKER_DEVICE:-cpu}
       OCR_NUM_WORKERS: ${BACKEND_OCR_NUM_WORKERS:-2}
       OCR_USE_GPU: "true"
@@ -370,8 +374,8 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-changeme}
       SYNC_INTERVAL: ${SYNC_INTERVAL:-300}
       SYNC_ON_START: ${SYNC_ON_START:-false}
-      # Fine-tuned embedding model (same as backend)
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-/workspace/models/finetuned_embeddings}
+      # Embedding model: mismo que el backend para consistencia vectorial
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
       LOG_LEVEL: INFO
       PYTHONPATH: /app
     ports:
