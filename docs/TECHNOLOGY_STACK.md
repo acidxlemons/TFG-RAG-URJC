@@ -117,9 +117,9 @@ config/nginx/ssl/          # Certificados SSL
 
 | Modelo | Uso | VRAM |
 |--------|-----|------|
-| `llama3.1:8b-instruct-q8_0` | Chat general, RAG | ~8GB |
-| `tfg-qwen-ft:latest` | Fine-tuned para este proyecto | ~6GB |
-| `qwen2.5vl:7b` | Análisis de imágenes | ~8GB |
+| `rag-qwen-ft:latest` | RAG principal (JARVIS) — Qwen 2.5 14B + LoRA FT | ~8GB |
+| `qwen2.5:32b-instruct-q4_K_M` | Fallback y análisis complejo | ~19GB |
+| `qwen2.5vl:7b` | Análisis de imágenes y OCR asistido | ~6GB |
 
 **Puerto**: `11435`
 

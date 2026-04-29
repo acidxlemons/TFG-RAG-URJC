@@ -33,8 +33,9 @@ El proyecto se dividió en iteraciones incrementales de tipo sprint, cada una en
 3 & Dic 2025 & Integración SharePoint (MSAL/Graph API). Motor OCR PaddleOCR con GPU. & 30 h \\
 4 & Ene 2026 & Agente JARVIS Pipeline. Web scraping con Playwright. Búsqueda DuckDuckGo. & 40 h \\
 5 & Feb 2026 & Servidor MCP del BOE. Fine-tuning LoRA (Qwen). Stack Prometheus/Grafana. & 30 h \\
+6 & Mar--Abr 2026 & Agente SQL (NL$\rightarrow$SQL) con lista blanca y auto-corrección. Validación JWT Azure AD en backend. Corrección de expansión de consulta asíncrona (v2.2.0). & 25 h \\
 \midrule
- & & \textbf{Total desarrollo técnico} & \textbf{160 h} \\
+ & & \textbf{Total desarrollo técnico} & \textbf{185 h} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -55,18 +56,21 @@ La distribución temporal del proyecto se representa en el diagrama de GANTT de 
     bar label font=\footnotesize,
     title label font=\footnotesize,
     group label font=\footnotesize\bfseries
-]{1}{20}
+]{1}{28}
 \gantttitle{Oct}{4}
 \gantttitle{Nov}{4}
 \gantttitle{Dic}{4}
 \gantttitle{Ene}{4}
-\gantttitle{Feb}{4} \\
+\gantttitle{Feb}{4}
+\gantttitle{Mar}{4}
+\gantttitle{Abr}{4} \\
 \ganttbar{Infraestructura Docker}{1}{4} \\
 \ganttbar{Backend FastAPI + RAG}{5}{8} \\
 \ganttbar{SharePoint + OCR}{9}{12} \\
 \ganttbar{JARVIS + Scraping}{13}{16} \\
 \ganttbar{BOE + LoRA + Grafana}{17}{20} \\
-\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{20}
+\ganttbar{SQL + JWT + v2.2.0}{21}{28} \\
+\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{28}
 \end{ganttchart}
 }
 \caption{Diagrama de GANTT del proyecto.}

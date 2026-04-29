@@ -30,16 +30,18 @@ El sistema no se diseñó como un bloque monolítico, sino que emergió de un pr
     \item Octava limitación: Los analistas de datos necesitaban consultar tablas de datos estructurados sin aprender SQL. \textit{Solución:} Se desarrolló un agente de traducción NL$\rightarrow$SQL (\texttt{core/sql\_agent.py}) que genera y ejecuta consultas \texttt{SELECT} seguras sobre PostgreSQL mediante LiteLLM, con validación por lista blanca y auto-corrección ante errores de sintaxis.
 
     \item Novena limitación: El control de acceso mediante cabeceras HTTP era insuficiente para garantizar la seguridad en entornos multi-tenant con requisitos exigentes. \textit{Solución:} Se implementó validación criptográfica de tokens JWT de Azure AD (\texttt{core/auth.py}), con descarga dinámica de claves públicas JWKS, activable con la variable de entorno \texttt{AZURE\_JWT\_VALIDATION=true}.
+
+    \item Décima limitación: La expansión de consulta en el endpoint de búsqueda lanzaba el cálculo en un \texttt{ThreadPoolExecutor} paralelo, pero el futuro resultante nunca se recogía: la expansión estaba efectivamente deshabilitada en producción sin que los tests unitarios lo detectaran. Adicionalmente, el módulo \texttt{core/retrieval.py} contenía imports perezosos de clases de Qdrant dentro de métodos y mensajes de log de depuración (\texttt{logger.info("DEBUG:~\ldots")}) que no debían estar en producción. \textit{Solución} (v2.2.0): se añadió la recogida asíncrona del futuro mediante \texttt{asyncio.wait\_for(shield(future), timeout=1s)}, se ejecutan búsquedas adicionales con las consultas expandidas y se incorporan sus resultados sin duplicados; se movieron los imports al nivel del módulo y se eliminaron los logs de depuración.
 \end{enumerate}
 
-Esta aproximación iterativa ---identificar una carencia, evaluar alternativas, integrar la solución y validar el resultado--- se repitió a lo largo de los cinco sprints del proyecto. Cada nueva pieza se acopló al ecosistema respetando la separación de responsabilidades y las interfaces HTTP estándar entre servicios, permitiendo sustituir cualquier componente sin afectar al resto.
+Esta aproximación iterativa ---identificar una carencia, evaluar alternativas, integrar la solución y validar el resultado--- se repitió a lo largo de los seis sprints del proyecto. Cada nueva pieza se acopló al ecosistema respetando la separación de responsabilidades y las interfaces HTTP estándar entre servicios, permitiendo sustituir cualquier componente sin afectar al resto.
 
 % ============================================================
 \section{Arquitectura General del Sistema}
 \label{sec:arquitectura-general}
 % ============================================================
 
-Para tener visibilidad técnica, se ha diseñado el sistema mediante una arquitectura compuesta por 12 servicios principales y varios servicios auxiliares de soporte y arranque, todos ellos contenerizados con Docker, orquestados mediante Docker Compose \cite{dockerCompose2026docs} y aislados en una red virtual propia (\texttt{rag-network}). El flujo resumido de tecnologías ya se ha presentado en el Capítulo~\ref{cap:tecnologias}; aquí se detalla la función de cada servicio dentro de la arquitectura funcional.
+Para tener visibilidad técnica, se ha diseñado el sistema mediante una arquitectura compuesta por 15 servicios principales y varios servicios auxiliares de soporte y arranque, todos ellos contenerizados con Docker, orquestados mediante Docker Compose \cite{dockerCompose2026docs} y aislados en una red virtual propia (\texttt{rag-network}). El flujo resumido de tecnologías ya se ha presentado en el Capítulo~\ref{cap:tecnologias}; aquí se detalla la función de cada servicio dentro de la arquitectura funcional.
 
 \begin{table}[H]
 \centering
@@ -61,6 +63,9 @@ PostgreSQL         & Base de datos relacional               & 5432 (interno) \\
 Redis              & Caché de respuestas                    & 6379 (interno) \\
 MCP-BOE Server     & Consulta del BOE                       & 8010 (interno) \\
 MinIO              & Almacenamiento de objetos (backup)     & 9000 (interno) \\
+Prometheus         & Recolección de métricas del sistema    & 9090 (interno) \\
+Grafana            & Dashboards de observabilidad           & 3000 (interno) \\
+pgAdmin            & Administración de PostgreSQL           & 5050 (interno) \\
 \bottomrule
 \end{tabular}
 \end{table}

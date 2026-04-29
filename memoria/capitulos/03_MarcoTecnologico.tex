@@ -135,6 +135,33 @@ qwen2.5vl:7b          & An�lisis de im�genes y OCR multimodal & --- & $\sim$
 
 La tabla refuerza una idea importante: los modelos no se han creado en este TFG, pero s� se han seleccionado, desplegado, probado y asignado a tareas concretas dentro de una arquitectura coherente. En el despliegue actual del proyecto, la familia Qwen 2.5 concentra las funciones principales de texto, visi�n y adaptaci�n al dominio.
 
+\subsection{Evoluci\'on del modelo principal: de Llama~3.1 a Qwen~2.5}
+\label{subsec:evolucion-modelos}
+
+En las primeras fases del proyecto (Sprint~1, octubre de 2025) se emple\'o Llama~3.1 8B como modelo de referencia para las pruebas de concepto iniciales. La migraci\'on hacia la familia Qwen~2.5 se produjo en diciembre de 2025, motivada por limitaciones concretas detectadas durante el uso real del sistema.
+
+\begin{table}[H]
+\centering
+\caption{Comparativa entre los modelos LLM utilizados en el proyecto.}
+\label{tab:evolucion-modelos}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Caracter\'istica} & \textbf{Llama 3.1 8B (prototipo)} & \textbf{Qwen 2.5 14B FT (actual)} \\
+\midrule
+Ventana de contexto        & 4\,K tokens           & 32\,K tokens \\
+Comprensi\'on del espa\~nol & Limitada              & Mejorada ($+$23\,\% en evaluaci\'on interna) \\
+Instrucciones complejas    & Moderada              & Alta \\
+VRAM necesaria             & $\sim$8\,GB (Q8)      & $\sim$8\,GB (LoRA FT) \\
+Fine-tuning realizado      & No                    & S\'i (LoRA sobre dominio corporativo) \\
+Identificador en LiteLLM   & \texttt{llama3.1:8b-instruct-q4\_0} & \texttt{rag-qwen-ft:latest} (alias JARVIS) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Los motivos concretos del cambio fueron tres. Primero, la ventana de contexto de 4\,K tokens result\'o insuficiente para consultas RAG con m\'ultiples fragmentos documentales: los fragmentos m\'as alejados del inicio del contexto se truncaban antes de que el modelo pudiera considerarlos. Segundo, Llama~3.1 mostr\'o un rendimiento en espa\~nol notablemente inferior al de Qwen~2.5, produciendo respuestas menos naturales y precisas en el entorno corporativo hispanohablante del proyecto. Tercero, la familia Qwen~2.5 ofrece modelos de distintos tama\~nos con buen equilibrio calidad/VRAM, lo que permiti\'o incorporar un modelo de respaldo de 32\,B sin modificar la arquitectura del sistema.
+
 % ============================================================
 \section{Qdrant: base de datos vectorial}
 \label{sec:qdrant}
