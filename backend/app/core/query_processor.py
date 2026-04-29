@@ -265,3 +265,53 @@ class QueryProcessor:
         if intent == QueryIntent.ANALYTICAL:
             return self._analytical_model
         return self._primary_model
+
+
+class MultiQueryRetriever:
+    """
+    Wrapper que expande una query via QueryProcessor y fusiona resultados de múltiples variaciones.
+
+    Encapsula la lógica multi-query para el endpoint /search/multi-query:
+      1. Expande la query con QueryProcessor.expand_query()
+      2. Ejecuta búsqueda con cada variación en el retriever base
+      3. Deduplica por ID y retorna los top-k mejores por score
+    """
+
+    def __init__(self, base_retriever: Any, query_processor: QueryProcessor):
+        self.retriever = base_retriever
+        self.processor = query_processor
+
+    def search(
+        self,
+        query: str,
+        collection_name: str,
+        top_k: int = 5,
+        tenant_id: Optional[str] = None,
+        strategy: str = "hybrid",
+        use_reranking: bool = True,
+    ) -> List[Any]:
+        """Busca con query + variaciones expandidas y devuelve top-k deduplicados."""
+        queries = self.processor.expand_query(query)
+        seen_ids: Set[str] = set()
+        all_results: List[Any] = []
+
+        for q in queries:
+            try:
+                results = self.retriever.search(
+                    query=q,
+                    collection_name=collection_name,
+                    top_k=top_k,
+                    tenant_id=tenant_id,
+                    strategy=strategy,
+                    use_reranking=use_reranking,
+                )
+                for r in results:
+                    rid = str(r.id)
+                    if rid not in seen_ids:
+                        seen_ids.add(rid)
+                        all_results.append(r)
+            except Exception as e:
+                logger.warning(f"MultiQueryRetriever: variación '{q[:40]}' falló: {e}")
+
+        all_results.sort(key=lambda r: r.score, reverse=True)
+        return all_results[:top_k]

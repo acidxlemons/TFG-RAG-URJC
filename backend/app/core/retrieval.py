@@ -157,9 +157,15 @@ class HybridRetriever:
         if not configured:
             return DEFAULT_RERANKER_MODEL
 
-        looks_like_path = any(
-            marker in configured for marker in (os.sep, "/", "\\")
-        ) or configured.startswith(".")
+        # HuggingFace model IDs use "org/model" format — only treat as local path
+        # if it starts with ./ ../ or an absolute path marker (\ or leading /)
+        looks_like_path = (
+            configured.startswith(".") or
+            configured.startswith("/") or
+            configured.startswith("\\") or
+            ("\\" in configured) or
+            (os.sep != "/" and os.sep in configured)
+        )
         if looks_like_path and not os.path.exists(configured):
             logger.warning(
                 "RERANKER_MODEL apunta a '%s' pero no existe. Se usara '%s'.",
