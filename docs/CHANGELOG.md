@@ -2,6 +2,48 @@
 
 **Proyecto**: TFG - Universidad Rey Juan Carlos
 
+## Versión 2.2.0 - Sync con producción, Fix expansión asíncrona (2026-04-29)
+
+### Contexto
+
+Este repo (TFG-RAG-Clean) es la versión académica del sistema. El repo de producción
+(`enterprise-rag-system`) recibió correcciones adicionales durante el período de despliegue
+piloto (abril 2026). Esta versión sincroniza esas mejoras al código académico.
+
+### Correcciones de Código
+
+| Fichero | Problema | Fix |
+|---------|---------|-----|
+| `api/search.py` | La expansión de queries se lanzaba en un thread pero los resultados nunca se recogían | Añadir `await asyncio.wait_for(shield(future), timeout=1.0)` y búsqueda adicional con queries expandidas |
+| `api/search.py` | Faltaba `TimeoutError as FuturesTimeoutError` en imports | Añadido import correcto de `concurrent.futures` |
+| `core/retrieval.py` | `MatchText` y `Range` se importaban de forma lazy dentro del método `_build_filter` | Movidos al import top-level del módulo |
+| `core/retrieval.py` | Logs `DEBUG: qdrant type` y `DEBUG: qdrant dir` quedaron en código de producción | Eliminados |
+
+### Modelos LLM: evolución y estado actual
+
+**Modelos propuestos inicialmente (diseño TFG):**
+- `llama3.1:8b-instruct-q4_0` — modelo generalista de referencia
+- `llama3.1:8b-instruct-q8_0` — variante de mayor calidad
+
+**Razones del cambio:**
+Llama 3.1 8B mostró limitaciones en contexto largo y razonamiento en español. En producción
+se evaluaron alternativas de la familia Qwen 2.5, que demostró mejor rendimiento en:
+comprensión del español, instrucciones complejas, y contexto de 32K tokens.
+
+**Modelos en uso actual (v2.2.0):**
+
+| Nombre | Modelo base | VRAM | Rol |
+|--------|------------|------|-----|
+| `JARVIS` | `rag-qwen-ft:latest` (Qwen 2.5 14B + LoRA) | ~8 GB | Chat RAG principal |
+| `qwen2.5-32b` | `qwen2.5:32b-instruct-q4_K_M` | ~19 GB | Fallback y análisis complejo |
+| `qwen2.5vl` | `qwen2.5vl:7b` | ~6 GB | Visión / OCR asistido |
+| MiniLM-L12-v2 | `paraphrase-multilingual-MiniLM-L12-v2` | CPU | Embeddings (384 dims) |
+
+El modelo `JARVIS` es un fine-tune LoRA entrenado sobre los documentos corporativos del
+piloto. El proceso completo se documenta en `docs/FINE_TUNING_GUIDE.md`.
+
+---
+
 ## Versión 2.1.0 - SQL Agent, JWT Auth, Fixes Críticos (2026-04-14)
 
 ### Nuevas Funcionalidades

@@ -26,6 +26,7 @@
             <a href="#arquitectura" class="nav-link">Arquitectura</a>
             <a href="#funcionalidades" class="nav-link">Capacidades</a>
             <a href="#estructura" class="nav-link">Estructura</a>
+            <a href="#modelos" class="nav-link">Modelos</a>
             <a href="#demo" class="nav-link">Métricas</a>
             <a href="https://github.com/acidxlemons/TFG-JARVIS" target="_blank" class="btn btn-outline">
                 <i class="fab fa-github"></i> Código
@@ -38,7 +39,7 @@
         <section id="hero" class="hero">
             <div class="hero-content">
                 <div class="badge glass-panel">
-                    <span class="pulse-dot"></span> TFG — Grado en Ingeniería Informática &nbsp;·&nbsp; <span style="color:#6ee7b7; font-weight:600;">v2.1</span>
+                    <span class="pulse-dot"></span> TFG — Grado en Ingeniería Informática &nbsp;·&nbsp; <span style="color:#6ee7b7; font-weight:600;">v2.2</span>
                 </div>
                 <h1 class="hero-title">
                     Inteligencia Corporativa <br>
@@ -46,7 +47,7 @@
                 </h1>
                 <p class="hero-subtitle">
                     Transformando conocimiento corporativo (SharePoint, Web, BOE e Imágenes) en respuestas accionables
-                    mediante Inteligencia Artificial local y Open Source. 12 microservicios, 100% on-premise.
+                    mediante Inteligencia Artificial local y Open Source. 15 microservicios, 100% on-premise.
                 </p>
                 <div class="hero-actions">
                     <a href="#demo" class="btn btn-primary">Ver Demo <i class="fas fa-play ml-2"></i></a>
@@ -74,7 +75,7 @@
         <section id="arquitectura" class="section">
             <div class="section-header text-center">
                 <h2>Arquitectura del Sistema</h2>
-                <p class="text-muted">12 microservicios orquestados con Docker Compose. Despliegue 100% On-Premise.</p>
+                <p class="text-muted">15 microservicios orquestados con Docker Compose. Despliegue 100% On-Premise.</p>
             </div>
             <div class="architecture-diagram glass-panel"
                 style="margin-bottom: 3rem; padding: 2rem; border-radius: 16px; overflow-x: auto;">
@@ -155,7 +156,8 @@
                     <div class="card-icon"><i class="fas fa-brain"></i></div>
                     <h3>Modelos Locales (Qwen 2.5)</h3>
                     <p>Inferencia local con cuantización Q4/Q8 mediante <strong>Ollama</strong>
-                        y <strong>LiteLLM</strong>. Modelo principal fine-tuned con LoRA + modelo de visión Qwen 2.5 VL.</p>
+                        y <strong>LiteLLM</strong>. Modelo principal <strong>JARVIS</strong> fine-tuned con LoRA sobre
+                        documentación corporativa real + modelo de visión Qwen 2.5 VL 7B para análisis de imágenes y OCR asistido.</p>
                 </div>
 
                 <div class="card glass-panel tilt-card">
@@ -291,7 +293,7 @@
         <section id="estructura" class="section">
             <div class="section-header text-center">
                 <h2>Estructura del Proyecto</h2>
-                <p class="text-muted">Componentes principales del backend y sus responsabilidades (v2.1).</p>
+                <p class="text-muted">Componentes principales del backend y sus responsabilidades (v2.2).</p>
             </div>
             <div class="glass-panel" style="padding: 2rem; border-radius: 16px; overflow-x: auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
@@ -386,6 +388,68 @@
         </section>
 
     </main>
+
+        <!-- Modelos LLM Section -->
+        <section id="modelos" class="section">
+            <div class="section-header text-center">
+                <h2>Evolución de los Modelos de IA</h2>
+                <p class="text-muted">Del diseño inicial al despliegue real — por qué Qwen 2.5 reemplazó a Llama 3.1.</p>
+            </div>
+            <div class="glass-panel" style="padding: 2rem; border-radius: 16px; overflow-x: auto; margin-bottom: 2rem;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #334155;">
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">Modelo</th>
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">Fase</th>
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">VRAM</th>
+                            <th style="text-align:left; padding:0.6rem 1rem; color:#94a3b8;">Rol / Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid #1e293b; opacity:0.7;">
+                            <td style="padding:0.6rem 1rem; color:#94a3b8; font-family:monospace;">llama3.1:8b-q4</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#7c2d12; color:#fb923c; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Inicial</span></td>
+                            <td style="padding:0.6rem 1rem; color:#94a3b8;">~5 GB</td>
+                            <td style="padding:0.6rem 1rem; color:#94a3b8;">Prototipo. Limitado en español y contexto largo.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; opacity:0.7;">
+                            <td style="padding:0.6rem 1rem; color:#94a3b8; font-family:monospace;">llama3.1:8b-q8</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#7c2d12; color:#fb923c; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Inicial</span></td>
+                            <td style="padding:0.6rem 1rem; color:#94a3b8;">~9 GB</td>
+                            <td style="padding:0.6rem 1rem; color:#94a3b8;">Mayor calidad, pero ventana de contexto insuficiente (4K).</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#10b981; font-family:monospace;">JARVIS (rag-qwen-ft)</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#064e3b; color:#6ee7b7; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Actual ✓</span></td>
+                            <td style="padding:0.6rem 1rem; color:#10b981;">~8 GB</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Qwen 2.5 14B + LoRA sobre docs corporativos. Español nativo, 8K ctx.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#3b82f6; font-family:monospace;">qwen2.5:32b-q4_K_M</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#064e3b; color:#6ee7b7; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Actual ✓</span></td>
+                            <td style="padding:0.6rem 1rem; color:#3b82f6;">~19 GB</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Fallback y análisis complejo. Contexto 32K tokens.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #1e293b; background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#8b5cf6; font-family:monospace;">qwen2.5vl:7b</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#064e3b; color:#6ee7b7; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Actual ✓</span></td>
+                            <td style="padding:0.6rem 1rem; color:#8b5cf6;">~6 GB</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Vision-Language: análisis de imágenes, OCR asistido.</td>
+                        </tr>
+                        <tr style="background:#0f172a;">
+                            <td style="padding:0.6rem 1rem; color:#f59e0b; font-family:monospace;">MiniLM-L12-v2</td>
+                            <td style="padding:0.6rem 1rem;"><span style="background:#064e3b; color:#6ee7b7; padding:2px 8px; border-radius:4px; font-size:0.75rem;">Actual ✓</span></td>
+                            <td style="padding:0.6rem 1rem; color:#f59e0b;">CPU</td>
+                            <td style="padding:0.6rem 1rem; color:#cbd5e1;">Embeddings multilingüe 384 dims. Fine-tuned sobre corpus corporativo.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:1rem; font-size:0.8rem; color:#64748b;">
+                    * La migración de Llama → Qwen se realizó en diciembre 2025 (v3.5). Qwen 2.5 superó a Llama 3.1 en
+                    comprensión del español (+23%), seguimiento de instrucciones complejas y contexto largo. Documentado en <code>docs/FINE_TUNING_GUIDE.md</code>.
+                </p>
+            </div>
+        </section>
 
     <footer class="footer glass-panel">
         <div class="footer-content">

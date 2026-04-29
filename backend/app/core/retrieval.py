@@ -31,6 +31,8 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    MatchText,
+    Range,
     ScoredPoint,
     NamedVector,
     SparseVector,
@@ -323,12 +325,8 @@ class HybridRetriever:
         - Encontrar contenido similar semánticamente
         """
         try:
-            # DEBUG: Inspeccionar objeto qdrant
-            logger.info(f"DEBUG: qdrant type: {type(self.qdrant)}")
-            logger.info(f"DEBUG: qdrant dir: {dir(self.qdrant)}")
-
             from qdrant_client.models import SearchRequest
-            
+
             # Generar embedding de la query
             # encoder.encode() returns (1, dim) for single string, so take [0]
             query_vector = self.encoder.encode(query)[0].tolist()
@@ -804,7 +802,6 @@ class HybridRetriever:
             # Filtro por nombre de archivo (texto parcial)
             filename = additional_filters.get("filename")
             if filename:
-                from qdrant_client.models import MatchText
                 conditions.append(
                     FieldCondition(key="filename", match=MatchText(text=filename))
                 )
@@ -812,7 +809,6 @@ class HybridRetriever:
             # Filtro por rango de fechas (epoch seconds: {"gte": 1700000000, "lte": 1800000000})
             date_range = additional_filters.get("date_range")
             if date_range and isinstance(date_range, dict):
-                from qdrant_client.models import Range
                 range_kwargs = {}
                 if "gte" in date_range:
                     range_kwargs["gte"] = float(date_range["gte"])

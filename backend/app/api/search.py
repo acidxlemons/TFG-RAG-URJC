@@ -61,7 +61,7 @@ import asyncio
 import os
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import List, Dict, Optional, Any
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field, validator
@@ -388,9 +388,54 @@ async def search(
             except Exception as e:
                 logger.warning(f"Error querying collection {coll}: {e}")
 
+        # 4. Recoger resultados de expansión si ya terminaron (timeout corto)
+        if expansion_future is not None:
+            try:
+                # Esperar máximo 1s: si la búsqueda original ya terminó en ~300ms
+                # y la expansión tarda 1.5s total, esperamos solo el tiempo restante
+                expanded_queries = await asyncio.wait_for(
+                    asyncio.shield(expansion_future), timeout=1.0
+                )
+                # Buscar con las variaciones adicionales (excluir el original ya buscado)
+                extra_queries = [q for q in expanded_queries if q != request.query]
+                if extra_queries:
+                    seen_ids = {r.id for r in all_results}
+                    for eq in extra_queries:
+                        for coll in collections_to_search:
+                            try:
+                                eq_results = retriever.search(
+                                    query=eq,
+                                    collection_name=coll,
+                                    top_k=max(3, request.top_k // 2),
+                                    tenant_id=tenant_filter,
+                                    strategy=request.strategy,
+                                    use_reranking=False,
+                                    filters=request.filters,
+                                )
+                                for r in eq_results:
+                                    if r.id not in seen_ids:
+                                        if r.metadata is not None and "collection" not in r.metadata:
+                                            r.metadata["collection"] = coll
+                                        all_results.append(r)
+                                        seen_ids.add(r.id)
+                            except Exception:
+                                pass
+                    logger.info(
+                        f"Expansión aplicada: {len(expanded_queries)} queries, "
+                        f"{len(all_results)} resultados totales"
+                    )
+            except (asyncio.TimeoutError, FuturesTimeoutError):
+                logger.debug("Expansión no completada en tiempo (1s timeout) — usando query original")
+            except Exception as e:
+                logger.debug(f"Error recogiendo expansión: {e}")
+
+        # Actualizar processed_query con los queries finalmente usados
+        if processed_query is not None:
+            processed_query.expanded = expanded_queries
+
         all_results.sort(key=lambda r: r.score, reverse=True)
         results = all_results[: request.top_k]
-        
+
         # 3. Calcular latencia
         latency = (time.perf_counter() - t0) * 1000  # en ms
         
