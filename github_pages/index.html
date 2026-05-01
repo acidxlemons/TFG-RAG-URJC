@@ -309,7 +309,7 @@
                     <i class="fas fa-chart-line fa-4x" style="color: #10b981; margin-bottom: 1rem;"></i>
                     <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Prometheus + Grafana + DCGM</h4>
                     <p class="text-muted" style="font-size: 0.9rem; margin-top: 1rem; line-height: 1.5;">
-                        <em>Latencia RAG ~3.5s · TTFT ~1.2s · Cache hit ~35% · Uptime 99.8%</em>
+                        <em>Latencia RAG ~3.0s · Retrieval ~2.4s · 1.400 docs · 123.323 vectores</em>
                     </p>
                 </div>
             </div>
@@ -387,28 +387,28 @@
             </div>
             <div class="grid cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#3b82f6;">~3.5s</div>
-                    <p>Latencia RAG <br>(p95)</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#3b82f6;">~3.0s</div>
+                    <p>Latencia RAG media<br>(retrieval + LLM)</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#10b981;">~1.2s</div>
-                    <p>Primer Token <br>(TTFT)</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#10b981;">~2.4s</div>
+                    <p>Retrieval híbrido<br>(BM25 + dense + reranker)</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#f59e0b;">99.8%</div>
-                    <p>Uptime <br>(30 días)</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#f59e0b;">1.400</div>
+                    <p>Documentos<br>indexados</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#8b5cf6;">92%</div>
-                    <p>Precisión <br>Encaminamiento</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#8b5cf6;">123.323</div>
+                    <p>Vectores<br>en Qdrant</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#ef4444;">0%</div>
-                    <p>Alucinaciones <br>(modo RAG)</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#ef4444;">9</div>
+                    <p>Colecciones<br>por departamento</p>
                 </div>
                 <div class="card glass-panel tilt-card" style="text-align:center;">
-                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">8.000+</div>
-                    <p>Líneas Python <br>Desarrollo Propio</p>
+                    <div style="font-size:2.5rem; font-weight:800; color:#06b6d4;">17.400+</div>
+                    <p>Líneas Python<br>desarrollo propio</p>
                 </div>
             </div>
         </section>
