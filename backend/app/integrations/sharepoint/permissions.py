@@ -10,8 +10,8 @@ No requiere configurar nombres de grupos manualmente.
 Flujo para sitios normales:
   1. Para cada sitio en sharepoint_sites.json con site_id (y sin global_access)
   2. GET /sites/{siteId}?$select=webUrl  → obtener URL del sitio
-  3. Extraer mailNickname del path: /teams/CIVEX2 → "CIVEX2"
-  4. GET /groups?$filter=mailNickname eq 'CIVEX2' → UUID del grupo M365
+  3. Extraer mailNickname del path: /teams/Departamento → "Departamento"
+  4. GET /groups?$filter=mailNickname eq 'Departamento' → UUID del grupo M365
   5. Guardar UUID en azure_group_ids (caché en disco)
   6. Construir mapeo {uuid: colección_qdrant} para validación JWT
 
@@ -108,11 +108,11 @@ def _extract_mail_nickname(web_url: str) -> Optional[str]:
 
     Para sitios de Teams el path tiene forma /teams/<Nickname> o /sites/<Nickname>.
     Ejemplos:
-      https://europavia.sharepoint.com/teams/CIVEX2  → "CIVEX2"
-      https://europavia.sharepoint.com/sites/Calidad → "Calidad"
+      https://miempresa.sharepoint.com/teams/Departamento  → "Departamento"
+      https://miempresa.sharepoint.com/sites/Calidad       → "Calidad"
     """
     path = urlparse(web_url).path.strip("/")
-    # path = "teams/CIVEX2" o "sites/Calidad" etc.
+    # path = "teams/Departamento" o "sites/Calidad" etc.
     parts = path.split("/")
     if len(parts) >= 2:
         return parts[-1]  # último segmento

@@ -35,7 +35,7 @@ _JWT_ENABLED = os.getenv("AZURE_JWT_VALIDATION", "false").lower() in {"1", "true
 # Mapeo de group IDs de Azure AD a nombres de colección Qdrant.
 # Se construye automáticamente desde sharepoint_sites.json al arrancar
 # (ver main.py → sync_permissions). Puede complementarse con AZURE_GROUP_MAP en .env:
-#   AZURE_GROUP_MAP=<group-uuid>=documents_CALIDAD,<group-uuid>=documents_HELIAP2
+#   AZURE_GROUP_MAP=<group-uuid>=documents_Departamento1,<group-uuid>=documents_Departamento2
 _GROUP_MAP: dict[str, str] = {}
 
 # Colecciones con acceso global: accesibles para cualquier usuario autenticado

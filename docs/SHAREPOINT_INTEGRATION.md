@@ -48,7 +48,7 @@ graph TD
 
 | Concepto | Descripción |
 |----------|-------------|
-| **Colecciones de Qdrant** | Cada departamento o sitio de SharePoint se indexa en una **colección separada** dentro de Qdrant. Ejemplo: `documents` (Global), `documents_CIVEX2`, `documents_CALIDAD`. |
+| **Colecciones de Qdrant** | Cada departamento o sitio de SharePoint se indexa en una **colección separada** dentro de Qdrant. Ejemplo: `documents` (Global), `documents_Departamento`, `documents_Calidad`. |
 | **Mapeo de Grupos** | El pipeline `jarvis.py` actúa como "Portero". Cuando un usuario pregunta, consulta sus grupos de Azure AD y usa una tabla de mapeo (`DEPARTMENT_MAPPING`) para traducir "Grupo Azure → Colección Qdrant". |
 | **Pre-filtering** | El backend **nunca** busca en todas las colecciones. Solo busca en las colecciones que el pipeline le indica explícitamente en los headers (`X-Tenant-Ids`). |
 
@@ -69,17 +69,17 @@ graph TD
 
 El control de acceso se basa en **Grupos de Seguridad de Azure AD**.
 
-### 2.1 Dar acceso a un usuario a "CIVEX2"
+### 2.1 Dar acceso a un usuario a "Departamento"
 
 1. **En Azure Portal**:
    - Ir a **Active Directory** → **Groups**.
-   - Buscar el grupo correspondiente a CIVEX2 (ej. `CIVEX2_RAG_Users`).
+   - Buscar el grupo correspondiente a Departamento (ej. `Departamento_RAG_Users`).
    - Añadir el correo del usuario a este grupo.
 
 2. **En el Sistema RAG (Verificación)**:
    - El usuario hace login en OpenWebUI.
    - El pipeline `jarvis.py` detecta sus grupos.
-   - Automáticamente le da acceso a la colección `documents_CIVEX2`.
+   - Automáticamente le da acceso a la colección `documents_Departamento`.
 
 ### 2.2 Investigando IDs de Grupos (Graph Explorer)
 
@@ -226,7 +226,7 @@ Para que el sistema pueda leer los grupos del usuario, la App Registration neces
 
 ## ❓ 5. Troubleshooting Común
 
-### El usuario dice "No veo los documentos de CIVEX2"
+### El usuario dice "No veo los documentos de Departamento"
 
 1. **Check Azure**: ¿Está el usuario en el grupo de Azure AD correcto?
 2. **Check Pipeline Logs**:
