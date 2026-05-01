@@ -7,7 +7,7 @@ Este documento describe la estructura real del repositorio y aclara qué carpeta
 ## Estructura general del proyecto
 
 ```text
-TFG-JARVIS/
+TFG-RAG-URJC/
 ├── backend/                 # Backend principal y lógica RAG
 ├── config/                  # Configuración de servicios
 ├── database/                # Recursos auxiliares de datos

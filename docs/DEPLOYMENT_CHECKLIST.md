@@ -22,8 +22,8 @@ nvidia-smi          # Debe mostrar tu GPU
 
 ### Paso 1: Clonar y Configurar
 ```bash
-git clone https://github.com/acidxlemons/TFG-JARVIS.git
-cd TFG-JARVIS
+git clone https://github.com/acidxlemons/TFG-RAG-URJC.git
+cd TFG-RAG-URJC
 
 # Copiar y editar configuración
 cp .env.example .env

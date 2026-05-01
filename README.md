@@ -12,7 +12,7 @@
 <p align="center">
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick%20Start-5%20min-brightgreen?style=for-the-badge" alt="Quick Start"></a>
   <a href="#-características"><img src="https://img.shields.io/badge/Features-20+-blue?style=for-the-badge" alt="Features"></a>
-  <a href="https://acidxlemons.github.io/TFG-JARVIS/"><img src="https://img.shields.io/badge/Landing-Page-purple?style=for-the-badge" alt="Landing Page"></a>
+  <a href="https://acidxlemons.github.io/TFG-RAG-URJC/"><img src="https://img.shields.io/badge/Landing-Page-purple?style=for-the-badge" alt="Landing Page"></a>
 </p>
 
 <p align="center">
@@ -224,8 +224,8 @@ python test_mcp_real.py
 
 ```bash
 # 1. Clonar repositorio
-git clone https://github.com/acidxlemons/TFG-JARVIS.git
-cd TFG-JARVIS
+git clone https://github.com/acidxlemons/TFG-RAG-URJC.git
+cd TFG-RAG-URJC
 
 # 2. Configurar variables de entorno
 cp .env.example .env
