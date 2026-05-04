@@ -455,9 +455,9 @@ services:
       # Custom CSS theme for the TFG variant
       - ./services/openwebui/static/urjc-theme.css:/app/build/static/custom.css
     environment:
-      # Multiple OpenAI-compatible API endpoints: LiteLLM + Pipelines (JARVIS)
-      OPENAI_API_BASE_URLS: "http://litellm:4000/v1;http://pipelines:9099"
-      OPENAI_API_KEYS: "${LITELLM_MASTER_KEY:-sk-1234};0p3n-w3bu!"
+      # Solo el Pipeline JARVIS — LiteLLM es interno, no debe exponerse directamente
+      OPENAI_API_BASE_URLS: "http://pipelines:9099"
+      OPENAI_API_KEYS: "0p3n-w3bu!"
       # Fix for missing models/500 logs: Allow OpenWebUI to reach Ollama directly
       OLLAMA_BASE_URL: http://ollama:11434
       WEBUI_AUTH: "true"
