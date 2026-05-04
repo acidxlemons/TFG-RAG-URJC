@@ -1,59 +1,59 @@
-\chapter{Tecnolog�as utilizadas y criterio de elecci�n}
+\chapter{Tecnologías utilizadas y criterio de elección}
 \label{cap:tecnologias}
 
-Este cap�tulo aterriza la soluci�n en tecnolog�as concretas. Su objetivo principal es describir qu� es cada tecnolog�a y qu� papel desempe�a dentro del sistema completo. Cuando resulta �til, se menciona tambi�n por qu� encaja en el proyecto, pero el detalle de c�mo se ha combinado con otras piezas se deja para el Cap�tulo~\ref{cap:implementacion}. Tambi�n resulta importante distinguir entre herramientas preexistentes reutilizadas en el proyecto y componentes desarrollados espec�ficamente en este TFG.
+Este capítulo aterriza la solución en tecnologías concretas. Su objetivo principal es describir qué es cada tecnología y qué papel desempeña dentro del sistema completo. Cuando resulta útil, se menciona también por qué encaja en el proyecto, pero el detalle de cómo se ha combinado con otras piezas se deja para el Capítulo~\ref{cap:implementacion}. También resulta importante distinguir entre herramientas preexistentes reutilizadas en el proyecto y componentes desarrollados específicamente en este TFG.
 
 % ============================================================
-\section{Python como lenguaje de integraci�n principal}
+\section{Python como lenguaje de integración principal}
 \label{sec:python}
 % ============================================================
 
-El lenguaje vertebrador del proyecto es Python. La raz�n principal no es solo su popularidad, sino su capacidad para actuar como lenguaje de integraci�n entre bibliotecas de IA, servicios web, automatizaci�n y procesamiento documental. En este TFG, Python permite conectar en un mismo ecosistema el backend, el indexador, el pipeline de OpenWebUI, la integraci�n con SharePoint, el scraping, el OCR y el servidor MCP.
+El lenguaje vertebrador del proyecto es Python. La razón principal no es solo su popularidad, sino su capacidad para actuar como lenguaje de integración entre bibliotecas de IA, servicios web, automatización y procesamiento documental. En este TFG, Python permite conectar en un mismo ecosistema el backend, el indexador, el pipeline de OpenWebUI, la integración con SharePoint, el scraping, el OCR y el servidor MCP.
 
-Conviene separar aqu� dos planos. Por un lado, hay paquetes que se usan directamente en el c�digo desarrollado en el TFG, como FastAPI, qdrant-client, sentence-transformers o msal. Por otro, hay dependencias que vienen dadas por herramientas ya reutilizadas en el stack, como parte del ecosistema de OpenWebUI, Docker o Grafana. Esta distinci�n es importante porque el proyecto no consiste en construir esas plataformas de base, sino en apoyarse en ellas y extenderlas donde era necesario.
+Conviene separar aquí dos planos. Por un lado, hay paquetes que se usan directamente en el código desarrollado en el TFG, como FastAPI, qdrant-client, sentence-transformers o msal. Por otro, hay dependencias que vienen dadas por herramientas ya reutilizadas en el stack, como parte del ecosistema de OpenWebUI, Docker o Grafana. Esta distinción es importante porque el proyecto no consiste en construir esas plataformas de base, sino en apoyarse en ellas y extenderlas donde era necesario.
 
-Adem�s, buena parte de las herramientas reutilizadas en el proyecto exponen su mejor soporte precisamente en este lenguaje. Entre los paquetes y bibliotecas m�s importantes utilizados se encuentran:
+Además, buena parte de las herramientas reutilizadas en el proyecto exponen su mejor soporte precisamente en este lenguaje. Entre los paquetes y bibliotecas más importantes utilizados se encuentran:
 
 \begin{itemize}
     \item \textbf{FastAPI} y \textbf{Uvicorn} para los servicios web y la API REST.
-    \item \textbf{Pydantic} para validaci�n de datos y configuraci�n tipada.
-    \item \textbf{sentence-transformers} para generaci�n de embeddings.
-    \item \textbf{qdrant-client} para interacci�n con la base de datos vectorial.
-    \item \textbf{msal} y clientes asociados para autenticaci�n y acceso a Microsoft Graph.
-    \item \textbf{playwright} para automatizaci�n de navegador.
-    \item \textbf{trafilatura}, \textbf{readability} y \textbf{BeautifulSoup} para extracci�n de contenido web.
+    \item \textbf{Pydantic} para validación de datos y configuración tipada.
+    \item \textbf{sentence-transformers} para generación de embeddings.
+    \item \textbf{qdrant-client} para interacción con la base de datos vectorial.
+    \item \textbf{msal} y clientes asociados para autenticación y acceso a Microsoft Graph.
+    \item \textbf{playwright} para automatización de navegador.
+    \item \textbf{trafilatura}, \textbf{readability} y \textbf{BeautifulSoup} para extracción de contenido web.
     \item \textbf{PaddleOCR} para OCR de documentos escaneados.
-    \item \textbf{duckduckgo\_search} para b�squeda web controlada.
+    \item \textbf{duckduckgo\_search} para búsqueda web controlada.
     \item \textbf{fastmcp} para el servidor MCP del BOE.
-    \item \textbf{prometheus-client} para exponer m�tricas del backend.
+    \item \textbf{prometheus-client} para exponer métricas del backend.
 \end{itemize}
 
-Esta elecci�n tambi�n ayuda a explicar la naturaleza del trabajo realizado: el proyecto no consiste en inventar estas bibliotecas, sino en utilizarlas de forma coordinada y construir sobre ellas la l�gica que faltaba para el caso de uso corporativo.
+Esta elección también ayuda a explicar la naturaleza del trabajo realizado: el proyecto no consiste en inventar estas bibliotecas, sino en utilizarlas de forma coordinada y construir sobre ellas la lógica que faltaba para el caso de uso corporativo.
 
 % ============================================================
 \section{OpenWebUI: interfaz conversacional reutilizada}
 \label{sec:openwebui}
 % ============================================================
 
-OpenWebUI\footnote{\url{https://openwebui.com/}} es la interfaz conversacional utilizada como punto de entrada del sistema \cite{openwebui2024docs}. Es una herramienta externa, ya existente, que he reutilizado para no invertir el esfuerzo del TFG en construir una interfaz de chat desde cero. Esta decisi�n permite concentrar el trabajo en la parte realmente diferencial del proyecto: la integraci�n con las fuentes documentales y la l�gica del asistente.
+OpenWebUI\footnote{\url{https://openwebui.com/}} es la interfaz conversacional utilizada como punto de entrada del sistema \cite{openwebui2024docs}. Es una herramienta externa, ya existente, que he reutilizado para no invertir el esfuerzo del TFG en construir una interfaz de chat desde cero. Esta decisión permite concentrar el trabajo en la parte realmente diferencial del proyecto: la integración con las fuentes documentales y la lógica del asistente.
 
 \subsection{Arquitectura interna de OpenWebUI}
 
-OpenWebUI se estructura como una aplicaci�n web con tres bloques principales:
+OpenWebUI se estructura como una aplicación web con tres bloques principales:
 
 \begin{itemize}
     \item \textit{Frontend}: interfaz tipo chat accesible desde navegador, con historial de conversaciones, carga de adjuntos y streaming de respuestas.
-    \item \textit{Backend}: l�gica de autenticaci�n, persistencia de chats y gesti�n de modelos.
+    \item \textit{Backend}: lógica de autenticación, persistencia de chats y gestión de modelos.
     \item \textit{Base de datos}: almacenamiento de usuarios, conversaciones y metadatos.
 \end{itemize}
 
-Para el lector, lo importante es entender su papel dentro del proyecto: OpenWebUI aporta la experiencia de usuario, pero no constituye la inteligencia principal del sistema. Esa inteligencia se a�ade mediante el pipeline desarrollado en este TFG.
+Para el lector, lo importante es entender su papel dentro del proyecto: OpenWebUI aporta la experiencia de usuario, pero no constituye la inteligencia principal del sistema. Esa inteligencia se añade mediante el pipeline desarrollado en este TFG.
 
-En consecuencia, cuando en esta memoria se habla de ``integrar autenticaci�n corporativa con la interfaz conversacional'', no se est� describiendo la creaci�n de una interfaz nueva, sino la reutilizaci�n de OpenWebUI junto con su conexi�n al proveedor corporativo de identidad y su ampliaci�n mediante un pipeline propio.
+En consecuencia, cuando en esta memoria se habla de ``integrar autenticación corporativa con la interfaz conversacional'', no se está describiendo la creación de una interfaz nueva, sino la reutilización de OpenWebUI junto con su conexión al proveedor corporativo de identidad y su ampliación mediante un pipeline propio.
 
-\subsection{Por qu� OpenWebUI}
+\subsection{Por qué OpenWebUI}
 
-La elecci�n de OpenWebUI se justifica porque ya ofrece varias capacidades deseables en un entorno corporativo: interfaz madura, persistencia de conversaciones, compatibilidad con modelos locales y soporte de autenticaci�n. Frente a hacer una interfaz propia, reduce tiempo de desarrollo y riesgo t�cnico.
+La elección de OpenWebUI se justifica porque ya ofrece varias capacidades deseables en un entorno corporativo: interfaz madura, persistencia de conversaciones, compatibilidad con modelos locales y soporte de autenticación. Frente a hacer una interfaz propia, reduce tiempo de desarrollo y riesgo técnico.
 
 \begin{table}[H]
 \centering
@@ -66,74 +66,74 @@ La elecci�n de OpenWebUI se justifica porque ya ofrece varias capacidades dese
 UI tipo ChatGPT              & \checkmark & Parcial   & Parcial  & \checkmark \\
 Compatibilidad con Ollama    & Nativa     & Manual    & Manual   & Nativa \\
 Sistema de Pipelines/Plugins & \checkmark & $\times$  & $\times$ & $\times$ \\
-Gesti�n de usuarios          & \checkmark & $\times$  & $\times$ & \checkmark \\
+Gestión de usuarios          & \checkmark & $\times$  & $\times$ & \checkmark \\
 Persistencia de chats        & \checkmark & $\times$  & $\times$ & \checkmark \\
 SSO / OIDC                   & \checkmark & $\times$  & $\times$ & $\times$ \\
-C�digo abierto               & \checkmark & \checkmark & \checkmark & \checkmark \\
+Código abierto               & \checkmark & \checkmark & \checkmark & \checkmark \\
 Carga de archivos adjuntos   & \checkmark & \checkmark & \checkmark & Parcial \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-El factor decisivo es el sistema de Pipelines, porque permite insertar l�gica personalizada sin modificar el n�cleo de la herramienta. Gracias a ello, la interfaz sigue siendo una pieza reutilizada, pero el comportamiento final del asistente pasa a estar controlado por desarrollo propio.
+El factor decisivo es el sistema de Pipelines, porque permite insertar lógica personalizada sin modificar el núcleo de la herramienta. Gracias a ello, la interfaz sigue siendo una pieza reutilizada, pero el comportamiento final del asistente pasa a estar controlado por desarrollo propio.
 
 \subsection{Sistema de Pipelines de OpenWebUI}
 \label{subsec:pipelines}
 
-El sistema de Pipelines es el mecanismo que convierte una interfaz gen�rica en un asistente especializado. Funciona como una capa intermedia entre el usuario y el modelo: recibe el mensaje, decide qu� hacer con �l y devuelve la respuesta final.
+El sistema de Pipelines es el mecanismo que convierte una interfaz genérica en un asistente especializado. Funciona como una capa intermedia entre el usuario y el modelo: recibe el mensaje, decide qué hacer con él y devuelve la respuesta final.
 
 Desde el punto de vista del proyecto, esta capacidad es clave porque permite:
 
 \begin{itemize}
     \item interceptar cada consulta antes de enviarla al modelo,
-    \item aplicar l�gica de encaminamiento,
+    \item aplicar lógica de encaminamiento,
     \item conectar con el backend propio,
     \item y conservar la interfaz original sin reescribirla.
 \end{itemize}
 
-Este es uno de los mejores ejemplos de la filosof�a del TFG: reutilizar una herramienta existente cuando ya resuelve bien una capa del problema y centrar el desarrollo propio en la parte que aporta valor diferencial.
+Este es uno de los mejores ejemplos de la filosofía del TFG: reutilizar una herramienta existente cuando ya resuelve bien una capa del problema y centrar el desarrollo propio en la parte que aporta valor diferencial.
 
 % ============================================================
-\section{Ollama: ejecuci�n local de modelos}
+\section{Ollama: ejecución local de modelos}
 \label{sec:ollama}
 % ============================================================
 
-Ollama\footnote{\url{https://ollama.com/}} es la herramienta externa utilizada para ejecutar modelos de lenguaje localmente. Su funci�n es cargar modelos, servirlos por API y gestionar su uso en el hardware disponible \cite{ollama2024docs}.
+Ollama\footnote{\url{https://ollama.com/}} es la herramienta externa utilizada para ejecutar modelos de lenguaje localmente. Su función es cargar modelos, servirlos por API y gestionar su uso en el hardware disponible \cite{ollama2024docs}.
 
-\subsection{Caracter�sticas t�cnicas}
+\subsection{Características técnicas}
 
-Se ha elegido Ollama por varias razones pr�cticas:
+Se ha elegido Ollama por varias razones prácticas:
 
 \begin{itemize}
     \item \textit{Facilita el despliegue de modelos locales}: evita construir una capa de inferencia propia desde cero.
-    \item \textit{Gestiona la VRAM de manera operativa}: carga y descarga modelos seg�n sea necesario.
-    \item \textit{Expone una API sencilla}: esto simplifica mucho su integraci�n con el resto del sistema.
-    \item \textit{Encaja bien en contenedores}: puede desplegarse como un servicio m�s dentro de Docker Compose.
+    \item \textit{Gestiona la VRAM de manera operativa}: carga y descarga modelos según sea necesario.
+    \item \textit{Expone una API sencilla}: esto simplifica mucho su integración con el resto del sistema.
+    \item \textit{Encaja bien en contenedores}: puede desplegarse como un servicio más dentro de Docker Compose.
 \end{itemize}
 
 \subsection{Modelos desplegados}
 
-En el sistema se emplean varias familias de modelos ya existentes, cada una con una funci�n concreta:
+En el sistema se emplean varias familias de modelos ya existentes, cada una con una función concreta:
 
 \begin{table}[H]
 \centering
-\caption{Modelos de IA desplegados en Ollama y su funci�n en el sistema.}
+\caption{Modelos de IA desplegados en Ollama y su función en el sistema.}
 \label{tab:modelos-ollama}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llcc}
 \toprule
-\textbf{Modelo} & \textbf{Funci�n} & \textbf{Cuantizaci�n} & \textbf{VRAM} \\
+\textbf{Modelo} & \textbf{Función} & \textbf{Cuantización} & \textbf{VRAM} \\
 \midrule
 rag-qwen-ft:latest    & Modelo principal del alias JARVIS para chat y RAG & LoRA FT & $\sim$8 GB \\
-qwen2.5:32b-instruct-q4\_K\_M & Fallback de texto y comparaci�n base & Q4\_K\_M & $\sim$19 GB \\
-qwen2.5-coder:32b     & Modelo auxiliar instalado para tareas de c�digo & --- & $\sim$19 GB \\
-qwen2.5vl:7b          & An�lisis de im�genes y OCR multimodal & --- & $\sim$6 GB \\
+qwen2.5:32b-instruct-q4\_K\_M & Fallback de texto y comparación base & Q4\_K\_M & $\sim$19 GB \\
+qwen2.5-coder:32b     & Modelo auxiliar instalado para tareas de código & --- & $\sim$19 GB \\
+qwen2.5vl:7b          & Análisis de imágenes y OCR multimodal & --- & $\sim$6 GB \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-La tabla refuerza una idea importante: los modelos no se han creado en este TFG, pero s� se han seleccionado, desplegado, probado y asignado a tareas concretas dentro de una arquitectura coherente. En el despliegue actual del proyecto, la familia Qwen 2.5 concentra las funciones principales de texto, visi�n y adaptaci�n al dominio.
+La tabla refuerza una idea importante: los modelos no se han creado en este TFG, pero sí se han seleccionado, desplegado, probado y asignado a tareas concretas dentro de una arquitectura coherente. En el despliegue actual del proyecto, la familia Qwen 2.5 concentra las funciones principales de texto, visión y adaptación al dominio.
 
 \subsection{Evoluci\'on del modelo principal: trayectoria de cuatro etapas}
 \label{subsec:evolucion-modelos}
@@ -228,32 +228,32 @@ La combinaci\'on de los tres mecanismos ---intent detection, model routing y que
 \label{sec:qdrant}
 % ============================================================
 
-Qdrant\footnote{\url{https://qdrant.tech/}} es la base de datos vectorial empleada como almac�n principal del conocimiento documental del sistema \cite{qdrant2024docs}. Es una herramienta externa, pero su estructura, colecciones y criterios de uso se definen dentro del proyecto.
+Qdrant\footnote{\url{https://qdrant.tech/}} es la base de datos vectorial empleada como almacén principal del conocimiento documental del sistema \cite{qdrant2024docs}. Es una herramienta externa, pero su estructura, colecciones y criterios de uso se definen dentro del proyecto.
 
-\subsection{Caracter�sticas utilizadas}
+\subsection{Características utilizadas}
 
 \begin{itemize}
-    \item \textit{�ndice HNSW}: permite b�squedas vectoriales r�pidas sobre grandes vol�menes de fragmentos.
-    \item \textit{B�squeda h�brida}: combina similitud sem�ntica y coincidencia l�xica exacta.
-    \item \textit{Filtrado por metadatos}: habilita segmentaci�n por fuente, documento o departamento.
-    \item \textit{Multi-colecci�n}: permite separar documentos por contexto de uso.
+    \item \textit{Índice HNSW}: permite búsquedas vectoriales rápidas sobre grandes volúmenes de fragmentos.
+    \item \textit{Búsqueda híbrida}: combina similitud semántica y coincidencia léxica exacta.
+    \item \textit{Filtrado por metadatos}: habilita segmentación por fuente, documento o departamento.
+    \item \textit{Multi-colección}: permite separar documentos por contexto de uso.
 \end{itemize}
 
-Para el proyecto, esto significa que Qdrant no es solo un repositorio t�cnico, sino el componente que hace posible que el sistema encuentre evidencia relevante antes de responder.
+Para el proyecto, esto significa que Qdrant no es solo un repositorio técnico, sino el componente que hace posible que el sistema encuentre evidencia relevante antes de responder.
 
 % ============================================================
 \section{FastAPI: backend del sistema}
 \label{sec:fastapi}
 % ============================================================
 
-FastAPI\footnote{\url{https://fastapi.tiangolo.com/}} es el framework seleccionado para construir los servicios backend en Python \cite{fastapi2024docs}. A diferencia de OpenWebUI, Ollama o Qdrant, que son herramientas reutilizadas, aqu� s� aparece una parte importante de desarrollo propio: los servicios implementados con FastAPI contienen gran parte de la l�gica central del sistema.
+FastAPI\footnote{\url{https://fastapi.tiangolo.com/}} es el framework seleccionado para construir los servicios backend en Python \cite{fastapi2024docs}. A diferencia de OpenWebUI, Ollama o Qdrant, que son herramientas reutilizadas, aquí sí aparece una parte importante de desarrollo propio: los servicios implementados con FastAPI contienen gran parte de la lógica central del sistema.
 
 Se ha elegido por tres motivos principales:
 
 \begin{itemize}
     \item \textbf{Facilidad para construir APIs tipadas y mantenibles}.
-    \item \textit{Soporte as�ncrono}: �til cuando el sistema depende de m�ltiples llamadas a servicios externos o internos.
-    \item \textit{Integraci�n natural con el ecosistema Python}: permite usar en el mismo entorno paquetes de IA, scraping, OCR y autenticaci�n.
+    \item \textit{Soporte asíncrono}: útil cuando el sistema depende de múltiples llamadas a servicios externos o internos.
+    \item \textit{Integración natural con el ecosistema Python}: permite usar en el mismo entorno paquetes de IA, scraping, OCR y autenticación.
 \end{itemize}
 
 En este TFG, FastAPI sustenta el backend RAG, el indexador de documentos y parte de las integraciones auxiliares.
@@ -263,89 +263,89 @@ En este TFG, FastAPI sustenta el backend RAG, el indexador de documentos y parte
 \label{sec:litellm}
 % ============================================================
 
-LiteLLM\footnote{\url{https://docs.litellm.ai/}} es una herramienta externa que se utiliza como capa intermedia entre los servicios propios y los modelos servidos por Ollama \cite{litellm2024docs}. Su utilidad est� en unificar llamadas, aplicar alias de modelos, gestionar cach� y simplificar el encaminamiento t�cnico.
+LiteLLM\footnote{\url{https://docs.litellm.ai/}} es una herramienta externa que se utiliza como capa intermedia entre los servicios propios y los modelos servidos por Ollama \cite{litellm2024docs}. Su utilidad está en unificar llamadas, aplicar alias de modelos, gestionar caché y simplificar el encaminamiento técnico.
 
-Desde la perspectiva del lector no t�cnico, su papel puede resumirse as�: en lugar de que cada parte del sistema tenga que conocer todos los detalles de cada modelo, LiteLLM ofrece un punto �nico y homog�neo de acceso.
+Desde la perspectiva del lector no técnico, su papel puede resumirse así: en lugar de que cada parte del sistema tenga que conocer todos los detalles de cada modelo, LiteLLM ofrece un punto único y homogéneo de acceso.
 
 % ============================================================
-\section{Docker y orquestaci�n de contenedores}
+\section{Docker y orquestación de contenedores}
 \label{sec:docker}
 % ============================================================
 
 Docker\footnote{\url{https://www.docker.com/}} y Docker Compose son la base del despliegue reproducible \cite{dockerCompose2026docs}. Se utilizan para empaquetar todos los componentes y ponerlos en marcha como un conjunto coordinado.
 
-\subsection{Ventajas de la contenerizaci�n}
+\subsection{Ventajas de la contenerización}
 
 \begin{itemize}
     \item \textit{Reproducibilidad}: el mismo sistema puede desplegarse de forma controlada en distintos entornos.
     \item \textit{Aislamiento}: cada servicio mantiene sus dependencias separadas.
     \item \textit{Seguridad perimetral}: solo ciertos servicios se exponen al exterior.
-    \item \textit{Acceso a GPU cuando es necesario}: se reserva aceleraci�n solo para los servicios que la necesitan.
+    \item \textit{Acceso a GPU cuando es necesario}: se reserva aceleración solo para los servicios que la necesitan.
 \end{itemize}
 
-En el contexto del TFG, esto tambi�n es una parte de la contribuci�n: no solo se han elegido tecnolog�as, sino que se han dejado integradas dentro de una arquitectura desplegable de forma repetible.
+En el contexto del TFG, esto también es una parte de la contribución: no solo se han elegido tecnologías, sino que se han dejado integradas dentro de una arquitectura desplegable de forma repetible.
 
 % ============================================================
 \section{Herramientas de procesamiento documental y web}
 \label{sec:herramientas-procesamiento}
 % ============================================================
 
-Esta secci�n re�ne herramientas ya existentes que no han sido desarrolladas en el proyecto, pero que s� se han integrado y combinado para cubrir necesidades concretas del sistema.
+Esta sección reúne herramientas ya existentes que no han sido desarrolladas en el proyecto, pero que sí se han integrado y combinado para cubrir necesidades concretas del sistema.
 
-\subsection{PaddleOCR: reconocimiento �ptico de caracteres}
+\subsection{PaddleOCR: reconocimiento Óptico de caracteres}
 
-PaddleOCR\footnote{\url{https://github.com/PaddlePaddle/PaddleOCR}} es un motor OCR externo utilizado para extraer texto de PDFs escaneados \cite{paddleocr2024docs}. No se ha implementado un OCR propio; el trabajo realizado aqu� consiste en decidir cu�ndo usarlo, c�mo integrarlo en la ingesta y c�mo hacerlo convivir con el resto de componentes del sistema.
+PaddleOCR\footnote{\url{https://github.com/PaddlePaddle/PaddleOCR}} es un motor OCR externo utilizado para extraer texto de PDFs escaneados \cite{paddleocr2024docs}. No se ha implementado un OCR propio; el trabajo realizado aquí consiste en decidir cuándo usarlo, cómo integrarlo en la ingesta y cómo hacerlo convivir con el resto de componentes del sistema.
 
-\subsection{Playwright: automatizaci�n de navegadores}
+\subsection{Playwright: automatización de navegadores}
 
-Playwright\footnote{\url{https://playwright.dev/}} es una herramienta externa de automatizaci�n de navegador \cite{playwright2024docs}. Se utiliza porque muchas p�ginas web modernas dependen de JavaScript y no pueden procesarse correctamente con una simple petici�n HTTP. Su papel dentro del proyecto es permitir obtener el contenido real que ve el usuario en p�ginas din�micas.
+Playwright\footnote{\url{https://playwright.dev/}} es una herramienta externa de automatización de navegador \cite{playwright2024docs}. Se utiliza porque muchas páginas web modernas dependen de JavaScript y no pueden procesarse correctamente con una simple petición HTTP. Su papel dentro del proyecto es permitir obtener el contenido real que ve el usuario en páginas dinámicas.
 
-\subsection{Trafilatura: extracci�n de contenido web}
+\subsection{Trafilatura: extracción de contenido web}
 
-Trafilatura \cite{barbaresi2021trafilatura} es una biblioteca externa especializada en extraer el contenido principal de una p�gina web, eliminando men�s, barras laterales y ruido. En este TFG no se ha desarrollado un extractor propio de texto web desde cero; se ha integrado Trafilatura como primera opci�n dentro de una cadena de extracci�n con \textit{fallbacks}, porque resuelve bien el problema de aislar el contenido relevante.
+Trafilatura \cite{barbaresi2021trafilatura} es una biblioteca externa especializada en extraer el contenido principal de una página web, eliminando menús, barras laterales y ruido. En este TFG no se ha desarrollado un extractor propio de texto web desde cero; se ha integrado Trafilatura como primera opción dentro de una cadena de extracción con \textit{fallbacks}, porque resuelve bien el problema de aislar el contenido relevante.
 
-\subsection{SentenceTransformers: generaci�n de embeddings}
+\subsection{SentenceTransformers: generación de embeddings}
 
-SentenceTransformers \cite{reimers2019sentence,sbertDocs} es una biblioteca externa utilizada para generar embeddings. Se emplea el modelo \texttt{paraphrase-multilingual-MiniLM-L12-v2}, elegido por su equilibrio entre tama�o, soporte multiling�e y facilidad de despliegue. Aqu� tambi�n es importante la distinci�n metodol�gica: el modelo y la librer�a ya exist�an; lo que aporta el proyecto es su integraci�n en el pipeline RAG y su ajuste al caso de uso documental.
+SentenceTransformers \cite{reimers2019sentence,sbertDocs} es una biblioteca externa utilizada para generar embeddings. Se emplea el modelo \texttt{paraphrase-multilingual-MiniLM-L12-v2}, elegido por su equilibrio entre tamaño, soporte multilingüe y facilidad de despliegue. Aquí también es importante la distinción metodológica: el modelo y la librería ya existían; lo que aporta el proyecto es su integración en el pipeline RAG y su ajuste al caso de uso documental.
 
 % ============================================================
-\section{Stack de monitorizaci�n}
+\section{Stack de monitorización}
 \label{sec:stack-monitorizacion}
 % ============================================================
 
-Para operar un sistema de este tipo no basta con que funcione: tambi�n hay que entender c�mo se comporta. Por ello se incorpora un stack de observabilidad formado por herramientas ya existentes, configuradas y conectadas dentro del proyecto.
+Para operar un sistema de este tipo no basta con que funcione: también hay que entender cómo se comporta. Por ello se incorpora un stack de observabilidad formado por herramientas ya existentes, configuradas y conectadas dentro del proyecto.
 
 \subsection{Prometheus}
 
-Prometheus\footnote{\url{https://prometheus.io/}} recoge m�tricas temporales del backend y de otros servicios \cite{prometheus2026docs}. Su utilidad en este TFG es permitir medir latencia, tasa de errores y patrones de uso en lugar de basar las decisiones de optimizaci�n en impresiones subjetivas.
+Prometheus\footnote{\url{https://prometheus.io/}} recoge métricas temporales del backend y de otros servicios \cite{prometheus2026docs}. Su utilidad en este TFG es permitir medir latencia, tasa de errores y patrones de uso en lugar de basar las decisiones de optimización en impresiones subjetivas.
 
 \subsection{Grafana}
 
-Grafana\footnote{\url{https://grafana.com/}} visualiza las m�tricas recogidas por Prometheus mediante paneles comprensibles \cite{grafana2026docs}. En el proyecto se ha utilizado para construir paneles espec�ficos de backend, GPU y bases de datos. Esto no debe entenderse como un desarrollo de una herramienta nueva, sino como el dise�o de la capa de observaci�n necesaria para operar el sistema con criterio.
+Grafana\footnote{\url{https://grafana.com/}} visualiza las métricas recogidas por Prometheus mediante paneles comprensibles \cite{grafana2026docs}. En el proyecto se ha utilizado para construir paneles específicos de backend, GPU y bases de datos. Esto no debe entenderse como un desarrollo de una herramienta nueva, sino como el diseño de la capa de observación necesaria para operar el sistema con criterio.
 
 \subsection{NVIDIA DCGM Exporter}
 
-NVIDIA DCGM Exporter\footnote{\url{https://github.com/NVIDIA/dcgm-exporter}} expone m�tricas de la GPU en formato compatible con Prometheus \cite{dcgmExporter2026docs}. Su presencia se justifica porque en un sistema que ejecuta modelos y OCR en local, la GPU es un recurso cr�tico y debe monitorizarse con el mismo nivel de detalle que el backend.
+NVIDIA DCGM Exporter\footnote{\url{https://github.com/NVIDIA/dcgm-exporter}} expone métricas de la GPU en formato compatible con Prometheus \cite{dcgmExporter2026docs}. Su presencia se justifica porque en un sistema que ejecuta modelos y OCR en local, la GPU es un recurso crítico y debe monitorizarse con el mismo nivel de detalle que el backend.
 
 % ============================================================
-\section{Otras tecnolog�as del ecosistema}
+\section{Otras tecnologías del ecosistema}
 \label{sec:otras-tecnologias}
 % ============================================================
 
 \begin{itemize}
     \item \textit{PostgreSQL}: almacena usuarios, conversaciones y metadatos de OpenWebUI.
-    \item \textit{Redis}: se emplea como cach� de respuestas a trav�s de LiteLLM.
-    \item \textit{MinIO}: conserva documentos binarios como respaldo y fuente de reindexaci�n.
-    \item \textit{NGINX}: act�a como proxy inverso y punto �nico de entrada.
-    \item \textit{MSAL}: permite autenticaci�n con Azure AD y acceso autenticado a SharePoint mediante Microsoft Graph.
+    \item \textit{Redis}: se emplea como caché de respuestas a través de LiteLLM.
+    \item \textit{MinIO}: conserva documentos binarios como respaldo y fuente de reindexación.
+    \item \textit{NGINX}: actúa como proxy inverso y punto único de entrada.
+    \item \textit{MSAL}: permite autenticación con Azure AD y acceso autenticado a SharePoint mediante Microsoft Graph.
 \end{itemize}
 
 % ============================================================
-\section{Diagrama de flujo de tecnolog�as usadas}
+\section{Diagrama de flujo de tecnologías usadas}
 \label{sec:diagrama-flujo}
 % ============================================================
 
-La Figura~\ref{fig:flujo-tecnologias} resume c�mo se conectan las tecnolog�as principales del sistema. No representa �nicamente el recorrido de una consulta, sino tambi�n los componentes de soporte que permiten que el sistema funcione en un entorno real: autenticaci�n, almacenamiento, cach� y monitorizaci�n. Se incluye aqu� porque ayuda a que un lector no especializado entienda de un vistazo qu� piezas existen y c�mo se relacionan.
+La Figura~\ref{fig:flujo-tecnologias} resume cómo se conectan las tecnologías principales del sistema. No representa únicamente el recorrido de una consulta, sino también los componentes de soporte que permiten que el sistema funcione en un entorno real: autenticación, almacenamiento, caché y monitorización. Se incluye aquí porque ayuda a que un lector no especializado entienda de un vistazo qué piezas existen y cómo se relacionan.
 
 \clearpage
 \begin{landscape}
@@ -380,7 +380,7 @@ La Figura~\ref{fig:flujo-tecnologias} resume c�mo se conectan las tecnolog�a
 
 \node[ext]   (litellm)    at (14.7,2.4)  {LiteLLM\\Proxy};
 \node[ext]   (ollama)     at (18.6,2.4)  {Ollama\\LLMs locales};
-\node[ext]   (redis)      at (14.7,0.6)  {Redis\\Cach�};
+\node[ext]   (redis)      at (14.7,0.6)  {Redis\\Caché};
 \node[ext]   (qdrant)     at (14.7,-1.2) {Qdrant\\Base vectorial};
 \node[ext]   (minio)      at (18.6,-1.2) {MinIO\\Documentos};
 \node[ext]   (sharepoint) at (14.7,-3.7) {SharePoint\\Graph API};
@@ -388,7 +388,7 @@ La Figura~\ref{fig:flujo-tecnologias} resume c�mo se conectan las tecnolog�a
 \node[ext]   (ocr)        at (22.5,-3.7) {PaddleOCR\\OCR};
 
 \node[infra] (dcgm)       at (12.5,-6.3) {NVIDIA DCGM\\GPU exporter};
-\node[infra] (prom)       at (16.4,-6.3) {Prometheus\\M�tricas};
+\node[infra] (prom)       at (16.4,-6.3) {Prometheus\\Métricas};
 \node[infra] (grafana)    at (20.3,-6.3) {Grafana\\Paneles};
 
 \draw[flow]    (user.south) -- (nginx.north);
@@ -424,7 +424,7 @@ La Figura~\ref{fig:flujo-tecnologias} resume c�mo se conectan las tecnolog�a
 \end{pgfonlayer}
 
 \node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-access.north west) {Acceso e interfaz};
-\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-own.north west) {L�gica propia del TFG};
+\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-own.north west) {Lógica propia del TFG};
 \node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-ext.north west) {Servicios externos e integraciones};
 \node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-obs.north west) {Observabilidad};
 \end{tikzpicture}%
@@ -437,7 +437,7 @@ La Figura~\ref{fig:flujo-tecnologias} resume c�mo se conectan las tecnolog�a
     \node[anchor=west,font=\footnotesize] at (6.05,0) {soporte transversal};
 \end{tikzpicture}
 \vspace{0.4em}
-\caption{Diagrama general de las tecnolog�as utilizadas en el sistema. La disposici�n apaisada separa el flujo de consulta, la l�gica propia del TFG, las integraciones externas y la capa de observabilidad en bloques legibles.}
+\caption{Diagrama general de las tecnologías utilizadas en el sistema. La disposición apaisada separa el flujo de consulta, la lógica propia del TFG, las integraciones externas y la capa de observabilidad en bloques legibles.}
 \label{fig:flujo-tecnologias}
 \end{minipage}
 \end{figure}
