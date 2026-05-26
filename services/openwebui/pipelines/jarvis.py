@@ -62,7 +62,7 @@ class Pipeline:
             # Añadir más grupos aquí cuando se configuren en Azure AD
         }
         # Colección por defecto si no hay grupos o multi-tenant deshabilitado
-        DEFAULT_COLLECTION: str = "documents"
+        DEFAULT_COLLECTION: str = os.getenv("JARVIS_DEFAULT_COLLECTION", "documents_TFGDEMO")
         # Habilitar multi-departamento
         MULTI_DEPARTMENT_ENABLED: bool = True
         # Tiempo de cache de permisos (segundos)
@@ -72,7 +72,17 @@ class Pipeline:
         FILE_CHUNK_SIZE: int = 1200
         FILE_CHUNK_OVERLAP: int = 200
         FILE_TOP_K: int = 5
-        GLOBAL_READ_COLLECTIONS: List[str] = ["documents", "webs"]
+        GLOBAL_READ_COLLECTIONS: List[str] = [
+            item.strip()
+            for item in os.getenv("JARVIS_GLOBAL_READ_COLLECTIONS", "documents_TFGDEMO").split(",")
+            if item.strip()
+        ]
+        ENABLE_PRIVATE_WEB_COLLECTION: bool = os.getenv("JARVIS_ENABLE_PRIVATE_WEB_COLLECTION", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         
         # URL del servicio Indexer para status checks
         INDEXER_URL: str = "http://indexer:8001"
@@ -164,7 +174,8 @@ class Pipeline:
         # Alias adicionales de colecciones para resolución por nombre natural
         # Añadir aquí aliases específicos de los departamentos configurados
         # Ejemplo: mapping["nombre_departamento"] = "documents_NombreDepartamento"
-        register_collection_aliases("webs")
+        # Las colecciones web se habilitan explicitamente mediante
+        # JARVIS_GLOBAL_READ_COLLECTIONS o JARVIS_ENABLE_PRIVATE_WEB_COLLECTION.
 
         self._department_mapping = mapping
         self._normalized_department_mapping = {
@@ -803,7 +814,11 @@ class Pipeline:
                 return cached_depts
 
         departments = self._get_global_read_collections()
-        private_web_collection = self._get_private_web_collection(user_data)
+        private_web_collection = (
+            self._get_private_web_collection(user_data)
+            if self.valves.ENABLE_PRIVATE_WEB_COLLECTION
+            else None
+        )
         if private_web_collection and private_web_collection not in departments:
             departments.append(private_web_collection)
 
@@ -3213,30 +3228,10 @@ Your response:"""
         )
         rag_content = data.get("content", "")
         sources = data.get("sources", [])
-        if messages and len(messages) > 1:
-            system_prompt = (
-                "###### LANGUAGE RULE (HIGHEST PRIORITY) ######\n"
-                "DETECT the language of the user's question and respond ONLY in that language.\n"
-                "This rule is MANDATORY.\n"
-                "############################################\n\n"
-                "You are an expert enterprise assistant. Answer based on the document context provided.\n"
-                f"{self._get_current_time_context()}\n"
-                "You have access to the conversation history to understand follow-up questions.\n"
-                "Be precise and cite sources when possible."
-            )
-            doc_context = f"Document search results:\n{rag_content}"
-            try:
-                content = self._call_litellm_with_history(
-                    user_message=user_message, system_prompt=system_prompt,
-                    messages=messages, extra_context=doc_context
-                )
-                if self._is_refusal_text(content):
-                    content = rag_content
-            except Exception as e:
-                logger.warning(f"Error re-processing with history: {e}, using original response")
-                content = rag_content
-        else:
-            content = rag_content
+        # The backend already performs retrieval, model routing, and citation-aware
+        # generation. Returning it directly avoids a second LLM pass that can
+        # distort factual details such as ports, document names, or citations.
+        content = rag_content
         yield content
         self._store_rag_memory(conversation_key, effective_message or user_message, content or rag_content, sources)
         if sources:

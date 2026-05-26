@@ -74,13 +74,27 @@ pgAdmin            & Administración de PostgreSQL           & 5050 (interno) \\
 
 Todos los servicios comparten una red Docker interna de tipo \textit{bridge} denominada \texttt{rag-network}. Únicamente NGINX expone un puerto al exterior (8443), garantizando que ningún servicio interno es accesible directamente desde fuera del servidor.
 
-En la validación final realizada el 26 de mayo de 2026, el despliegue convivía con otros servicios Docker en el mismo host. Para evitar colisiones de puertos se mantuvieron los puertos internos de los contenedores y se publicaron accesos locales diferenciados: OpenWebUI en \texttt{localhost:3000}, Grafana en \texttt{localhost:3001}, Backend en \texttt{localhost:8004}, Indexer en \texttt{localhost:8001}, Qdrant en \texttt{localhost:6333}, MinIO en \texttt{localhost:9000}/\texttt{9001} y LiteLLM en \texttt{localhost:4000}. Esta separación no modifica la arquitectura interna, pero permite ejecutar el sistema completo sin detener otros servicios del entorno de desarrollo.
+En la validación final realizada el 26 de mayo de 2026, el despliegue convivía con otros servicios Docker en el mismo host. Para evitar colisiones de puertos se mantuvieron los puertos internos de los contenedores y se publicaron accesos locales diferenciados: OpenWebUI en \texttt{localhost:3002}, Backend en \texttt{localhost:8002}, Indexer en \texttt{localhost:8003}, Qdrant en \texttt{localhost:6335}/\texttt{6336}, Grafana en \texttt{localhost:3003}, Prometheus en \texttt{localhost:9091}, MinIO en \texttt{localhost:9002}/\texttt{9003}, pgAdmin en \texttt{localhost:5051}, Ollama en \texttt{localhost:11435} y LiteLLM en \texttt{localhost:4001}. Esta separación no modifica la arquitectura interna, pero permite ejecutar el sistema completo sin detener otros servicios del entorno de desarrollo.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{cap_backend_swagger.png}
+\includegraphics[width=0.95\textwidth]{cap_tfg_docker_stack.png}
+\caption{Estado del stack Docker en la validación final. La captura muestra los servicios principales de \texttt{TFG-RAG-Clean}, su estado de ejecución y los puertos alternativos publicados para la demo local.}
+\label{fig:docker-stack-final}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfg_backend_swagger.png}
 \caption{Documentación interactiva del Backend FastAPI desplegado en el entorno local de validación. La captura muestra la API activa, los endpoints de scraping, búsqueda y salud, y confirma que el servicio expone su contrato OpenAPI.}
 \label{fig:backend-swagger-final}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfg_indexer_health.png}
+\caption{Endpoint de salud del servicio Indexer durante la demo final. El servicio opera en modo \texttt{backend}, observa la carpeta \texttt{/app/watch}, mantiene SharePoint desactivado en el entorno TFG y utiliza cabeceras de tenant para separar colecciones.}
+\label{fig:indexer-health-final}
 \end{figure}
 
 \subsection{Orquestación con Docker Compose}
@@ -454,12 +468,12 @@ El proceso de ingesta de un documento sigue las siguientes etapas:
 \label{fig:qdrant-collections}
 \end{figure}
 
-Además de las colecciones corporativas, para la validación final se creó una colección aislada denominada \texttt{documents\_TFGDEMO}. Esta colección contiene únicamente documentación del propio repositorio del TFG, por lo que permite generar capturas y pruebas reproducibles sin exponer documentos internos reales. El estado de Qdrant confirma que la colección quedó en estado \texttt{green}, con 503 puntos vectoriales y búsqueda híbrida habilitada.
+Además de las colecciones corporativas, para la validación final se creó una colección aislada denominada \texttt{documents\_TFGDEMO}. Esta colección contiene únicamente documentación sintética y segura del propio TFG, por lo que permite generar capturas y pruebas reproducibles sin exponer documentos internos reales. El estado de Qdrant confirma que la colección quedó en estado \texttt{green}, con 13 puntos vectoriales y búsqueda híbrida habilitada.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{cap_tfgdemo_qdrant_estado.png}
-\caption{Estado de la colección \texttt{documents\_TFGDEMO} en Qdrant. La captura muestra puntos indexados, dimensión del vector denso, vector sparse habilitado y campos de payload indexados.}
+\includegraphics[width=0.9\textwidth]{cap_tfg_qdrant_dashboard.png}
+\caption{Estado de las colecciones en Qdrant durante la demo final. La colección \texttt{documents\_TFGDEMO} aparece separada del resto de colecciones, con 13 puntos y configuración híbrida dense+sparse.}
 \label{fig:qdrant-tfgdemo}
 \end{figure}
 
@@ -691,7 +705,7 @@ Se diseñaron y configuraron tres dashboards interactivos en Grafana:
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{cap_grafana_enterprise_rag.png}
+\includegraphics[width=0.9\textwidth]{cap_tfg_grafana_jarvis_dashboard.png}
 \caption{Dashboard principal de Grafana durante la validación final. Se observa el estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
 \label{fig:grafana-final}
 \end{figure}

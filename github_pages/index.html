@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise RAG System — TFG URJC 2026</title>
-    <meta name="description" content="Enterprise RAG System: Arquitectura Inteligente de Generación Aumentada mediante Recuperación con Modelos Locales. Trabajo de Fin de Grado — Universidad Rey Juan Carlos 2026.">
+    <title>JARVIS RAG - TFG URJC 2026</title>
+    <meta name="description" content="JARVIS RAG: Sistema local de consulta documental con generación aumentada mediante recuperación y modelos locales. Trabajo de Fin de Grado - Universidad Rey Juan Carlos 2026.">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap"
         rel="stylesheet">
@@ -28,7 +28,7 @@
             <a href="#funcionalidades" class="nav-link">Capacidades</a>
             <a href="#estructura" class="nav-link">Estructura</a>
             <a href="#modelos" class="nav-link">Modelos</a>
-            <a href="#demo" class="nav-link">Métricas</a>
+            <a href="#demo" class="nav-link">Demo</a>
             <a href="https://github.com/acidxlemons/TFG-RAG-URJC" target="_blank" class="btn btn-outline">
                 <i class="fab fa-github"></i> Código
             </a>
@@ -43,12 +43,12 @@
                     <span class="pulse-dot"></span> TFG — Grado en Ingeniería de Tecnologías de Telecomunicación &nbsp;·&nbsp; <span style="color:#6ee7b7; font-weight:600;">v2.3.0</span>
                 </div>
                 <h1 class="hero-title">
-                    Generación Aumentada <br>
-                    <span class="gradient-text">mediante Recuperación</span> con Modelos Locales
+                    JARVIS RAG <br>
+                    <span class="gradient-text">Sistema Local de Consulta Documental con IA</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Transformando conocimiento corporativo (SharePoint, Web, BOE e Imágenes) en respuestas accionables
-                    mediante Inteligencia Artificial local y Open Source. 15 microservicios, 100% on-premise.
+                    Trabajo de Fin de Grado sobre una arquitectura RAG local: ingesta documental, búsqueda vectorial,
+                    OpenWebUI, modelos locales, observabilidad y demo reproducible con Docker.
                 </p>
                 <div class="hero-actions">
                     <a href="#demo" class="btn btn-primary">Ver Demo <i class="fas fa-play ml-2"></i></a>
@@ -186,83 +186,75 @@
             </div>
 
             <div class="screenshot-grid">
-                <figure class="screenshot-card glass-panel">
-                    <img src="assets/openwebui_jarvis.png" alt="Interfaz de OpenWebUI con JARVIS seleccionado">
-                    <figcaption>
-                        <strong>Interfaz principal</strong>
-                        <span>OpenWebUI actuando como front conversacional del pipeline JARVIS.</span>
-                    </figcaption>
-                </figure>
-
-                <figure class="screenshot-card glass-panel">
-                    <img src="assets/jarvis_documentos.png" alt="Listado de documentos disponibles devuelto por JARVIS">
-                    <figcaption>
-                        <strong>Listado documental</strong>
-                        <span>Consulta real al indexador con documentos disponibles e ingesta reciente.</span>
-                    </figcaption>
-                </figure>
-
-                <figure class="screenshot-card glass-panel">
-                    <img src="assets/qdrant_collections.png" alt="Colección documents en Qdrant">
-                    <figcaption>
-                        <strong>Base vectorial</strong>
-                        <span>Colección <code>documents</code> en Qdrant con vectores densos y dispersos.</span>
-                    </figcaption>
-                </figure>
-
-                <figure class="screenshot-card glass-panel">
-                    <img src="assets/login_sso_actual.png" alt="Pantalla de autenticación de OpenWebUI">
-                    <figcaption>
-                        <strong>Acceso corporativo</strong>
-                        <span>Entrada al sistema integrada con el flujo de autenticación de usuarios.</span>
-                    </figcaption>
-                </figure>
-
                 <figure class="screenshot-card glass-panel wide">
-                    <img src="assets/sin_documentos.png" alt="Respuesta de JARVIS cuando no hay documentos disponibles">
+                    <img src="assets/openwebui_chat_rag_demo.png" alt="Respuesta RAG desde OpenWebUI con JARVIS">
                     <figcaption>
-                        <strong>Control de alucinaciones</strong>
-                        <span>JARVIS informa de la ausencia de documentos en lugar de inventar una respuesta.</span>
+                        <strong>Demo conversacional completa</strong>
+                        <span>OpenWebUI muestra JARVIS consultando documentos internos, respondiendo con puertos reales y citando fuentes.</span>
                     </figcaption>
                 </figure>
 
                 <figure class="screenshot-card glass-panel">
-                    <img src="assets/tfgdemo_documentos_backend.png" alt="Documentos de demostración cargados en el backend">
+                    <img src="assets/docker_stack_tfg.png" alt="Servicios Docker del entorno limpio">
                     <figcaption>
-                        <strong>Validación con documentos del TFG</strong>
-                        <span>Colección <code>documents_TFGDEMO</code> con documentación segura del propio repositorio.</span>
+                        <strong>Stack Docker validado</strong>
+                        <span>Servicios principales activos con puertos alternativos para evitar conflictos durante la demo.</span>
                     </figcaption>
                 </figure>
 
                 <figure class="screenshot-card glass-panel">
-                    <img src="assets/tfgdemo_respuesta_rag.png" alt="Respuesta RAG con fuentes trazables">
+                    <img src="assets/documentos_demo_backend_tfg.png" alt="Documentos de demostración indexados en backend">
                     <figcaption>
-                        <strong>Respuesta RAG trazable</strong>
-                        <span>Consulta real al endpoint <code>/chat</code> con fuentes y puntuaciones de recuperación.</span>
+                        <strong>Documentos de demo</strong>
+                        <span>Colección <code>documents_TFGDEMO</code> con 4 documentos y 13 chunks indexados.</span>
                     </figcaption>
                 </figure>
 
                 <figure class="screenshot-card glass-panel">
-                    <img src="assets/tfgdemo_qdrant_estado.png" alt="Estado de la colección documents_TFGDEMO en Qdrant">
+                    <img src="assets/backend_chat_respuesta_tfg.png" alt="Respuesta RAG validada en el backend">
+                    <figcaption>
+                        <strong>Respuesta backend trazable</strong>
+                        <span>Consulta directa al endpoint <code>/chat</code> con fuentes y puntuaciones de recuperación.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/qdrant_dashboard_tfg.png" alt="Dashboard de Qdrant con documents_TFGDEMO">
                     <figcaption>
                         <strong>Qdrant aislado</strong>
-                        <span>503 puntos vectoriales en una colección separada para pruebas reproducibles.</span>
+                        <span>Colección <code>documents_TFGDEMO</code> separada para pruebas reproducibles y sin datos sensibles.</span>
                     </figcaption>
                 </figure>
 
                 <figure class="screenshot-card glass-panel">
-                    <img src="assets/backend_swagger.png" alt="Swagger del backend FastAPI">
+                    <img src="assets/backend_swagger_tfg.png" alt="Swagger del backend FastAPI">
                     <figcaption>
                         <strong>Contrato OpenAPI</strong>
-                        <span>Documentación interactiva del Backend FastAPI con endpoints de búsqueda y scraping.</span>
+                        <span>Documentación interactiva del Backend FastAPI con endpoints de búsqueda, scraping, chat y salud.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/indexer_health_tfg.png" alt="Health check del indexer">
+                    <figcaption>
+                        <strong>Indexer operativo</strong>
+                        <span>Servicio de ingesta en modo backend, con carpeta <code>/app/watch</code> y SharePoint desactivado para TFG.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/openwebui_login_tfg.png" alt="Pantalla de login local de OpenWebUI">
+                    <figcaption>
+                        <strong>Acceso local</strong>
+                        <span>Pantalla de autenticación usada para entrar como administrador de demo en OpenWebUI.</span>
                     </figcaption>
                 </figure>
 
                 <figure class="screenshot-card glass-panel wide">
-                    <img src="assets/grafana_enterprise_rag.png" alt="Dashboard principal de Grafana">
+                    <img src="assets/grafana_jarvis_dashboard_tfg.png" alt="Dashboard JARVIS RAG en Grafana">
                     <figcaption>
                         <strong>Observabilidad final</strong>
-                        <span>Grafana muestra estado operativo de backend, Qdrant y Prometheus junto a métricas de recursos.</span>
+                        <span>Grafana muestra backend, Qdrant y Prometheus en estado UP junto a métricas de memoria, CPU y ficheros abiertos.</span>
                     </figcaption>
                 </figure>
             </div>
@@ -284,10 +276,10 @@
                 </div>
                 <div class="feature-visual glass-panel">
                     <div class="mock-data">
-                        <div class="log-line success">[✓] Conectado a SharePoint (Graph API)</div>
-                        <div class="log-line info">[*] Detectados 45 documentos nuevos/modificados</div>
-                        <div class="log-line info">[*] OCR GPU en 15 PDFs escaneados...</div>
-                        <div class="log-line success">[✓] 2.340 chunks generados y cargados a Qdrant</div>
+                        <div class="log-line success">[OK] Ingesta local y SharePoint preparados</div>
+                        <div class="log-line info">[*] Detectados 4 documentos TFG_DEMO para la demo</div>
+                        <div class="log-line info">[*] Extraccion nativa CSV/PDF y OCR disponibles</div>
+                        <div class="log-line success">[OK] 13 chunks generados y cargados en Qdrant</div>
                     </div>
                 </div>
             </div>
@@ -473,8 +465,13 @@
         <!-- Demo Section -->
         <section id="demo" class="section">
             <div class="section-header text-center">
-                <h2>Métricas del Sistema</h2>
-                <p class="text-muted">Medidas en despliegue real en entorno corporativo durante el desarrollo del TFG.</p>
+                <h2>Demo Final y Métricas</h2>
+                <p class="text-muted">Evidencias de ejecución del stack limpio y medidas obtenidas durante el desarrollo del TFG.</p>
+            </div>
+            <div class="video-container glass-panel" style="margin-bottom:2rem;">
+                <video controls preload="metadata" poster="assets/openwebui_chat_rag_demo.png" style="width:100%; height:100%; object-fit:contain; background:#020617;">
+                    <source src="assets/demo_tfg_rag.webm" type="video/webm">
+                </video>
             </div>
             <div class="grid cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                 <div class="card glass-panel tilt-card" style="text-align:center;">
@@ -503,8 +500,6 @@
                 </div>
             </div>
         </section>
-
-    </main>
 
         <!-- Modelos LLM Section -->
         <section id="modelos" class="section">
@@ -569,11 +564,13 @@
             </div>
         </section>
 
+    </main>
+
     <footer class="footer glass-panel">
         <div class="footer-content">
             <div class="footer-left">
-                <h3>Enterprise RAG System</h3>
-                <p>Arquitectura Inteligente de Generación Aumentada mediante Recuperación con Modelos Locales</p>
+                <h3>JARVIS RAG</h3>
+                <p>Sistema Local de Consulta Documental con Generación Aumentada mediante Recuperación</p>
                 <p>Trabajo de Fin de Grado · Universidad Rey Juan Carlos · 2026</p>
             </div>
             <div class="footer-right">
@@ -581,7 +578,7 @@
                 <p style="font-size:0.8rem; color:#94a3b8;">Tutor: Jesús María González Barahona</p>
                 <div class="social-links">
                     <a href="https://github.com/acidxlemons" target="_blank"><i class="fab fa-github"></i></a>
-                    <a href="https://www.linkedin.com/in/acidxlemons" target="_blank"><i class="fab fa-linkedin"></i></a>
+                    <a href="https://www.linkedin.com/in/acidxlemons" target="_blank" aria-label="LinkedIn acidxlemons"><i class="fab fa-linkedin"></i></a>
                 </div>
             </div>
         </div>

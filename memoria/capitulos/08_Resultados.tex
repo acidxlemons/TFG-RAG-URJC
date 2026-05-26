@@ -143,24 +143,44 @@ Se realizaron pruebas funcionales sistemáticas sobre cada modo de operación de
 
 \subsection{Validación final con documentación del TFG}
 
-Para disponer de una prueba reproducible sin capturar documentación corporativa, se creó una carpeta de demostración en el volumen de ingesta: \texttt{data/watch/TFG\_DEMO}. En ella se copiaron cinco documentos del propio repositorio: \texttt{README\_TFG\_RAG.md}, \texttt{TECHNICAL\_ARCHITECTURE\_TFG.md}, \texttt{USER\_GUIDE\_TFG.md}, \texttt{BOE\_INTEGRATION\_TFG.md} y \texttt{DEPLOYMENT\_CHECKLIST\_TFG.md}. Posteriormente se indexaron en la colección aislada \texttt{documents\_TFGDEMO} mediante el endpoint \texttt{POST /documents/upload} con la cabecera \texttt{X-Tenant-Id: documents\_TFGDEMO}.
+Para disponer de una prueba reproducible sin capturar documentación corporativa, se creó una carpeta de demostración en el volumen de ingesta: \texttt{data/watch/TFG\_DEMO}. En ella se añadieron cuatro documentos CSV controlados: \texttt{TFG\_DEMO\_01\_arquitectura.csv}, \texttt{TFG\_DEMO\_02\_operacion.csv}, \texttt{TFG\_DEMO\_03\_memoria\_y\_pages.csv} y \texttt{TFG\_DEMO\_04\_accesos\_demo.csv}. Posteriormente se indexaron en la colección aislada \texttt{documents\_TFGDEMO} mediante el endpoint \texttt{POST /documents/upload} con la cabecera \texttt{X-Tenant-Id: documents\_TFGDEMO}.
 
-Esta carpeta es también la referencia práctica para añadir documentos de prueba al RAG durante una validación local: los ficheros se colocan bajo \texttt{data/watch/} y se procesan por el Indexer o por la API de carga del Backend, indicando la colección de destino cuando se necesita separar el contenido por permisos o por entorno. En esta ejecución, la colección generó 503 puntos vectoriales.
+Esta carpeta es también la referencia práctica para añadir documentos de prueba al RAG durante una validación local: los ficheros se colocan bajo \texttt{data/watch/} y se procesan por el Indexer o por la API de carga del Backend, indicando la colección de destino cuando se necesita separar el contenido por permisos o por entorno. En esta ejecución, la colección generó 13 puntos vectoriales y 4 documentos lógicos.
+
+Para facilitar la reproducción de la demo, los accesos utilizados fueron cuentas locales y contraseñas dummy, sin validez fuera del entorno de pruebas: OpenWebUI con \texttt{admin@tfg.local} / \texttt{Admin123456!}, Grafana con \texttt{admin} / \texttt{dummy\_grafana\_password}, MinIO con \texttt{minio\_admin} / \texttt{dummy\_minio\_password}, pgAdmin con \texttt{admin@example.com} / \texttt{admin} y LiteLLM mediante la clave local \texttt{dummy\_litellm\_key}. En un despliegue real estas credenciales deben sustituirse por secretos gestionados y no deben publicarse.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{cap_tfgdemo_documentos_backend.png}
-\caption{Listado real de documentos cargados en \texttt{documents\_TFGDEMO}. La captura procede del endpoint \texttt{GET /documents/list} y muestra los documentos, sus chunks y la ruta lógica \texttt{/TFG\_DEMO}.}
+\includegraphics[width=0.9\textwidth]{cap_tfg_documentos_demo_backend.png}
+\caption{Listado real de documentos cargados en \texttt{documents\_TFGDEMO}. La captura procede del endpoint \texttt{GET /documents/list} y muestra los documentos, sus chunks, la extracción nativa y el instante de ingesta.}
 \label{fig:tfgdemo-documentos}
 \end{figure}
 
-Sobre esa colección se lanzó una consulta RAG de control preguntando por las características \textit{Core RAG} descritas en el \texttt{README}. La respuesta recuperó fuentes de la colección \texttt{documents\_TFGDEMO}, mantuvo trazabilidad hacia los documentos de origen y devolvió una respuesta sin apoyarse en conocimiento externo.
+Sobre esa colección se lanzó una consulta RAG de control preguntando por los puertos del entorno limpio del TFG y el papel de Qdrant. La respuesta recuperó fuentes de la colección \texttt{documents\_TFGDEMO}, mantuvo trazabilidad hacia los documentos de origen y devolvió una respuesta sin apoyarse en conocimiento externo.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{cap_tfgdemo_respuesta_rag.png}
-\caption{Respuesta RAG real sobre la colección de demostración. La captura muestra la pregunta, el tiempo de procesamiento, el número de fuentes y las citas devueltas por el Backend.}
+\includegraphics[width=0.9\textwidth]{cap_tfg_backend_chat_respuesta.png}
+\caption{Respuesta RAG real sobre la colección de demostración. La captura muestra la pregunta, la respuesta generada por el Backend y las fuentes recuperadas con sus puntuaciones de relevancia.}
 \label{fig:tfgdemo-rag}
+\end{figure}
+
+La misma consulta se ejecutó desde OpenWebUI mediante el modelo \texttt{JARVIS}. Esta prueba valida el recorrido completo usuario--interfaz--pipeline--backend--Qdrant--LLM y demuestra que la respuesta visible en la aplicación mantiene la misma trazabilidad documental.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfg_openwebui_chat_rag.png}
+\caption{Consulta RAG desde OpenWebUI durante la demo final. JARVIS responde con los puertos del entorno limpio, explica el papel de Qdrant y muestra las fuentes documentales utilizadas.}
+\label{fig:tfg-openwebui-rag}
+\end{figure}
+
+Como apoyo a la defensa, se actualizó también la página de GitHub Pages del proyecto con el nombre final \textit{JARVIS RAG}, una sección de capturas reales y un vídeo \texttt{webm} de demostración que recorre Pages, Swagger, Qdrant, OpenWebUI y Grafana.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfg_github_pages_demo_video.png}
+\caption{Sección de demo publicada en GitHub Pages. La página incluye el vídeo de demostración y las métricas principales del sistema.}
+\label{fig:tfg-pages-demo}
 \end{figure}
 
 \subsection{Consulta RAG sobre Documentos Corporativos}
