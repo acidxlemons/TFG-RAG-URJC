@@ -24,6 +24,7 @@
         </div>
         <div class="nav-links">
             <a href="#arquitectura" class="nav-link">Arquitectura</a>
+            <a href="#capturas" class="nav-link">Capturas</a>
             <a href="#funcionalidades" class="nav-link">Capacidades</a>
             <a href="#estructura" class="nav-link">Estructura</a>
             <a href="#modelos" class="nav-link">Modelos</a>
@@ -174,6 +175,56 @@
                     <p>3 dashboards <strong>Grafana</strong> (Backend, GPU, BBDD) + <strong>Prometheus</strong> +
                         NVIDIA DCGM para monitorizar VRAM, latencia y throughput en tiempo real.</p>
                 </div>
+            </div>
+        </section>
+
+        <!-- Capturas reales -->
+        <section id="capturas" class="section">
+            <div class="section-header text-center">
+                <h2>Capturas Reales del Sistema</h2>
+                <p class="text-muted">Evidencia visual del despliegue: interfaz, control de acceso, base vectorial y respuestas del pipeline.</p>
+            </div>
+
+            <div class="screenshot-grid">
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/openwebui_jarvis.png" alt="Interfaz de OpenWebUI con JARVIS seleccionado">
+                    <figcaption>
+                        <strong>Interfaz principal</strong>
+                        <span>OpenWebUI actuando como front conversacional del pipeline JARVIS.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/jarvis_documentos.png" alt="Listado de documentos disponibles devuelto por JARVIS">
+                    <figcaption>
+                        <strong>Listado documental</strong>
+                        <span>Consulta real al indexador con documentos disponibles e ingesta reciente.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/qdrant_collections.png" alt="Colección documents en Qdrant">
+                    <figcaption>
+                        <strong>Base vectorial</strong>
+                        <span>Colección <code>documents</code> en Qdrant con vectores densos y dispersos.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel">
+                    <img src="assets/login_sso.png" alt="Pantalla de autenticación de OpenWebUI">
+                    <figcaption>
+                        <strong>Acceso corporativo</strong>
+                        <span>Entrada al sistema integrada con el flujo de autenticación de usuarios.</span>
+                    </figcaption>
+                </figure>
+
+                <figure class="screenshot-card glass-panel wide">
+                    <img src="assets/sin_documentos.png" alt="Respuesta de JARVIS cuando no hay documentos disponibles">
+                    <figcaption>
+                        <strong>Control de alucinaciones</strong>
+                        <span>JARVIS informa de la ausencia de documentos en lugar de inventar una respuesta.</span>
+                    </figcaption>
+                </figure>
             </div>
         </section>
 
