@@ -544,13 +544,13 @@ main {
     display: block;
     width: 100%;
     aspect-ratio: 16 / 9;
-    object-fit: cover;
+    object-fit: contain;
     background: #020617;
     border-bottom: 1px solid var(--glass-border);
 }
 
 .screenshot-card.wide img {
-    aspect-ratio: 21 / 9;
+    aspect-ratio: 16 / 9;
 }
 
 .screenshot-card figcaption {

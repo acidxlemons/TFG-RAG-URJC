@@ -74,6 +74,15 @@ pgAdmin            & Administración de PostgreSQL           & 5050 (interno) \\
 
 Todos los servicios comparten una red Docker interna de tipo \textit{bridge} denominada \texttt{rag-network}. Únicamente NGINX expone un puerto al exterior (8443), garantizando que ningún servicio interno es accesible directamente desde fuera del servidor.
 
+En la validación final realizada el 26 de mayo de 2026, el despliegue convivía con otros servicios Docker en el mismo host. Para evitar colisiones de puertos se mantuvieron los puertos internos de los contenedores y se publicaron accesos locales diferenciados: OpenWebUI en \texttt{localhost:3000}, Grafana en \texttt{localhost:3001}, Backend en \texttt{localhost:8004}, Indexer en \texttt{localhost:8001}, Qdrant en \texttt{localhost:6333}, MinIO en \texttt{localhost:9000}/\texttt{9001} y LiteLLM en \texttt{localhost:4000}. Esta separación no modifica la arquitectura interna, pero permite ejecutar el sistema completo sin detener otros servicios del entorno de desarrollo.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_backend_swagger.png}
+\caption{Documentación interactiva del Backend FastAPI desplegado en el entorno local de validación. La captura muestra la API activa, los endpoints de scraping, búsqueda y salud, y confirma que el servicio expone su contrato OpenAPI.}
+\label{fig:backend-swagger-final}
+\end{figure}
+
 \subsection{Orquestación con Docker Compose}
 
 La totalidad del ecosistema se define de forma declarativa en un único fichero \texttt{docker-compose.yml}. Este manifiesto YAML, alineado con la especificación actual de Compose \cite{dockerCompose2026docs}, describe tanto los servicios principales de la arquitectura como varios servicios auxiliares de inicialización y observabilidad, además de sus dependencias (\texttt{depends\_on}), volúmenes persistentes para datos, variables de entorno, políticas de reinicio (\texttt{restart: unless-stopped}) y reservas de recursos GPU.
@@ -445,6 +454,15 @@ El proceso de ingesta de un documento sigue las siguientes etapas:
 \label{fig:qdrant-collections}
 \end{figure}
 
+Además de las colecciones corporativas, para la validación final se creó una colección aislada denominada \texttt{documents\_TFGDEMO}. Esta colección contiene únicamente documentación del propio repositorio del TFG, por lo que permite generar capturas y pruebas reproducibles sin exponer documentos internos reales. El estado de Qdrant confirma que la colección quedó en estado \texttt{green}, con 503 puntos vectoriales y búsqueda híbrida habilitada.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfgdemo_qdrant_estado.png}
+\caption{Estado de la colección \texttt{documents\_TFGDEMO} en Qdrant. La captura muestra puntos indexados, dimensión del vector denso, vector sparse habilitado y campos de payload indexados.}
+\label{fig:qdrant-tfgdemo}
+\end{figure}
+
 \subsection{Búsqueda Híbrida}
 
 La recuperación de contexto para consultas RAG combina dos estrategias complementarias:
@@ -604,8 +622,8 @@ OpenWebUI se configura con el protocolo OpenID Connect (OIDC) apuntando al \text
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{fig_login_sso.png}
-\caption{Pantalla de autenticación de OpenWebUI integrada en el flujo de acceso corporativo.}
+\includegraphics[width=0.85\textwidth]{cap_openwebui_login_actual.png}
+\caption{Pantalla real de autenticación de OpenWebUI en el despliegue local. El formulario permite inicio de sesión clásico y conserva el acceso mediante SSO corporativo.}
 \label{fig:login-sso}
 \end{figure}
 
@@ -670,6 +688,13 @@ Se diseñaron y configuraron tres dashboards interactivos en Grafana:
 
     \item Dashboard de Base de Datos: Métricas de PostgreSQL (conexiones activas, queries por segundo) y estadísticas de Qdrant (número de puntos indexados, latencia de búsqueda).
 \end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_grafana_enterprise_rag.png}
+\caption{Dashboard principal de Grafana durante la validación final. Se observa el estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
+\label{fig:grafana-final}
+\end{figure}
 
 \subsection{Impacto de la Monitorización}
 

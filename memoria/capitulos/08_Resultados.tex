@@ -141,6 +141,28 @@ Se realizaron pruebas funcionales sistemáticas sobre cada modo de operación de
     \item \textbf{Resultado:} Clasificada como \texttt{FACTUAL}, usó \texttt{top\_k=5} y modelo JARVIS. Latencia total $<3$\,s incluyendo la expansión (timeout 12\,s previene bloqueo si LiteLLM está ocupado).
 \end{itemize}
 
+\subsection{Validación final con documentación del TFG}
+
+Para disponer de una prueba reproducible sin capturar documentación corporativa, se creó una carpeta de demostración en el volumen de ingesta: \texttt{data/watch/TFG\_DEMO}. En ella se copiaron cinco documentos del propio repositorio: \texttt{README\_TFG\_RAG.md}, \texttt{TECHNICAL\_ARCHITECTURE\_TFG.md}, \texttt{USER\_GUIDE\_TFG.md}, \texttt{BOE\_INTEGRATION\_TFG.md} y \texttt{DEPLOYMENT\_CHECKLIST\_TFG.md}. Posteriormente se indexaron en la colección aislada \texttt{documents\_TFGDEMO} mediante el endpoint \texttt{POST /documents/upload} con la cabecera \texttt{X-Tenant-Id: documents\_TFGDEMO}.
+
+Esta carpeta es también la referencia práctica para añadir documentos de prueba al RAG durante una validación local: los ficheros se colocan bajo \texttt{data/watch/} y se procesan por el Indexer o por la API de carga del Backend, indicando la colección de destino cuando se necesita separar el contenido por permisos o por entorno. En esta ejecución, la colección generó 503 puntos vectoriales.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfgdemo_documentos_backend.png}
+\caption{Listado real de documentos cargados en \texttt{documents\_TFGDEMO}. La captura procede del endpoint \texttt{GET /documents/list} y muestra los documentos, sus chunks y la ruta lógica \texttt{/TFG\_DEMO}.}
+\label{fig:tfgdemo-documentos}
+\end{figure}
+
+Sobre esa colección se lanzó una consulta RAG de control preguntando por las características \textit{Core RAG} descritas en el \texttt{README}. La respuesta recuperó fuentes de la colección \texttt{documents\_TFGDEMO}, mantuvo trazabilidad hacia los documentos de origen y devolvió una respuesta sin apoyarse en conocimiento externo.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{cap_tfgdemo_respuesta_rag.png}
+\caption{Respuesta RAG real sobre la colección de demostración. La captura muestra la pregunta, el tiempo de procesamiento, el número de fuentes y las citas devueltas por el Backend.}
+\label{fig:tfgdemo-rag}
+\end{figure}
+
 \subsection{Consulta RAG sobre Documentos Corporativos}
 
 \begin{itemize}
