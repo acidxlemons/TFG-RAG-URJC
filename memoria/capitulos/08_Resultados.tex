@@ -229,6 +229,13 @@ La eliminación de alucinaciones en modo RAG se logró mediante la combinación 
 
 En las pruebas realizadas, no se detectó ninguna instancia de alucinación en modo RAG con la configuración descrita. El modelo respondió ``No dispongo de esa información en los documentos consultados'' cuando la pregunta no encontraba coincidencias relevantes en Qdrant, que es el comportamiento deseado.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{screenshot_rag_response_no_documents.png}
+\caption{Comportamiento del sistema cuando no existen documentos disponibles para el usuario. En lugar de inventar una respuesta, JARVIS informa explícitamente de la ausencia de documentos consultables y muestra las colecciones evaluadas.}
+\label{fig:no-documentos-disponibles}
+\end{figure}
+
 % ============================================================
 \section{Impacto de la Caché}
 % ============================================================

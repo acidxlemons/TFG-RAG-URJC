@@ -75,7 +75,7 @@ class Pipeline:
         GLOBAL_READ_COLLECTIONS: List[str] = ["documents", "webs"]
         
         # URL del servicio Indexer para status checks
-        INDEXER_URL: str = "http://rag-indexer:8001"
+        INDEXER_URL: str = "http://indexer:8001"
 
     def __init__(self):
         self.name = "JARVIS"
@@ -2100,7 +2100,7 @@ class Pipeline:
         # 1. Imágenes adjuntas → OCR (revisar primero, antes de mensaje vacío)
         # Buscar imágenes en body.files, body.images, o dentro de messages
         if self._is_file_followup(conversation_key, message, messages):
-            logger.info(f"   â†’ Detected file follow-up for {user_email}")
+            logger.info(f"   -> Detected file follow-up for {user_email}")
             return {
                 "action": "file_chat",
                 "metadata": {"from_memory": True}

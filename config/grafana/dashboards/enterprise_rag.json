@@ -77,7 +77,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸŸ¢ Backend Status",
+            "title": "🟢 Backend Status",
             "type": "stat"
         },
         {
@@ -148,7 +148,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ”µ Qdrant Status",
+            "title": "🔵 Qdrant Status",
             "type": "stat"
         },
         {
@@ -219,7 +219,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ“Š Prometheus Status",
+            "title": "📊 Prometheus Status",
             "type": "stat"
         },
         {
@@ -275,7 +275,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ“Š Total Requests",
+            "title": "📊 Total Requests",
             "type": "stat"
         },
         {
@@ -363,7 +363,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ“ˆ Requests per Second",
+            "title": "📈 Requests per Second",
             "type": "timeseries"
         },
         {
@@ -460,7 +460,7 @@
                     "refId": "B"
                 }
             ],
-            "title": "â±ï¸ Request Latency (p50, p95)",
+            "title": "⏱️ Request Latency (p50, p95)",
             "type": "timeseries"
         },
         {
@@ -524,7 +524,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ’¾ Backend Memory",
+            "title": "💾 Backend Memory",
             "type": "stat"
         },
         {
@@ -582,7 +582,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "âš¡ CPU Usage",
+            "title": "⚡ CPU Usage",
             "type": "stat"
         },
         {
@@ -638,7 +638,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ“‚ Open Files",
+            "title": "📂 Open Files",
             "type": "stat"
         },
         {
@@ -649,7 +649,7 @@
                 "y": 16
             },
             "id": 99,
-            "title": "ðŸ¤– RAG Intelligence",
+            "title": "🤖 RAG Intelligence",
             "type": "row"
         },
         {
@@ -725,7 +725,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ” Filename Detection Rate",
+            "title": "🔍 Filename Detection Rate",
             "type": "timeseries"
         },
         {
@@ -776,7 +776,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "ðŸ“‹ Listing Usage (Last 1h)",
+            "title": "📋 Listing Usage (Last 1h)",
             "type": "piechart"
         },
         {
@@ -831,7 +831,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "âš–ï¸ Comparisons (24h)",
+            "title": "⚖️ Comparisons (24h)",
             "type": "stat"
         }
     ],

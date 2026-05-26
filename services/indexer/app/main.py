@@ -105,8 +105,9 @@ SHAREPOINT_MULTI_SITE = os.getenv("SHAREPOINT_MULTI_SITE", "false").lower() in {
 SHAREPOINT_SITES_CONFIG = os.getenv("SHAREPOINT_SITES_CONFIG", "/app/config/sharepoint_sites.json")
 
 SUPPORTED_EXTS = {
-    ".pdf", ".doc", ".docx", ".txt",
-    ".jpg", ".jpeg", ".png", ".tiff", ".bmp", ".webp"
+    ".pdf", ".doc", ".docx", ".txt", ".md", ".log", ".json",
+    ".jpg", ".jpeg", ".png", ".tiff", ".bmp", ".webp",
+    ".xlsx", ".xls", ".csv", ".ppt", ".pptx"
 }
 
 # =========================

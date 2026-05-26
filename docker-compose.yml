@@ -361,6 +361,7 @@ services:
       - ./models:/workspace/models:ro # Fine-tuned models
     environment:
       BACKEND_URL: http://rag-backend:8000
+      INDEX_TENANT_ID: ${DEFAULT_TENANT_ID:-tenant-default}
       # Azure AD credentials (para SharePoint)
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}

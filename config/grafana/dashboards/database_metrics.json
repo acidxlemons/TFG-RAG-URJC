@@ -412,7 +412,7 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "ðŸ˜ Database Metrics (PostgreSQL)",
+    "title": "🐘 Database Metrics (PostgreSQL)",
     "uid": "postgres-metrics",
     "version": 1,
     "weekStart": ""

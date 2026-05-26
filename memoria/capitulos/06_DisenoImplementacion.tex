@@ -371,9 +371,9 @@ La Tabla~\ref{tab:intenciones-detalle} resume las categorías de intención, su 
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{screenshot_rag_response.png}
-\caption{Ejemplo de respuesta RAG con fuentes documentales. El sistema muestra el contenido recuperado junto con las referencias a los documentos y páginas de origen.}
-\label{fig:screenshot-rag-response}
+\includegraphics[width=0.85\textwidth]{cap_chat_lista_docs.png}
+\caption{Respuesta real del modo de listado documental. JARVIS consulta el estado del indexador y devuelve los documentos disponibles para consulta, junto con la información reciente de ingesta.}
+\label{fig:documentos-disponibles}
 \end{figure}
 
 \subsection{Sticky Mode: Persistencia de Contexto}
@@ -437,6 +437,13 @@ El proceso de ingesta de un documento sigue las siguientes etapas:
 
     \item Almacenamiento en Qdrant: Los vectores se almacenan en la colección correspondiente de Qdrant junto con un payload de metadatos que incluye el texto original, nombre de fichero, página, índice de chunk, fuente, marca temporal y tenant\_id.
 \end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{cap_qdrant_dashboard.png}
+\caption{Panel de colecciones de Qdrant tras la ingesta documental. La colección \texttt{documents} muestra los puntos vectoriales almacenados, el estado operativo y la configuración de vectores densos y dispersos.}
+\label{fig:qdrant-collections}
+\end{figure}
 
 \subsection{Búsqueda Híbrida}
 
@@ -595,6 +602,13 @@ NGINX actúa como la primera barrera de seguridad y el único servicio expuesto 
 
 OpenWebUI se configura con el protocolo OpenID Connect (OIDC) apuntando al \textit{tenant} corporativo de Azure AD. Los usuarios se autentican con sus credenciales corporativas sin crear cuenta separada. Los tokens JWT emitidos por Azure AD se validan en cada petición y sus atributos (nombre, correo, grupos) se utilizan para el control de acceso departamental en JARVIS.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig_login_sso.png}
+\caption{Pantalla de autenticación de OpenWebUI integrada en el flujo de acceso corporativo.}
+\label{fig:login-sso}
+\end{figure}
+
 \subsection{Validación JWT en el Backend}
 \label{sec:jwt-backend}
 
@@ -656,13 +670,6 @@ Se diseñaron y configuraron tres dashboards interactivos en Grafana:
 
     \item Dashboard de Base de Datos: Métricas de PostgreSQL (conexiones activas, queries por segundo) y estadísticas de Qdrant (número de puntos indexados, latencia de búsqueda).
 \end{enumerate}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{screenshot_grafana_dashboard.png}
-\caption{Dashboard de Grafana mostrando las métricas del backend en tiempo real: latencia, distribución de modos de operación y tasa de errores.}
-\label{fig:screenshot-grafana}
-\end{figure}
 
 \subsection{Impacto de la Monitorización}
 

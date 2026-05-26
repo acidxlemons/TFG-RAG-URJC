@@ -179,3 +179,16 @@ memoria/capitulos/*.aux
 #   10.0.0.41 → YOUR_SERVER_IP o 192.168.1.100
 #   raiz@europavia.es → admin@example.com
 # ============================================
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.bbl
+*.bcf
+*.blg
+*.lof
+*.lot
+*.out
+*.toc
+*.run.xml
+*.synctex.gz
