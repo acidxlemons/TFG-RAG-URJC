@@ -340,7 +340,7 @@ PDF adjunto → _has_file_attachment() → action=file_chat → _call_ollama_dir
 
 | Archivo | Cambio |
 |---------|--------|
-| `services/openwebui/pipelines/enterprise_rag.py` | `_has_file_attachment()`, `_call_ollama_direct()`, acción `file_chat` |
+| `services/openwebui/pipelines/jarvis.py` | `_has_file_attachment()`, `_call_ollama_direct()`, acción `file_chat` |
 | `docker-compose.yml` | Servicio pgAdmin añadido |
 | `config/pgadmin/servers.json` | **NUEVO** - Configuración del servidor PostgreSQL |
 
@@ -406,7 +406,7 @@ Respuesta con tabla markdown mostrando archivos recientes y sus estados.
 | `backend/app/core/memory/manager.py` | Modelo `IngestionStatus` + métodos |
 | `backend/app/main.py` | 3 endpoints + tracking en `process_document` |
 | `services/indexer/app/main.py` | Detección borrados + report status |
-| `services/openwebui/pipelines/enterprise_rag.py` | Intent `check_status` |
+| `services/openwebui/pipelines/jarvis.py` | Intent `check_status` |
 
 ---
 
@@ -561,7 +561,7 @@ rag_search_hits_total - Búsquedas exitosas
 rag_search_misses_total - Búsquedas sin resultados
 ```
 
-#### 4. **OpenWebUI Pipeline** (`services/openwebui/pipelines/enterprise_rag.py`)
+#### 4. **OpenWebUI Pipeline** (`services/openwebui/pipelines/jarvis.py`)
 
 **¿Qué es?**
 Pipeline personalizado que conecta OpenWebUI con el backend RAG.
@@ -728,7 +728,7 @@ results = retriever.search(
 
 1. Ir a Admin Panel → Pipelines
 2. Añadir nuevo pipeline
-3. Copiar contenido de `enterprise_rag.py`
+3. Copiar contenido de `jarvis.py`
 4. Guardar y activar
 5. Usar chat normalmente
 

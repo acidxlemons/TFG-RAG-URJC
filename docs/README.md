@@ -38,7 +38,7 @@
 ### 📋 Otros
 | Documento | Descripción |
 |-----------|-------------|
-| [CHANGELOG.md](CHANGELOG.md) | Historial de cambios del proyecto (v2.1 incluido) |
+| [CHANGELOG.md](CHANGELOG.md) | Historial de cambios del proyecto |
 | [DEPLOYMENT_GANTT.md](DEPLOYMENT_GANTT.md) | Diagrama GANTT del despliegue |
 
 ---
@@ -60,12 +60,29 @@ Usuario → NGINX (TLS) → OpenWebUI → Pipeline JARVIS (14 modos)
 
 **Stack:** Python 3.11 · FastAPI · Docker Compose · Qdrant · PostgreSQL · Redis · Ollama · LiteLLM · Prometheus · Grafana
 
-## 🆕 Novedades v2.1
+## 🆕 Estado final del TFG
 
 | Componente | Descripción |
 |------------|-------------|
 | `core/sql_agent.py` | Agente NL→SQL con whitelist, timeout y auto-corrección |
 | `core/auth.py` | Validación JWT Azure AD (JWKS + PyJWT), activable con `AZURE_JWT_VALIDATION=true` |
 | `api/query.py` | Endpoint unificado `POST /api/v1/query` con auto-routing RAG+SQL |
+| `core/query_processor.py` | Intent detection, expansión de consultas y smart routing entre JARVIS y `qwen2.5-32b` |
+| `services/openwebui/pipelines/jarvis.py` | Pipeline JARVIS integrado con RAG, BOE, web, scraping, OCR, documentos y demo TFG |
 | `docker-compose.yml` | Límites de recursos (`deploy.resources.limits`) para 6 servicios |
-| `services/litellm/config.yaml` | Secretos gestionados por variables de entorno (no hardcodeados) |
+| `services/litellm/config.yaml` | Modelos locales servidos por Ollama mediante LiteLLM |
+| `github_pages/` | Página pública `JARVIS RAG` con capturas reales y vídeo de demostración |
+| `memoria/` | Memoria final en LaTeX con validación sobre `documents_TFGDEMO` |
+
+## 🧪 Demo final reproducible
+
+| Elemento | Valor |
+|----------|-------|
+| OpenWebUI | `http://localhost:3002` |
+| Backend Swagger | `http://localhost:8002/docs` |
+| Indexer health | `http://localhost:8003/health` |
+| Qdrant dashboard | `http://localhost:6335/dashboard` |
+| Grafana | `http://localhost:3003` |
+| Colección de demo | `documents_TFGDEMO` |
+| Documentos de demo | `data/watch/TFG_DEMO/` |
+| GitHub Pages | `https://acidxlemons.github.io/TFG-RAG-URJC/` |

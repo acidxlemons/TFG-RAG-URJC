@@ -68,7 +68,7 @@ docker compose restart openwebui  # Reiniciar servicio
 ```
 Internet → NGINX (8443) → OpenWebUI (8080)
                        → Backend (8002)
-                       → Grafana (3002)
+                       → Grafana (3003)
 ```
 
 **Archivos clave**:

@@ -1,7 +1,7 @@
 # 🛠️ Arquitectura Técnica - JARVIS RAG System
 
 **Para**: Desarrolladores, Arquitectos, Administradores de Sistemas  
-**Versión**: 4.0 (v2.1)  
+**Versión**: 4.1 (v2.3 / validación final TFG)
 **Proyecto**: TFG - Universidad Rey Juan Carlos  
 **Nivel**: Técnico
 
@@ -395,7 +395,7 @@ GET /web-search?q=significado+nombre+Orla
 ```python
 class Pipeline:
     class Valves(BaseModel):
-        BACKEND_URL: str = "http://tfg-backend:8002"
+        BACKEND_URL: str = "http://rag-backend:8000"
         LITELLM_URL: str = "http://litellm:4001"
         DEBUG_MODE: bool = True
         TEXT_MODEL: str = "llama3.1-8b"
@@ -760,7 +760,7 @@ La temperatura es un hiperparámetro que controla la **aleatoriedad** de las res
 |---------|-------------|---------------|
 | Tool calling | **0.1** | Máxima precisión en decisiones |
 
-**Pipeline** (`services/openwebui/pipelines/enterprise_rag.py`):
+**Pipeline** (`services/openwebui/pipelines/jarvis.py`):
 
 | Acción | Temperatura | Justificación |
 |--------|-------------|---------------|
@@ -1070,7 +1070,7 @@ La autenticación de usuarios se delega en **Microsoft Entra ID (Azure AD)**.
   - *Implementado mediante Metadata Filters en Qdrant.*
 
 ### 4. Aislamiento de Red
-- **Docker Network**: `tfg-network` (bridge).
+- **Docker Network**: `rag-network` (bridge).
 - **Exposición**: Solo Nginx (8443/80) y PostgreSQL (5433, solo local) exponen puertos. El resto de servicios (Ollama, Backend) son internos.
 
 ### Multi-Tenancy
@@ -1211,7 +1211,7 @@ services:
 **nginx.conf**:
 ```nginx
 upstream backend {
-    server tfg-backend:8002 weight=1;
+    server rag-backend:8000 weight=1;
     # Si hay múltiples réplicas, Docker DNS hace round-robin
 }
 
@@ -1278,8 +1278,8 @@ server {
 │  │                    PROMETHEUS (9091)                           │  │
 │  │                                                                │  │
 │  │  Scrape Jobs:                                                  │  │
-│  │  • tfg-backend:8002/metrics  (cada 10s)                       │  │
-│  │  • qdrant:6335/metrics       (cada 30s)                       │  │
+│  │  • rag-backend:8000/metrics  (cada 10s)                       │  │
+│  │  • qdrant:6333/metrics       (cada 30s)                       │  │
 │  │  • prometheus:9091/metrics   (cada 15s)                       │  │
 │  │                                                                │  │
 │  │  Storage: 15 días retención                                   │  │
@@ -1366,12 +1366,12 @@ scrape_configs:
 
   - job_name: 'tfg-backend'
     static_configs:
-      - targets: ['tfg-backend:8002']
+      - targets: ['rag-backend:8000']
     scrape_interval: 10s
 
   - job_name: 'qdrant'
     static_configs:
-      - targets: ['qdrant:6335']
+      - targets: ['qdrant:6333']
     scrape_interval: 30s
 ```
 
@@ -1458,8 +1458,8 @@ async def track_requests(request: Request, call_next):
 │                    (Reverse Proxy + SSL)                           │
 │                                                                    │
 │  ┌─────────────────────────────────────────────────────────────┐  │
-│  │ location / → proxy_pass http://openwebui:3002               │  │
-│  │ location /api/ → proxy_pass http://tfg-backend:8002         │  │
+│  │ location / → proxy_pass http://openwebui:8080               │  │
+│  │ location /api/ → proxy_pass http://rag-backend:8000         │  │
 │  │ SSL: config/nginx/ssl/cert.pem + key.pem                    │  │
 │  └─────────────────────────────────────────────────────────────┘  │
 └───────────────────┬─────────────────────────┬────────────────────┘
@@ -1610,11 +1610,11 @@ Si detectas duplicados en Qdrant (por ejemplo, tras un error):
 
 ```powershell
 # Ejecutar script de limpieza
-docker compose exec tfg-backend python3 -c "
+docker compose exec rag-backend python3 -c "
 from qdrant_client import QdrantClient
 from collections import defaultdict
 
-client = QdrantClient(host='qdrant', port=6335)
+client = QdrantClient(host='qdrant', port=6333)
 collection = 'documents'  # o 'documents_CALIDAD', etc.
 
 all_points, _ = client.scroll(collection, limit=25000, with_payload=True, with_vectors=False)
@@ -1763,7 +1763,7 @@ Invoke-WebRequest -Uri "http://localhost:9091/api/v1/query?query=DCGM_FI_DEV_GPU
 
 | Situación | Acción recomendada |
 |-----------|-------------------|
-| Backend Memory > 16GB | Reiniciar: `docker compose restart tfg-backend` |
+| Backend Memory > 16GB | Reiniciar: `docker compose restart rag-backend` |
 | Memory creciendo sin parar | Verificar logs de errores, posible memory leak |
 | Qdrant Vectors > 500K | Considerar particionamiento de colecciones |
 | CPU > 85% sostenido | Aumentar workers o optimizar queries |
@@ -1880,7 +1880,7 @@ Si ves mensajes de estado confusos en el chat del agente:
 - La sincronización ocurre cada 5 minutos (default).
 - Si notas que las barras naranjas del heatmap desaparecen:
   1. Verificar estado del scheduler: `http://localhost:8003/scheduler` (debe devolver `running: true`).
-  2. Si está detenido, reiniciar: `docker compose restart tfg-indexer`.
+  2. Si está detenido, reiniciar: `docker compose restart indexer`.
 
 #### Paneles del Dashboard
 
@@ -2754,10 +2754,10 @@ Ver: [FINE_TUNING_GUIDE.md](FINE_TUNING_GUIDE.md) para guía detallada.
 docker-compose logs -f tfg-backend pipelines
 
 # Reiniciar servicio específico
-docker-compose restart tfg-backend
+docker-compose restart rag-backend
 
 # Entrar al contenedor
-docker-compose exec tfg-backend bash
+docker-compose exec rag-backend bash
 
 # Ver uso de recursos
 docker stats
@@ -4086,9 +4086,9 @@ mcp-boe:
     context: ./mcp-boe-server
   container_name: tfg-mcp-boe
   ports:
-    - "8011:8011"
+    - "8011:8010"
   networks:
-    - tfg-network
+    - rag-network
   restart: unless-stopped
 ```
 

@@ -134,7 +134,7 @@ Remove-Item -Force data\watch\.synced_* -ErrorAction SilentlyContinue
 3. **Reiniciar** servicios para aplicar el nuevo modelo:
    Asegúrate de que en `.env` tengas `EMBEDDING_MODEL=/workspace/models/finetuned_embeddings`.
 ```powershell
-docker compose restart tfg-backend indexer
+docker compose restart rag-backend indexer
 ```
 
 4. **Forzar Inicio de Indexación**:

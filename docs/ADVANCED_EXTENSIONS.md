@@ -408,7 +408,7 @@ from mcp.types import Tool, TextContent
 # Crear servidor MCP
 server = Server("jarvis-rag")
 
-BACKEND_URL = "http://tfg-backend:8002"
+BACKEND_URL = "http://rag-backend:8000"
 
 
 @server.tool()
@@ -600,17 +600,17 @@ if __name__ == "__main__":
 mcp-rag:
   build: ./services/mcp-servers
   environment:
-    - BACKEND_URL=http://tfg-backend:8002
+    - BACKEND_URL=http://rag-backend:8000
   depends_on:
     - tfg-backend
   networks:
-    - tfg-network
+    - rag-network
 
 mcp-boe:
   build: ./services/mcp-servers
   command: python boe_server.py
   networks:
-    - tfg-network
+    - rag-network
 ```
 
 ### 4.5 Integración con Claude Desktop
@@ -662,7 +662,7 @@ Edita `docker-compose.yml`:
     volumes:
       - ./data/docs:/data  # Carpeta que el LLM podrá leer
     networks:
-      - tfg-network
+      - rag-network
 ```
 
 #### Paso 3: Configurar Clientes

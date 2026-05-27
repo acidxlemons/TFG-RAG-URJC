@@ -26,8 +26,8 @@ docker compose down && docker compose up -d
 
 | Variable | Descripción | Requerido | Ejemplo |
 |----------|-------------|-----------|---------|
-| `APP_NAME` | Nombre del sistema | No | `Enterprise RAG System` |
-| `APP_URL` | URL base de la aplicación | **Sí** | `https://mi-servidor.com` |
+| `APP_NAME` | Nombre del sistema | No | `JARVIS RAG - TFG URJC` |
+| `APP_URL` | URL base de la aplicación | **Sí** | `http://localhost:3002` |
 | `ENVIRONMENT` | Entorno de ejecución | No | `local`, `production` |
 
 ---

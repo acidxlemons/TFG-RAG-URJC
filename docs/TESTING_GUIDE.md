@@ -1,6 +1,6 @@
 # 🧪 Guía Completa de Setup y Testing - JARVIS RAG System
 
-**Versión**: 4.0  
+**Versión**: 4.1 (validación final TFG)
 **Proyecto**: TFG - Universidad Rey Juan Carlos  
 **Última actualización**: 29 de Enero de 2026
 
@@ -49,7 +49,7 @@ docker compose ps
 
 ```powershell
 # Backend
-docker compose logs tfg-backend --tail 5
+docker compose logs rag-backend --tail 5
 
 # Pipelines  
 docker compose logs pipelines --tail 5
@@ -71,10 +71,10 @@ Uvicorn running on http://0.0.0.0:8002
 Ctrl+C
 
 # Rebuild limpio
-docker compose build tfg-backend pipelines litellm --no-cache
+docker compose build rag-backend pipelines litellm --no-cache
 
 # Levantar
-docker compose up -d tfg-backend pipelines litellm
+docker compose up -d rag-backend pipelines litellm
 ```
 
 ---
@@ -121,12 +121,12 @@ docker compose restart [nombre-servicio]
 ### 3.1 Backend
 
 ```powershell
-docker compose logs tfg-backend --tail 30
+docker compose logs rag-backend --tail 30
 ```
 
 **Buscar líneas (✅ BUENO)**:
 ```
-✓ Qdrant conectado: http://qdrant:6335
+✓ Qdrant conectado: http://qdrant:6333
 ✓ RAG Retriever inicializado
 ✓ Memory Manager inicializado
 ✓ OCR Pipeline inicializado
@@ -136,7 +136,7 @@ docker compose logs tfg-backend --tail 30
 **Errores comunes (❌ MALO)**:
 ```
 ModuleNotFoundError: No module named 'httpx'
-  → SOLUCIÓN: docker compose build tfg-backend --no-cache
+  → SOLUCIÓN: docker compose build rag-backend --no-cache
 
 Connection refused to qdrant
   → SOLUCIÓN: docker compose restart qdrant
@@ -151,7 +151,7 @@ docker compose logs pipelines --tail 30
 **Buscar líneas (✅ BUENO)**:
 ```
 ✓ JARVIS inicializado
-  Backend: http://tfg-backend:8002
+  Backend: http://rag-backend:8000
   LiteLLM: http://litellm:4001
 🚀 Starting JARVIS
 ```
@@ -315,7 +315,7 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8002/api/v1/search `
 1. Ir a **Settings** (⚙️)
 2. **Admin Panel** → **Settings** → **Connections**
 3. Verificar/añadir:
-   - **Pipelines URL**: `http://pipelines:9100`
+   - **Pipelines URL**: `http://pipelines:9099`
    - ✅ Enabled
 4. Click "Save"
 5. Refrescar página
@@ -511,7 +511,7 @@ Invoke-RestMethod -Uri "http://localhost:8002/upload" -Method Post -Form $form
 
 ```powershell
 # Ver logs del indexer
-docker compose logs tfg-indexer --tail 50
+docker compose logs indexer --tail 50
 
 # Ver estadísticas de Qdrant
 Invoke-RestMethod http://localhost:8002/documents/stats
@@ -732,8 +732,8 @@ Start-Process "http://localhost:9091"
 | Job | Endpoint | Función |
 |-----|----------|---------|
 | `prometheus` | localhost:9091 | Prometheus mismo |
-| `tfg-backend` | tfg-backend:8002 | API principal con métricas |
-| `qdrant` | qdrant:6335 | Base de datos vectorial |
+| `rag-backend` | rag-backend:8000 | API principal con métricas |
+| `qdrant` | qdrant:6333 | Base de datos vectorial |
 
 ### 15.2 Acceso a Grafana
 
@@ -882,8 +882,8 @@ docker compose logs -f
 ### 18.2 Logs Específicos
 
 ```powershell
-docker compose logs tfg-backend --tail 50
-docker compose logs tfg-indexer --tail 50
+docker compose logs rag-backend --tail 50
+docker compose logs indexer --tail 50
 docker compose logs pipelines --tail 50
 docker compose logs litellm --tail 20
 docker compose logs qdrant --tail 20
@@ -929,11 +929,11 @@ docker compose restart pipelines openwebui
 
 ```powershell
 # Ver error exacto
-docker compose logs tfg-backend --tail 50
+docker compose logs rag-backend --tail 50
 
 # Si dice "No module named 'bs4'"
-docker compose build tfg-backend --no-cache
-docker compose restart tfg-backend
+docker compose build rag-backend --no-cache
+docker compose restart rag-backend
 ```
 
 ### Problema 3: NO encuentra documentos (mode=rag)
@@ -948,7 +948,7 @@ Invoke-RestMethod http://localhost:8002/documents/stats
 Copy-Item "C:\documento.pdf" "c:\TFG-RAG-Clean\data\watch\"
 
 # 3. Ver logs indexer
-docker compose logs tfg-indexer -f
+docker compose logs indexer -f
 
 # Esperar: "✓ Documento procesado e indexado"
 ```
@@ -992,7 +992,7 @@ Invoke-RestMethod http://localhost:6335/collections
 |-------------|---------|---|
 | Docker corriendo | `docker ps` | ☐ |
 | Todos servicios up | `docker compose ps` | ☐ |
-| Backend sin errores | `docker compose logs tfg-backend --tail 20` | ☐ |
+| Backend sin errores | `docker compose logs rag-backend --tail 20` | ☐ |
 | Pipelines cargado | Log: "JARVIS inicializado" | ☐ |
 | Modelos Ollama | `docker compose exec ollama ollama list` | ☐ |
 
@@ -1045,11 +1045,11 @@ Si todos los checks están ✅, el sistema está completamente operativo.
 
 **Documentos relacionados**:
 - [USER_GUIDE.md](USER_GUIDE.md) - Para usuarios finales
-- [DATABASE_STORAGE_GUIDE.md](DATABASE_STORAGE_GUIDE.md) - Bases de datos y credenciales
+- [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) - Variables de entorno, credenciales y servicios
 - [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) - Arquitectura técnica
 
 ---
 
-**JARVIS Team** | 2025
+**JARVIS RAG - TFG URJC** | 2026
 
 

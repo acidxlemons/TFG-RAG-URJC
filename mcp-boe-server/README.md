@@ -124,13 +124,16 @@ El servidor ya está incluido en el stack:
 
 ```bash
 # Ver logs
-docker logs rag-mcp-boe -f
+docker logs tfg-mcp-boe -f
 
 # Reiniciar
-docker restart rag-mcp-boe
+docker restart tfg-mcp-boe
 
-# Puerto expuesto
-# http://localhost:8010
+# Puerto expuesto en el host
+# http://localhost:8011
+#
+# Puerto interno del contenedor
+# http://mcp-boe:8010
 ```
 
 ---
@@ -156,8 +159,8 @@ mcp-boe-server/
 # 1. Verificar que el contenedor está corriendo
 docker ps | grep mcp-boe
 
-# 2. Health check
-curl http://localhost:8010/health
+# 2. Health check local
+curl http://localhost:8011/health
 
 # 3. Test completo
 cd mcp-boe-server

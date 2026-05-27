@@ -164,12 +164,12 @@ Editar `docker-compose.yml`:
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
-      BACKEND_URL: http://tfg-backend:8002
+      BACKEND_URL: http://rag-backend:8000
     depends_on:
       - qdrant
-      - tfg-backend
+      - rag-backend
     networks:
-      - tfg-network
+      - rag-network
 ```
 
 ### Paso 3: Desplegar

@@ -249,14 +249,17 @@ curl http://localhost:8002/health
 # Verificar Qdrant
 curl http://localhost:6335/health
 
-# Acceder a la interfaz
-open https://localhost:8443   # macOS / a través de NGINX
-start https://localhost:8443  # Windows
+# Acceder a la interfaz principal
+open http://localhost:3002   # macOS
+start http://localhost:3002  # Windows
+
+# Opcional: acceso a través de NGINX local
+# http://localhost:8080 / https://localhost:8443
 ```
 
 ### Tu Primera Consulta
 
-1. Abre `https://localhost:8443` (o `http://localhost:3002` directamente)
+1. Abre `http://localhost:3002` (o `http://localhost:8080` a través de NGINX)
 2. Selecciona el modelo **JARVIS**
 3. Prueba estas consultas:
    - *"¿Qué documentos tienes?"* (lista de archivos indexados)
@@ -442,8 +445,9 @@ curl http://localhost:6335/collections/documents
 # 2. Verificar tenant_id correcto
 # El tenant del usuario debe coincidir con el de los documentos
 
-# 3. Indexar un documento de prueba
-curl -X POST http://localhost:8002/api/upload -F "file=@test.pdf"
+# 3. Indexar un documento de prueba desde Swagger:
+# http://localhost:8002/docs -> POST /documents/upload
+# Cabecera recomendada: X-Tenant-Id: documents_TFGDEMO
 ```
 </details>
 
@@ -467,13 +471,13 @@ docker stats
 
 ```bash
 # 1. Verificar que backend está corriendo
-docker compose ps tfg-backend
+docker compose ps rag-backend
 
 # 2. Ver logs
-docker compose logs tfg-backend --tail=50
+docker compose logs rag-backend --tail=50
 
 # 3. Reiniciar servicios
-docker compose restart tfg-backend
+docker compose restart rag-backend
 ```
 </details>
 
