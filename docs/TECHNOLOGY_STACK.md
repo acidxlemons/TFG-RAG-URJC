@@ -159,8 +159,10 @@ config/nginx/ssl/          # Certificados SSL
 
 **Componentes clave del pipeline RAG** (v2.3.0):
 - **QueryProcessor** (`core/query_processor.py`): Intent detection → query expansion (×3 variantes) → smart model routing (JARVIS/qwen2.5-32b).
-- **Sentence Transformers**: Embeddings multilingües.
-- **PaddleOCR**: OCR con GPU para PDFs escaneados.
+- **Sentence Transformers**: Embeddings densos multilingües (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dims).
+- **Búsqueda híbrida**: vectores densos + vectores dispersos **BM25** (`Qdrant/bm25` vía `fastembed`) para coincidencias léxicas exactas.
+- **Reranker** (`core/rag/reranker.py`): Cross-Encoder `cross-encoder/ms-marco-MiniLM-L-6-v2` que reordena los candidatos por relevancia antes de construir el contexto.
+- **PaddleOCR**: OCR con GPU para PDFs escaneados (procesamiento paralelo con **Ray**).
 - **LangChain**: Chunking semántico.
 - **MemoryManager**: Historial conversacional con summarización automática vía qwen2.5-32b.
 
@@ -272,6 +274,26 @@ documents_DEPT  # Colecciones por departamento (multi-tenant)
 - `DCGM_FI_DEV_GPU_TEMP` - Temperatura (°C)
 
 **Puerto**: `9401`
+
+---
+
+### 🪵 Loki + Promtail (Logs centralizados)
+
+**Qué es**: Stack de agregación de logs. **Promtail** recolecta los logs de todos los contenedores y los envía a **Loki**, que los indexa y los hace consultables desde Grafana junto a las métricas.
+
+**Por qué lo usamos**:
+- **Diagnóstico unificado**: métricas (Prometheus) y logs (Loki) en el mismo Grafana.
+- **Correlación**: ante un pico de latencia, se salta directamente a los logs de ese instante.
+- **Sin agentes pesados**: Promtail es ligero y descubre los contenedores automáticamente.
+
+**Archivos clave**:
+```
+config/promtail/config.yaml                       # Recolección de logs
+config/grafana/provisioning/datasources/loki.yml  # Datasource Loki en Grafana
+config/grafana/dashboards/logs_overview.json      # Dashboard de logs
+```
+
+**Puertos**: Loki `3101` (interno)
 
 ---
 
@@ -435,8 +457,9 @@ Usuario envía URL
 ```
 backend/app/api/scrape.py              # Endpoint de scraping
 backend/app/integrations/scraper/      # Módulos de scraping
-  ├── aiohttp_scraper.py               # Motor HTTP simple
-  └── playwright_scraper.py            # Motor con navegador
+  ├── content_extractor.py             # Extracción HTTP + Trafilatura/BeautifulSoup
+  ├── playwright_scraper.py            # Motor con navegador (JS)
+  └── recursive_scraper.py             # Rastreo recursivo de URLs
 ```
 
 ---
