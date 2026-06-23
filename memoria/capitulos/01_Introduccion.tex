@@ -7,13 +7,13 @@
 
 En los entornos corporativos actuales, el volumen de información disponible crece de forma constante, pero no crece de forma ordenada. La documentación relevante suele estar repartida entre repositorios como Microsoft SharePoint, PDFs internos, muchos de ellos escaneados, wikis, portales de proveedores, procedimientos técnicos y fuentes públicas como el Boletín Oficial del Estado (BOE). En la práctica, el problema habitual no es la falta de información, sino la dispersión, la heterogeneidad de formatos y la dificultad para recuperar contenido útil cuando se necesita.
 
-Los métodos tradicionales de búsqueda por palabras clave fallan en situaciones muy comunes: cuando el usuario no conoce el término exacto, cuando la información está contenida en documentos largos, cuando existen sinónimos o acrónimos internos, o cuando el contenido está en PDFs escaneados y requiere OCR. Como consecuencia, tareas rutinarias como confirmar un procedimiento, localizar un requisito normativo o recuperar una especificación se convierten en procesos lentos y propensos a errores.
+Los métodos tradicionales de búsqueda por palabras clave fallan en situaciones muy comunes: cuando el usuario no conoce el término exacto, cuando la información está contenida en documentos largos, cuando existen sinónimos o acrónimos internos, o cuando el contenido está en PDFs escaneados y requiere reconocimiento óptico de caracteres (OCR, \textit{Optical Character Recognition}). Como consecuencia, tareas rutinarias como confirmar un procedimiento, localizar un requisito normativo o recuperar una especificación se convierten en procesos lentos y propensos a errores.
 
 En paralelo, la popularización de los grandes modelos de lenguaje (LLMs, \textit{Large Language Models}) ha permitido interactuar con sistemas de información mediante lenguaje natural. Sin embargo, en un contexto corporativo, una respuesta fluida pero incorrecta tiene un coste elevado: puede inducir decisiones erróneas y generar confianza injustificada. El problema se agrava cuando el modelo no dispone de acceso al conocimiento interno, cuando la documentación cambia con frecuencia o cuando la consulta requiere precisión y respaldo documental.
 
 Por este motivo, resulta especialmente relevante el enfoque de Generación Aumentada mediante Recuperación (RAG, \textit{Retrieval-Augmented Generation}), que combina la generación de lenguaje con la recuperación de información desde una base documental. En lugar de responder de memoria, el sistema fundamenta la respuesta en documentos recuperados, mejorando la utilidad, la trazabilidad y reduciendo la probabilidad de respuestas no justificadas \cite{lewis2020rag}.
 
-Este Trabajo de Fin de Grado no parte de entrenar un modelo desde cero. Sería un objetivo desproporcionado para el alcance del proyecto y, además, no resolvería por sí mismo el problema principal, que no es crear otro LLM generalista, sino poner modelos ya existentes a trabajar de forma útil, segura y controlada sobre información corporativa cambiante. Por ello, el trabajo se centra en seleccionar, integrar, adaptar y orquestar tecnologías existentes de código abierto y pesos abiertos: modelos de lenguaje ejecutados localmente, embeddings, una base de datos vectorial, un backend propio en Python, mecanismos de ingesta documental y una interfaz conversacional empresarial.
+Este Trabajo de Fin de Grado no parte de entrenar un modelo desde cero. Sería un objetivo desproporcionado para el alcance del proyecto y, además, no resolvería por sí mismo el problema principal, que no es crear otro LLM generalista, sino poner modelos ya existentes a trabajar de forma útil, segura y controlada sobre información corporativa cambiante. Por ello, el trabajo se centra en seleccionar, integrar, adaptar y orquestar tecnologías existentes de código abierto y pesos abiertos: modelos de lenguaje ejecutados localmente, embeddings (representaciones numéricas que capturan el significado del texto), una base de datos vectorial, un backend propio en Python, mecanismos de ingesta documental y una interfaz conversacional empresarial.
 
 Con esta motivación, el proyecto aborda el diseño, desarrollo e integración de un sistema RAG corporativo desplegado en infraestructura controlada (\textit{on-premise}), capaz de ingerir documentos desde fuentes heterogéneas y ofrecer a los usuarios una interfaz conversacional orientada a consultas técnicas, con recuperación semántica y soporte documental.
 
@@ -102,7 +102,7 @@ El proyecto cubre el ciclo completo de construcción de un sistema RAG empresari
     \item Desarrollo de un backend propio en Python para orquestación, recuperación documental, control de acceso y conexión con herramientas externas.
     \item Integración de un pipeline de ingesta documental con soporte para PDFs, HTML, imágenes y documentación alojada en SharePoint.
     \item Construcción de un motor de búsqueda semántica basado en embeddings y almacenamiento vectorial.
-    \item Reutilización de OpenWebUI como interfaz conversacional e integración de su autenticación con el proveedor corporativo de identidad mediante OIDC/Azure AD.
+    \item Reutilización de OpenWebUI como interfaz conversacional e integración de su autenticación con el proveedor corporativo de identidad mediante OpenID Connect (OIDC) sobre Azure AD, es decir, inicio de sesión único corporativo (SSO, \textit{Single Sign-On}).
     \item Extensión de OpenWebUI mediante un pipeline propio que añade encaminamiento, memoria de sesión y control de acceso documental.
     \item Integración funcional con fuentes externas como SharePoint, BOE e Internet.
     \item Desarrollo de un servidor MCP para normativa del BOE como prueba de concepto técnica orientada a futuras integraciones.
@@ -118,7 +118,7 @@ En relación con MCP, conviene precisar el alcance para evitar ambigüedades: en
 Se identifican las siguientes limitaciones reconocidas:
 
 \begin{itemize}
-    \item \textit{Requisitos hardware}: el sistema requiere una GPU NVIDIA con suficiente VRAM para mantener un rendimiento aceptable en tareas de OCR e inferencia local.
+    \item \textit{Requisitos hardware}: el sistema requiere una GPU NVIDIA con suficiente VRAM (memoria de vídeo de la tarjeta gráfica) para mantener un rendimiento aceptable en tareas de OCR e inferencia local.
 
     \item \textit{Predominio de SharePoint en la validación}: aunque la arquitectura está pensada para documentos cambiantes en la nube y de distinta naturaleza, la validación experimental se ha centrado sobre todo en SharePoint, que es la integración más desarrollada del proyecto.
 

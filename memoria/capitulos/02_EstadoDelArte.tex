@@ -60,7 +60,7 @@ En un sistema real, RAG no suele quedarse en una búsqueda semántica simple:
 
 \begin{itemize}
     \item \textit{Búsqueda híbrida}: combina una recuperación basada en significado, obtenida al comparar embeddings, con otra basada en coincidencias exactas de palabras, habitualmente implementada con métodos como BM25. Esto evita perder siglas, identificadores, nombres de procedimientos o artículos legales \cite{robertson2009bm25,weaviateHybridDocs,qdrantHybridTutorial}.
-    \item \textit{Reordenación y filtrado}: se seleccionan los fragmentos más útiles antes de enviarlos al modelo.
+    \item \textit{Reordenación} (\textit{reranking}): un segundo modelo, llamado \textit{reranker}, vuelve a puntuar los fragmentos recuperados según su relevancia real para la pregunta y selecciona los más útiles antes de enviarlos al modelo. Mejora la precisión frente a usar solo la similitud de embeddings.
     \item \textit{Memoria conversacional acotada}: se conserva parte del historial cuando aporta contexto, pero evitando que el \textit{prompt} crezca sin control.
 \end{itemize}
 

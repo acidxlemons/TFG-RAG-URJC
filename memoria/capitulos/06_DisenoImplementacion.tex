@@ -29,7 +29,7 @@ El sistema no se diseñó como un bloque monolítico, sino que emergió de un pr
 
     \item Octava limitación: Los analistas de datos necesitaban consultar tablas de datos estructurados sin aprender SQL. \textit{Solución:} Se desarrolló un agente de traducción NL$\rightarrow$SQL (\texttt{core/sql\_agent.py}) que genera y ejecuta consultas \texttt{SELECT} seguras sobre PostgreSQL mediante LiteLLM, con validación por lista blanca y auto-corrección ante errores de sintaxis.
 
-    \item Novena limitación: El control de acceso mediante cabeceras HTTP era insuficiente para entornos multi-tenant exigentes. \textit{Solución:} Se implementó validación criptográfica de tokens JWT de Azure AD (\texttt{core/auth.py}), con descarga dinámica de claves públicas JWKS, activable con \texttt{AZURE\_JWT\_VALIDATION=true}.
+    \item Novena limitación: El control de acceso mediante cabeceras HTTP era insuficiente para entornos multi-tenant (múltiples grupos o departamentos con documentación aislada) exigentes. \textit{Solución:} Se implementó validación criptográfica de tokens JWT (\textit{JSON Web Token}) de Azure AD (\texttt{core/auth.py}), con descarga dinámica de las claves públicas del proveedor (JWKS, \textit{JSON Web Key Set}), activable con \texttt{AZURE\_JWT\_VALIDATION=true}.
 
     \item Décima limitación: La expansión de consulta en el endpoint de búsqueda lanzaba el cálculo en paralelo pero nunca recogía el resultado: estaba efectivamente deshabilitada en producción sin que los tests lo detectaran. \textit{Solución} (v2.2.0): se añadió la recogida asíncrona del futuro, se ejecutan búsquedas con las consultas expandidas y se incorporan sus resultados sin duplicados; además se limpiaron imports perezosos y logs de depuración en \texttt{core/retrieval.py}.
 
