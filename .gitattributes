@@ -1,0 +1,6 @@
+# Asegura que los scripts de shell SIEMPRE se hagan checkout con finales de
+# línea LF, incluso en clones Windows con core.autocrlf=true. De lo contrario
+# los CRLF rompen los scripts al montarlos en los contenedores Linux
+# (p. ej. scripts/pull_models.sh en el init de Ollama).
+*.sh text eol=lf
+*.bash text eol=lf

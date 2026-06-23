@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # scripts/pull_models.sh
-set -euo pipefail
+# POSIX sh (se ejecuta con /bin/sh en la imagen curlimages/curl, busybox).
+set -eu
 
 API="http://ollama:11434"
 MAX_RETRIES=30
@@ -22,15 +23,14 @@ echo "Ollama disponible"
 echo ""
 echo "Descargando modelos..."
 
-# 👇AÑADIR: función helper para descargas con retry
+# Helper para descargas con retry (idempotente: si el modelo ya existe, /api/pull responde OK).
 pull_model() {
-  local model=$1
+  model=$1
   echo "  • Descargando $model..."
-  
-  # Retry loop por si falla la descarga
-  local pull_retries=0
-  local max_pull_retries=3
-  
+
+  pull_retries=0
+  max_pull_retries=3
+
   until curl -sf -X POST "${API}/api/pull" -d "{\"name\": \"${model}\"}" >/dev/null 2>&1; do
     pull_retries=$((pull_retries + 1))
     if [ $pull_retries -ge $max_pull_retries ]; then
@@ -40,7 +40,7 @@ pull_model() {
     echo "    Reintentando descarga $pull_retries/$max_pull_retries..."
     sleep 5
   done
-  
+
   echo "   $model descargado"
   return 0
 }
@@ -64,12 +64,7 @@ echo "o usar temporalmente qwen2.5:32b-instruct-q4_K_M como modelo principal."
 echo ""
 echo "Todos los modelos listos"
 
-# Listar modelos disponibles
+# Listar modelos disponibles (sin python3, que no existe en la imagen curlimages/curl)
 echo ""
 echo "Modelos disponibles:"
-curl -sf "${API}/api/tags" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for m in data.get('models', []):
-    print(f\"  • {m['name']}\")
-"
+curl -sf "${API}/api/tags" 2>/dev/null | grep -o '"name":"[^"]*"' | sed 's/"name":"/  • /; s/"$//' || true
