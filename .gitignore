@@ -163,21 +163,13 @@ memoria/*.toc
 memoria/capitulos/*.aux
 
 # ============================================
-# ⚠️ ARCHIVOS QUE REQUIEREN REVISIÓN MANUAL
+# ℹ️ SANEAMIENTO DE DATOS SENSIBLES (HECHO)
 # ============================================
-# Estos archivos contienen IPs/URLs que podrían ser sensibles.
-# Revisar antes de subir y sanitizar si es necesario:
-#
-# - docs/TECHNICAL_ARCHITECTURE.md (contiene 10.0.0.41)
-# - docs/CHANGELOG.md (contiene 10.0.0.41)
-# - docs/STUDENT_GUIDE.md (menciona red 10.0.0.x)
-# - README.md (revisar ejemplos de configuración)
-# - PROJECT_DOCUMENTATION.md (email raiz@europavia.es)
-# - docker-compose.yml (email raiz@europavia.es)
-#
-# Recomendación: Reemplazar IPs reales por ejemplos como:
-#   10.0.0.41 → YOUR_SERVER_IP o 192.168.1.100
-#   raiz@europavia.es → admin@example.com
+# La documentación ya está sanitizada: no quedan IPs internas
+# (10.0.0.x) ni emails/dominios corporativos en archivos versionados.
+# Mantener esta política al añadir nueva documentación:
+#   IPs reales        → YOUR_SERVER_IP / 192.168.1.100
+#   emails internos   → admin@example.com
 # ============================================
 
 # LaTeX auxiliary files
