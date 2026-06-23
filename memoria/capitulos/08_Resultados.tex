@@ -28,6 +28,8 @@ Cache hit rate (Redis)            & $\sim 35$\% \\
 \end{tabular}
 \end{table}
 
+Conviene aclarar dos de estos indicadores. El \textit{TTFT} (\textit{Time To First Token}) es el tiempo que transcurre hasta que el usuario ve la primera palabra de la respuesta. La latencia \textit{p95} es el percentil 95: el valor por debajo del cual se resuelve el 95\% de las consultas; se usa en lugar de la media porque refleja mejor la experiencia en los peores casos habituales, no solo el caso promedio.
+
 \subsection{Análisis de Latencia}
 
 La latencia del sistema se descompone en los siguientes segmentos:

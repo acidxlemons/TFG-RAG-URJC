@@ -198,7 +198,7 @@ Un empleado del departamento de calidad necesita verificar un requisito específ
     \item Escribe: ``¿Cuáles son los requisitos para la auditoría interna según el manual de calidad?''
     \item El sistema detecta la intención RAG, busca en los documentos del departamento de calidad y responde con los requisitos específicos extraídos del manual, incluyendo referencias a la sección y página del documento original.
     \item El empleado pregunta: ``¿Y cada cuánto tiempo se debe realizar?''
-    \item El sistema, en modo \textit{sticky}, mantiene el contexto RAG y responde con la periodicidad especificada en el documento.
+    \item El sistema aplica el \textit{sticky mode} ---mantiene automáticamente el modo de la consulta anterior ante preguntas de seguimiento breves---, conserva el contexto RAG y responde con la periodicidad especificada en el documento.
 \end{enumerate}
 
 \subsection{Escenario 2: Análisis de una normativa del BOE}

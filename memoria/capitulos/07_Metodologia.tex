@@ -158,7 +158,7 @@ Proxy Inverso       & NGINX        & Alpine \\
 % ============================================================
 Para la correcta organización del proyecto se utilizó el sistema de control de versiones Git, alojando el repositorio principal en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}}. El seguimiento de incidencias, errores y nuevas características se realizó mediante trabajo por ramas, separando el código estable del trabajo en progreso.
 
-El entorno de desarrollo integrado (IDE) empleado primordialmente fue Visual Studio Code en Windows, acoplado al subsistema WSL o contenedores Docker en remoto para igualar la paridad funcional con el entorno de despliegue real Linux, evitando fricciones a nivel de sistema de archivos o librerías específicas compiladas para CUDA/NVIDIA.
+El entorno de desarrollo integrado (IDE) empleado primordialmente fue Visual Studio Code en Windows, acoplado al subsistema WSL (\textit{Windows Subsystem for Linux}) o a contenedores Docker en remoto para igualar la paridad funcional con el entorno de despliegue real Linux, evitando fricciones a nivel de sistema de archivos o librerías específicas compiladas para CUDA/NVIDIA.
 
 \subsection{Integración Continua con GitHub Actions}
 Se configuró un flujo de integración continua (CI) mediante GitHub Actions \cite{githubActions2026docs} para automatizar el despliegue de la documentación del proyecto en GitHub Pages. Cada vez que se realiza un \textit{push} a la rama \texttt{main}, el workflow compila y publica automáticamente la landing page del proyecto, accesible públicamente en \url{https://acidxlemons.github.io/TFG-RAG-URJC/}.
