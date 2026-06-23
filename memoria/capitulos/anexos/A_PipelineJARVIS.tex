@@ -1,0 +1,151 @@
+\chapter{Detalle de implementación del Pipeline JARVIS}
+\label{anexo:pipeline}
+
+Este anexo recoge el detalle de implementación del Pipeline JARVIS que se resume en el Capítulo~\ref{cap:implementacion}. Se incluye aquí el contrato de la clase, el método \texttt{pipe()}, el sistema \textit{Valves} y los mecanismos de sesión y control de acceso, para no recargar el cuerpo principal con fragmentos de código extensos.
+
+% ============================================================
+\section{Contrato de la Clase Pipeline}
+\label{anexo:contrato-pipeline}
+% ============================================================
+
+El Pipeline se implementa como una clase Python que debe cumplir un contrato específico que OpenWebUI espera:
+
+\begin{lstlisting}[language=Python, caption={Estructura del Pipeline JARVIS.}]
+class Pipeline:
+    class Valves(BaseModel):
+        BACKEND_URL: str = "http://rag-backend:8000"
+        LITELLM_URL: str = "http://litellm:4000"
+        TEXT_MODEL: str = "JARVIS"
+        VISION_MODEL: str = "qwen2.5vl"
+        DEPARTMENT_MAPPING: Dict[str, str] = {
+            "CIVEX2": "documents_CIVEX2",
+        }
+        DEFAULT_COLLECTION: str = "documents"
+
+    def __init__(self):
+        self.name = "JARVIS"
+        self.id = "jarvis"
+        self.valves = self.Valves()
+        # Memoria de sesion por usuario
+        self._user_image_memory: Dict[str, str] = {}
+        self._user_web_memory: Dict[str, Dict] = {}
+
+    async def on_startup(self):
+        logger.info("Starting JARVIS")
+
+    async def on_shutdown(self):
+        logger.info("Shutting down JARVIS")
+
+    def pipe(self, user_message, model_id, messages, body):
+        # HOOK PRINCIPAL: toda la logica del sistema
+        intent = self._detect_intent(user_message, body, messages)
+        action = intent["action"]
+        # ... encaminamiento a subsistemas ...
+\end{lstlisting}
+
+% ============================================================
+\section{El Método \texttt{pipe()}: Corazón del Sistema}
+\label{anexo:metodo-pipe}
+% ============================================================
+
+El método \texttt{pipe()} es el punto de entrada de toda la lógica del sistema. Recibe cuatro parámetros:
+
+\begin{itemize}
+    \item \texttt{user\_message} (\texttt{str}): El texto del mensaje del usuario.
+    \item \texttt{model\_id} (\texttt{str}): El identificador del modelo seleccionado (``jarvis'').
+    \item \texttt{messages} (\texttt{List[Dict]}): El historial completo de la conversación actual, con mensajes del usuario y del asistente.
+    \item \texttt{body} (\texttt{Dict}): Metadatos de la petición, incluyendo el objeto \texttt{user} con email, nombre, rol y grupos del usuario autenticado, así como archivos e imágenes adjuntos.
+\end{itemize}
+
+El método utiliza la palabra clave \texttt{yield} de Python para devolver la respuesta en modo streaming. En lugar de esperar a que se genere la respuesta completa, el Pipeline va devolviendo fragmentos de texto a medida que están disponibles. OpenWebUI recibe estos fragmentos y los muestra progresivamente en la interfaz:
+
+\begin{lstlisting}[language=Python, caption={Ejemplo de respuesta streaming en el Pipeline.}]
+def pipe(self, user_message, model_id, messages, body):
+    intent = self._detect_intent(user_message, body, messages)
+    action = intent["action"]
+
+    if action == "rag":
+        yield "Buscando en documentos internos...\n\n"
+        response = self._call_backend_chat(
+            user_message, "rag", user_data
+        )
+        yield response["content"]
+        yield "\n\n---\n### Fuentes:\n"
+        for source in response["sources"]:
+            yield f"- {source['filename']} (p.{source['page']})\n"
+
+    elif action == "web_search":
+        yield "Buscando en internet...\n\n"
+        # ... logica de busqueda web ...
+
+    elif action == "chat":
+        # Conversacion directa con LLM
+        # ...
+\end{lstlisting}
+
+% ============================================================
+\section{Sistema Valves: Configuración Dinámica}
+\label{anexo:valves}
+% ============================================================
+
+La clase anidada \texttt{Valves} hereda de \texttt{Pydantic BaseModel} y define todos los parámetros configurables del Pipeline. La particularidad es que OpenWebUI detecta automáticamente esta clase y expone sus campos como formulario editable en la interfaz de administración. Esto significa que un administrador puede modificar la URL del backend, cambiar el modelo de texto, añadir departamentos al mapeo o activar/desactivar el modo de depuración directamente desde el navegador, sin editar código ni reiniciar servicios.
+
+Los parámetros configurados como Valves incluyen:
+
+\begin{itemize}
+    \item \texttt{BACKEND\_URL}: URL del servicio Backend FastAPI.
+    \item \texttt{LITELLM\_URL}: URL del proxy LiteLLM.
+    \item \texttt{TEXT\_MODEL}: Modelo de texto por defecto.
+    \item \texttt{VISION\_MODEL}: Modelo de visión para análisis de imágenes.
+    \item \texttt{DEPARTMENT\_MAPPING}: Diccionario que mapea grupos de Azure AD a colecciones de Qdrant.
+    \item \texttt{DEFAULT\_COLLECTION}: Colección por defecto para usuarios sin grupo específico.
+    \item \texttt{PERMISSION\_CACHE\_TTL}: Tiempo de vida de la caché de permisos.
+    \item \texttt{INDEXER\_URL}: URL del servicio Indexer para consultas de estado.
+    \item \texttt{DEBUG\_MODE}: Activar/desactivar logs detallados.
+\end{itemize}
+
+% ============================================================
+\section{Sticky Mode: Persistencia de Contexto}
+\label{anexo:sticky-mode}
+% ============================================================
+
+Una característica avanzada del encaminador es el \textit{Sticky Mode}: cuando un usuario está inmerso en una conversación RAG y formula una pregunta de seguimiento breve (``¿Y las fechas?'', ``Dime más''), el sistema detecta que la pregunta anterior era de tipo RAG y mantiene el mismo modo, evitando que keywords ambiguos como ``fechas'' o ``resultados'' desvíen la consulta al modo de búsqueda web.
+
+\begin{lstlisting}[language=Python, caption={Implementación del Sticky Mode.}]
+# Si el mensaje es corto y ambiguo,
+# mirar de que hablaba la pregunta anterior
+if msg_len < 25 and is_ambiguous and messages:
+    last_user_msg = messages[-2].get("content", "").lower()
+    was_rag = any(kw in last_user_msg for kw in rag_keywords)
+    if was_rag:
+        logger.info("Sticky Mode: Reusing RAG intent")
+        return {"action": "rag", "metadata": {}}
+\end{lstlisting}
+
+% ============================================================
+\section{Memoria de Sesión por Usuario}
+\label{anexo:memoria-sesion}
+% ============================================================
+
+JARVIS mantiene tres estructuras de estado en memoria para cada usuario, identificado por su dirección de correo electrónico:
+
+\begin{itemize}
+    \item \texttt{\_user\_image\_memory}: Almacena la última imagen enviada en formato Base64, permitiendo preguntas de seguimiento sin reenviar la imagen.
+    \item \texttt{\_user\_web\_memory}: Retiene el contenido extraído de la última URL analizada, habilitando consultas contextuales sobre la página.
+    \item \texttt{\_user\_pending\_decision}: Gestiona decisiones pendientes cuando el sistema detecta que una URL ya fue indexada previamente y ofrece al usuario la opción de reutilizar el contenido existente o volver a scrapearla.
+\end{itemize}
+
+% ============================================================
+\section{Control de Acceso Departamental}
+\label{anexo:control-acceso}
+% ============================================================
+
+El Pipeline integra un sistema de permisos multi-departamento que segmenta el acceso a las colecciones vectoriales según los grupos de Azure Active Directory del usuario. El flujo es:
+
+\begin{enumerate}
+    \item Al recibir una petición, JARVIS extrae los grupos del objeto \texttt{user\_data} proporcionado por OpenWebUI.
+    \item Si los grupos no están disponibles en \texttt{user\_data}, JARVIS consulta directamente la API de Microsoft Graph para obtener los grupos del usuario mediante el flujo de credenciales de cliente.
+    \item Los grupos se mapean a colecciones de Qdrant mediante el diccionario configurable \texttt{DEPARTMENT\_MAPPING}.
+    \item Las colecciones autorizadas se envían al Backend en la cabecera HTTP \texttt{X-Tenant-Ids}, que filtra la búsqueda vectorial a solo los documentos permitidos.
+    \item Los permisos se cachean durante 300 segundos (configurable) para minimizar llamadas a Graph API.
+\end{enumerate}

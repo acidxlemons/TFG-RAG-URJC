@@ -1,0 +1,144 @@
+\chapter{Evolución de modelos y diagrama tecnológico}
+\label{anexo:evolucion}
+
+Este anexo recoge la trayectoria completa de selección del LLM principal y el diagrama general de tecnologías, ambos resumidos en el Capítulo~\ref{cap:tecnologias}.
+
+% ============================================================
+\section{Evolución del modelo principal: trayectoria de cuatro etapas}
+\label{anexo:evolucion-modelos}
+% ============================================================
+
+El sistema no llegó al modelo de producción actual en un único paso. La elección del LLM evolucionó a lo largo del proyecto en cuatro etapas, cada una motivada por limitaciones reales detectadas durante el uso en el entorno corporativo.
+
+\begin{table}[H]
+\centering
+\caption{Trayectoria completa de LLMs empleados en el proyecto, desde el prototipo hasta producción.}
+\label{tab:evolucion-modelos}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{clllcl}
+\toprule
+\textbf{Etapa} & \textbf{Modelo} & \textbf{Período} & \textbf{Contexto} & \textbf{VRAM} & \textbf{Razón del cambio} \\
+\midrule
+1 & \texttt{llama3.1:8b-instruct-q4\_0}  & Oct 2025 (Sprint~1) & 4\,K  & $\sim$5\,GB & Calidad de respuesta insuficiente (Q4) \\
+2 & \texttt{llama3.1:8b-instruct-q8\_0}  & Nov--Dic 2025       & 4\,K  & $\sim$8\,GB & Contexto 4\,K y español limitados; generación repetitiva \\
+3 & Qwen 2.5 14B (base)                   & Dic 2025 (evaluación) & 32\,K & $\sim$8\,GB & \textit{Model loop}: tokens de parada incompatibles \\
+4 & \texttt{rag-qwen-ft:latest} (LoRA FT) & Dic 2025 -- actualidad & 32\,K & $\sim$8\,GB & \textbf{Modelo en producción (TFG y sistema empresarial)} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\paragraph{Etapa 1 --- Llama 3.1 8B Q4 (prototipo rápido, octubre 2025).}
+La cuantización Q4 (4 bits) reducía el consumo de VRAM a $\sim$5\,GB, lo que facilitaba pruebas ágiles sobre el hardware disponible. Sin embargo, la calidad de las respuestas en español era notablemente inferior a la de variantes de mayor precisión, y las respuestas largas perdían coherencia con frecuencia.
+
+\paragraph{Etapa 2 --- Llama 3.1 8B Q8 (prototipo de mayor calidad, noviembre--diciembre 2025).}
+La migración a la variante Q8 (8 bits) mejoró la precisión de forma apreciable. Durante las primeras semanas de uso real en el entorno corporativo se identificaron dos limitaciones estructurales: la ventana de contexto de 4\,K tokens era insuficiente para consultas RAG con múltiples fragmentos documentales ---los fragmentos más alejados se truncaban antes de que el modelo pudiera considerarlos--- y el rendimiento en español continuaba siendo inferior al esperado para un asistente empresarial hispanohablante.
+
+\paragraph{Etapa 3 --- Qwen 2.5 14B base (evaluación, diciembre 2025).}
+La familia Qwen~2.5, desarrollada por Alibaba Cloud, ofrecía ventana de contexto de 32\,K tokens y mejor rendimiento en español. Sin embargo, durante la integración se detectó un problema técnico crítico: el modelo generaba respuestas sin fin (\textit{model loop}). La causa era una incompatibilidad en los \textit{tokens de parada}: mientras Llama~3.1 utiliza \texttt{</s>} para indicar el fin de la respuesta, el formato ChatML de Qwen~2.5 emplea \texttt{<|im\_end|>}. Fue necesario reconstruir el Modelfile de Ollama declarando explícitamente los stop tokens correctos antes de poder usar el modelo de forma fiable.
+
+\paragraph{Etapa 4 --- rag-qwen-ft:latest con LoRA (producción, diciembre 2025 -- actualidad).}
+Resuelto el problema de los stop tokens, se realizó el ajuste fino con LoRA sobre la documentación corporativa del proyecto. El adaptador resultante, \texttt{rag-qwen-ft:latest}, concentra el vocabulario interno, la terminología procedimental y el estilo de respuesta esperado en el entorno de destino. Este modelo es el que está en producción en los dos sistemas derivados del TFG: en la versión académica bajo el alias \textbf{JARVIS} y en el sistema empresarial desplegado en piloto bajo el alias \textbf{europav-IA} \cite{qwen2024qwen25blog,hu2021lora}.
+
+% ============================================================
+\section{Diagrama de flujo de tecnologías usadas}
+\label{anexo:diagrama-flujo}
+% ============================================================
+
+La Figura~\ref{fig:flujo-tecnologias} resume cómo se conectan las tecnologías principales del sistema. No representa únicamente el recorrido de una consulta, sino también los componentes de soporte que permiten que el sistema funcione en un entorno real: autenticación, almacenamiento, caché y monitorización.
+
+\begin{landscape}
+\thispagestyle{empty}
+\vspace*{\fill}
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.985\linewidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={draw, rounded corners=5pt, minimum width=3.15cm, minimum height=1.05cm, align=center, inner sep=5pt},
+    own/.style={box, fill=blue!11, draw=blue!60!black},
+    ext/.style={box, fill=green!10, draw=green!45!black},
+    infra/.style={box, fill=yellow!18, draw=yellow!45!black},
+    flow/.style={-Latex, line width=1pt, draw=black!70},
+    support/.style={-Latex, dashed, line width=0.9pt, draw=black!55},
+    group/.style={draw, rounded corners=8pt, line width=0.8pt, inner sep=14pt},
+    grouplabel/.style={font=\bfseries\small, anchor=west, fill=white, inner sep=2pt}
+]
+\node[ext]   (user)       at (0.0,1.8)   {Usuario};
+\node[ext]   (nginx)      at (0.0,0.0)   {NGINX\\Entrada HTTPS};
+\node[ext]   (ui)         at (0.0,-1.8)  {OpenWebUI\\Interfaz};
+\node[ext]   (auth)       at (3.4,0.9)   {Azure AD / MSAL\\SSO};
+\node[ext]   (postgres)   at (3.4,-2.6)  {PostgreSQL\\Chats};
+\node[own]   (pipeline)   at (6.2,-1.0)  {Pipeline JARVIS\\Encaminador};
+
+\node[own]   (backend)    at (10.4,1.4)  {Backend RAG\\FastAPI};
+\node[own]   (indexer)    at (10.4,-1.0) {Indexer\\FastAPI};
+\node[own]   (boe)        at (10.4,-3.5) {Servidor MCP\\BOE};
+
+\node[ext]   (litellm)    at (14.7,2.4)  {LiteLLM\\Proxy};
+\node[ext]   (ollama)     at (18.6,2.4)  {Ollama\\LLMs locales};
+\node[ext]   (redis)      at (14.7,0.6)  {Redis\\Caché};
+\node[ext]   (qdrant)     at (14.7,-1.2) {Qdrant\\Base vectorial};
+\node[ext]   (minio)      at (18.6,-1.2) {MinIO\\Documentos};
+\node[ext]   (sharepoint) at (14.7,-3.7) {SharePoint\\Graph API};
+\node[ext]   (web)        at (18.6,-3.7) {Playwright +\\Trafilatura};
+\node[ext]   (ocr)        at (22.5,-3.7) {PaddleOCR\\OCR};
+
+\node[infra] (dcgm)       at (12.5,-6.3) {NVIDIA DCGM\\GPU exporter};
+\node[infra] (prom)       at (16.4,-6.3) {Prometheus\\Métricas};
+\node[infra] (grafana)    at (20.3,-6.3) {Grafana\\Paneles};
+
+\draw[flow]    (user.south) -- (nginx.north);
+\draw[flow]    (nginx.south) -- (ui.north);
+\draw[support] (auth.south west) -- ++(-0.5,-0.55) |- (ui.east);
+\draw[support] (ui.east) -- (postgres.west);
+\draw[flow]    (ui.east) to[out=0,in=180] (pipeline.west);
+
+\draw[flow]    (pipeline.north east) -- ++(0.55,0.20) |- (backend.west);
+\draw[flow]    (pipeline.east) -- (indexer.west);
+\draw[flow]    (pipeline.south east) -- ++(0.55,-0.20) |- (boe.west);
+
+\draw[flow]    (backend.east) -- (litellm.west);
+\draw[flow]    (litellm.east) -- (ollama.west);
+\draw[support] (litellm.south) -- (redis.north);
+\draw[flow]    (backend.east) to[out=-12,in=180] (qdrant.west);
+
+\draw[flow]    (indexer.east) to[out=-4,in=180] (qdrant.west);
+\draw[flow]    (indexer.east) to[out=-12,in=180] (minio.west);
+\draw[flow]    (indexer.east) to[out=-22,in=180] (sharepoint.west);
+\draw[flow]    (indexer.east) to[out=-30,in=180] (web.west);
+\draw[flow]    (indexer.east) to[out=-36,in=180] (ocr.west);
+
+\draw[support] (backend.south) to[out=-75,in=145] (prom.north);
+\draw[support] (dcgm.east) -- (prom.west);
+\draw[support] (prom.east) -- (grafana.west);
+
+\begin{pgfonlayer}{background}
+    \node[group, draw=green!45!black, fill=green!6, fit=(user)(nginx)(ui)(auth)(postgres)] (group-access) {};
+    \node[group, draw=blue!60!black, fill=blue!5, fit=(pipeline)(backend)(indexer)(boe)] (group-own) {};
+    \node[group, draw=green!45!black, fill=green!5, fit=(litellm)(ollama)(redis)(qdrant)(minio)(sharepoint)(ocr)(web)] (group-ext) {};
+    \node[group, draw=yellow!45!black, fill=yellow!8, fit=(dcgm)(prom)(grafana)] (group-obs) {};
+\end{pgfonlayer}
+
+\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-access.north west) {Acceso e interfaz};
+\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-own.north west) {Lógica propia del TFG};
+\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-ext.north west) {Servicios externos e integraciones};
+\node[grouplabel] at ([xshift=0.35cm,yshift=-0.2cm]group-obs.north west) {Observabilidad};
+\end{tikzpicture}%
+}
+\vspace{0.8em}
+\begin{tikzpicture}[baseline=(current bounding box.center)]
+    \draw[-Latex, line width=1pt, draw=black!70] (0,0) -- (1.0,0);
+    \node[anchor=west,font=\footnotesize] at (1.15,0) {flujo principal};
+    \draw[-Latex, dashed, line width=0.9pt, draw=black!55] (4.9,0) -- (5.9,0);
+    \node[anchor=west,font=\footnotesize] at (6.05,0) {soporte transversal};
+\end{tikzpicture}
+\vspace{0.4em}
+\caption{Diagrama general de las tecnologías utilizadas en el sistema. La disposición apaisada separa el flujo de consulta, la lógica propia del TFG, las integraciones externas y la capa de observabilidad en bloques legibles.}
+\label{fig:flujo-tecnologias}
+\end{minipage}
+\end{figure}
+\vspace*{\fill}
+\end{landscape}

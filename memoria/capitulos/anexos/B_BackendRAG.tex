@@ -1,0 +1,138 @@
+\chapter{Detalle del Backend RAG y el procesamiento documental}
+\label{anexo:backend}
+
+Este anexo amplía el motor de búsqueda y el procesamiento documental descritos en el Capítulo~\ref{cap:implementacion}: la ingesta paso a paso, la búsqueda híbrida con sus modelos concretos, la construcción del \textit{prompt}, la extracción web, el OCR y los mecanismos de seguridad del agente SQL.
+
+% ============================================================
+\section{Pipeline de Ingesta Documental}
+\label{anexo:ingesta}
+% ============================================================
+
+El proceso de ingesta de un documento sigue las siguientes etapas:
+
+\begin{enumerate}
+    \item Recepción: El documento llega al backend vía API REST (carga manual), vía Indexer (sincronización SharePoint) o vía scraper (extracción web).
+
+    \item Detección de tipo: Se intenta extraer texto directamente del PDF con \texttt{pdfplumber}. Si el texto extraído es insuficiente ($<100$ caracteres por página), se asume que el documento es escaneado y se redirige al motor OCR.
+
+    \item Extracción de texto: Para PDFs nativos se usa \texttt{pdfplumber}; para escaneados, PaddleOCR con aceleración GPU; para HTML, la cadena Trafilatura $\rightarrow$ Readability $\rightarrow$ BeautifulSoup.
+
+    \item Chunking semántico: El texto extraído se segmenta en fragmentos de 512--1024 tokens con un solapamiento del 10--15\% entre fragmentos consecutivos. El solapamiento es fundamental para no perder el hilo semántico de párrafos que cruzan los límites de ventana.
+
+    \item Generación de embeddings: Cada fragmento se transforma en un vector denso de 384 dimensiones mediante el modelo \path{paraphrase-multilingual-MiniLM-L12-v2} de SentenceTransformers, ejecutado en CPU para evitar conflictos de VRAM con los modelos de generación.
+
+    \item Almacenamiento en Qdrant: Los vectores se almacenan en la colección correspondiente de Qdrant junto con un payload de metadatos que incluye el texto original, nombre de fichero, página, índice de chunk, fuente, marca temporal y tenant\_id.
+\end{enumerate}
+
+% ============================================================
+\section{Búsqueda Híbrida: modelos densos, dispersos y reranker}
+\label{anexo:busqueda-hibrida}
+% ============================================================
+
+La recuperación de contexto para consultas RAG combina tres etapas complementarias:
+
+\begin{enumerate}
+    \item \textbf{Búsqueda densa (HNSW)}: La consulta del usuario se transforma en un embedding de 384 dimensiones con \texttt{paraphrase-multilingual-MiniLM-L12-v2} y se buscan los fragmentos más próximos en el espacio vectorial mediante el índice HNSW de Qdrant.
+
+    \item \textbf{Búsqueda dispersa (BM25)}: Se complementa con búsqueda léxica mediante vectores dispersos generados con el modelo \texttt{Qdrant/bm25} (a través de la librería \texttt{fastembed}). Favorece coincidencias exactas de términos —identificadores, códigos de documento, siglas o artículos legales— que la búsqueda semántica podría no capturar con precisión.
+
+    \item \textbf{Reordenación (reranking)}: Los candidatos de ambas búsquedas se fusionan eliminando duplicados y se reordenan con un \textit{Cross-Encoder} (\texttt{cross-encoder/ms-marco-MiniLM-L-6-v2}, implementado en \texttt{core/rag/reranker.py}). A diferencia de los embeddings —que codifican consulta y documento por separado—, el Cross-Encoder evalúa el par (consulta, fragmento) conjuntamente, lo que produce una puntuación de relevancia más precisa. El reranker dispone de \textit{fallback} automático a CPU si la GPU no está disponible.
+\end{enumerate}
+
+Tras el reranking se seleccionan los $k$ fragmentos más relevantes (típicamente $k=5$, ajustado dinámicamente por el \texttt{QueryProcessor} según la intención de la consulta).
+
+% ============================================================
+\section{Construcción del Prompt Contextual}
+\label{anexo:prompt}
+% ============================================================
+
+El prompt que se envía al LLM se estructura en tres partes:
+
+\begin{lstlisting}[language=Python, caption={Estructura del prompt RAG.}]
+system_prompt = """Eres un asistente corporativo.
+Responde UNICAMENTE basandote en el contexto proporcionado.
+Si la informacion no esta en el contexto, di que no la tienes.
+NO inventes informacion."""
+
+context = "\n\n".join([
+    f"[{r.filename} | pagina {r.page} | score={r.score:.2f}]\n{r.text}"
+    for r in search_results
+])
+
+user_prompt = f"CONTEXTO:\n{context}\n\nPREGUNTA:\n{query}"
+\end{lstlisting}
+
+El \textit{system prompt} restrictivo, combinado con una temperatura de inferencia baja ($0.1$--$0.2$), elimina prácticamente las alucinaciones en modo RAG: el modelo solo puede responder con información que esté presente en los fragmentos recuperados.
+
+% ============================================================
+\section{Extracción Web: Scraping y Búsqueda en Internet}
+\label{anexo:scraping}
+% ============================================================
+
+\subsection{Motor de Renderizado con Playwright}
+
+El módulo de scraping utiliza Playwright para instanciar un navegador Chromium completo en modo \textit{headless}. A diferencia de soluciones basadas en peticiones HTTP simples, este enfoque permite renderizar páginas JavaScript complejas (React, Vue, Angular), ejecutar la carga diferida (\textit{lazy loading}), resolver redirecciones y consentimientos de cookies, y capturar el DOM final tras la ejecución de todos los scripts. El scraper incorpora rotación de \textit{User-Agent}, reintentos con retroceso exponencial y una espera inteligente configurable para SPA.
+
+\subsection{Cadena de Extracción con Fallback}
+
+Tras obtener el HTML renderizado, se aplica una cadena de extracción con tres estrategias de \textit{fallback}:
+
+\begin{enumerate}
+    \item Trafilatura: Algoritmo que extrae el contenido principal eliminando menús, cabeceras y publicidad. Se prioriza por su alta precisión.
+    \item Readability: Algoritmo basado en heurísticas de densidad de texto, comparable al modo lectura de los navegadores.
+    \item BeautifulSoup: Extracción cruda de todo el texto visible del DOM como última alternativa si las dos anteriores producen menos de 200 caracteres.
+\end{enumerate}
+
+\subsection{Búsqueda en Internet}
+
+El modo de búsqueda web utiliza la librería \texttt{duckduckgo\_search} con un \textit{fallback} propio que realiza scraping HTML directo sobre el dominio \texttt{html.duckduckgo.com}. El sistema detecta automáticamente consultas que necesitan información fresca (noticias, precios, eventos) y enriquece el query con el año actual para obtener resultados actualizados.
+
+% ============================================================
+\section{Reconocimiento Óptico de Caracteres (OCR)}
+\label{anexo:ocr}
+% ============================================================
+
+El motor OCR PaddleOCR se integra en el servicio Indexer y se ejecuta con aceleración GPU. El procesamiento de varios documentos en paralelo se apoya en \textbf{Ray}, que reparte las tareas de OCR entre los \textit{workers} disponibles. La inicialización implementa un mecanismo de \textit{fallback} automático:
+
+\begin{lstlisting}[language=Python, caption={Inicialización de PaddleOCR con fallback GPU/CPU.}]
+try:
+    self.ocr = PaddleOCR(
+        use_angle_cls=True, lang="latin",
+        use_gpu=True, gpu_mem=500
+    )
+except Exception:
+    logger.warning("GPU no disponible, modo CPU")
+    self.ocr = PaddleOCR(
+        use_angle_cls=True, lang="latin",
+        use_gpu=False
+    )
+\end{lstlisting}
+
+Si la GPU no está disponible (fallo de driver, VRAM agotada), el motor se reinicia automáticamente en modo CPU sin intervención manual, garantizando la continuidad del servicio de ingesta.
+
+% ============================================================
+\section{Agente SQL: mecanismos de seguridad}
+\label{anexo:sql-agent}
+% ============================================================
+
+El agente NL$\rightarrow$SQL (\texttt{backend/app/core/sql\_agent.py}) sigue un flujo de tres pasos: inspección del esquema de PostgreSQL, generación de la consulta \texttt{SELECT} con LiteLLM, y ejecución con auto-corrección (hasta dos reintentos usando el mensaje de error como contexto). El acceso no autorizado o accidental a datos sensibles se previene mediante varias capas:
+
+\begin{lstlisting}[language=Python, caption={Validación de la consulta generada contra lista blanca.}]
+ALLOWED_PATTERN = re.compile(
+    r"^\s*(SELECT|WITH|EXPLAIN)\s",
+    re.IGNORECASE
+)
+
+def _validate_query(self, sql: str) -> bool:
+    if not ALLOWED_PATTERN.match(sql.strip()):
+        raise SecurityError("Solo se permiten consultas SELECT")
+    for forbidden in ["DROP", "DELETE", "INSERT",
+                       "UPDATE", "TRUNCATE"]:
+        if forbidden in sql.upper():
+            raise SecurityError(
+                f"Operacion prohibida detectada: {forbidden}"
+            )
+    return True
+\end{lstlisting}
+
+Adicionalmente, las consultas se ejecutan con un \textit{timeout} configurable para prevenir consultas costosas que saturen la base de datos. El endpoint unificado \texttt{POST /api/v1/query} (\texttt{backend/app/api/query.py}) enruta automáticamente entre el pipeline RAG y el agente SQL según patrones de la consulta (``cuántos'', ``total de'', ``promedio de'' frente a búsqueda documental), de forma transparente para el usuario.

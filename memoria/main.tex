@@ -21,7 +21,7 @@
 \usepackage{setspace}
 \onehalfspacing
 \emergencystretch=2em
-\raggedbottom
+\flushbottom
 \setlength{\parindent}{1.25em}
 \setlength{\parskip}{0pt}
 \clubpenalty=10000
@@ -94,9 +94,9 @@
 \titlespacing*{\subsection}{0pt}{2.2ex plus 0.6ex minus 0.2ex}{0.8ex}
 \titlespacing*{\subsubsection}{0pt}{1.8ex plus 0.4ex minus 0.2ex}{0.6ex}
 
-\pretocmd{\section}{\needspace{8\baselineskip}}{}{}
-\pretocmd{\subsection}{\needspace{6\baselineskip}}{}{}
-\pretocmd{\subsubsection}{\needspace{5\baselineskip}}{}{}
+\pretocmd{\section}{\needspace{3\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{2\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\needspace{2\baselineskip}}{}{}
 
 \newcommand{\modebadge}[2]{%
     \begingroup
@@ -146,6 +146,16 @@
 \include{capitulos/07_Metodologia}
 \include{capitulos/08_Resultados}
 \include{capitulos/09_Conclusiones}
+
+% ==========================================
+% ANEXOS
+% ==========================================
+\appendix
+\include{capitulos/anexos/A_PipelineJARVIS}
+\include{capitulos/anexos/B_BackendRAG}
+\include{capitulos/anexos/C_IntegracionesSeguridad}
+\include{capitulos/anexos/D_FineTuning}
+\include{capitulos/anexos/E_EvolucionModelos}
 
 \backmatter
 

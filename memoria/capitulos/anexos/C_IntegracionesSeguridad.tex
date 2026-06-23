@@ -1,0 +1,74 @@
+\chapter{Integraciones, seguridad y observabilidad en detalle}
+\label{anexo:integraciones}
+
+Este anexo amplía las integraciones externas, las capas de seguridad y el stack de observabilidad resumidos en el Capítulo~\ref{cap:implementacion}.
+
+% ============================================================
+\section{Integración con Microsoft SharePoint}
+\label{anexo:sharepoint}
+% ============================================================
+
+El módulo Indexer funciona como un servicio autónomo (\textit{worker}) que ejecuta un ciclo de sincronización periódica cada 5 minutos.
+
+\paragraph{Autenticación MSAL.} La conexión con SharePoint se realiza mediante OAuth 2.0 con flujo de credenciales de cliente (\textit{Client Credentials Flow}). El servicio obtiene un token de acceso del \textit{tenant} de Azure AD mediante la librería MSAL y utiliza la API REST de Microsoft Graph \cite{msgraph2024docs} para listar y descargar ficheros.
+
+\paragraph{Sincronización delta incremental.} Para evitar reprocesar documentos ya ingeridos, el Indexer consulta la marca temporal de modificación de cada fichero en SharePoint y la compara con los registros almacenados en PostgreSQL. Solo los ficheros nuevos o modificados se descargan, procesan e indexan. Esta estrategia reduce drásticamente el consumo de red y GPU en ciclos de sincronización recurrentes.
+
+% ============================================================
+\section{Resolución Semántica de Leyes (BOE)}
+\label{anexo:boe}
+% ============================================================
+
+Para consultas como ``Resume la Ley de Protección de Datos'', el sistema implementa un mecanismo que mapea nombres coloquiales a identificadores oficiales del BOE:
+
+\begin{lstlisting}[language=Python, caption={Mapeo semántico de nombres de leyes.}]
+LAW_MAPPINGS = {
+    "proteccion de datos": "BOE-A-2018-16673",
+    "constitucion": "BOE-A-1978-31229",
+    "propiedad intelectual": "BOE-A-1996-8930",
+    "igualdad": "BOE-A-2007-6115",
+}
+\end{lstlisting}
+
+El resolvedor elimina palabras vacías comunes del español (``la'', ``de'', ``del'', ``ley'') y busca coincidencias parciales en el diccionario antes de acudir al endpoint de búsqueda general del BOE.
+
+En el alcance actual, el servidor MCP se ha validado en ejecución por terminal con un LLM y un cliente MCP compatible. Aunque OpenWebUI ya incorpora soporte MCP en versiones recientes \cite{openwebuiMcp2026}, la funcionalidad BOE dentro de la interfaz web se integra mediante llamadas a API directas desde el pipeline JARVIS. Esta decisión permitió mantener un mayor control sobre autenticación, encaminamiento y trazabilidad durante el desarrollo, dejando preparada la migración a MCP como evolución posterior.
+
+% ============================================================
+\section{Validación JWT en el Backend}
+\label{anexo:jwt}
+% ============================================================
+
+Además de la autenticación perimetral de OpenWebUI vía OIDC, el Backend implementa una segunda capa de validación directa de tokens JWT para clientes externos y herramientas MCP que llaman a los endpoints sin pasar por la interfaz web. La lógica, implementada en \texttt{backend/app/core/auth.py}, sigue el flujo estándar de validación de tokens Bearer de Azure AD:
+
+\begin{enumerate}
+    \item El backend descarga dinámicamente el conjunto de claves públicas del \textit{tenant} corporativo desde el endpoint JWKS de Azure AD.
+    \item Las claves se cachean en memoria para evitar latencia en peticiones sucesivas.
+    \item Cada token JWT recibido en la cabecera \texttt{Authorization: Bearer} se verifica criptográficamente contra esas claves.
+    \item Los grupos del usuario extraídos del token se mapean a colecciones de Qdrant autorizadas.
+    \item Si el token no es válido o el usuario carece de acceso a alguna colección, el backend devuelve \texttt{HTTP 403 Forbidden} antes de ejecutar ninguna búsqueda.
+\end{enumerate}
+
+Esta funcionalidad se activa con la variable de entorno \texttt{AZURE\_JWT\_VALIDATION=true} y es completamente transparente para los clientes que ya utilizan el flujo SSO de OpenWebUI.
+
+\paragraph{Aislamiento de red.} Toda la malla de servicios convive dentro de un plano interno \texttt{rag-network}, una red Docker de tipo \textit{bridge}. Servicios como PostgreSQL (5432), Redis (6379), Qdrant (6333) y Ollama (11434) no son accesibles desde fuera del servidor bajo ninguna circunstancia, eliminando vectores de ataque sobre estas bases de datos.
+
+% ============================================================
+\section{Métricas, telemetría GPU y dashboards}
+\label{anexo:observabilidad}
+% ============================================================
+
+\paragraph{Métricas personalizadas en el backend.} El backend FastAPI expone métricas en formato Prometheus a través del endpoint \texttt{/metrics}: contador de peticiones HTTP (por endpoint, método y código), histograma de latencia (para calcular p50, p95, p99), distribución de modos de operación (RAG, chat, web, scraping, OCR, BOE) y tasa de errores por tipo.
+
+\paragraph{Telemetría GPU con NVIDIA DCGM Exporter.} Captura consumo de VRAM, utilización de CUDA cores, temperatura del chip y potencia consumida. Estas métricas resultaron críticas para determinar qué combinaciones de modelos podían coexistir en la VRAM disponible y cuándo recurrir a cuantizaciones más agresivas (Q4 en lugar de Q8).
+
+\paragraph{Dashboards en Grafana.} Se diseñaron tres dashboards interactivos:
+\begin{enumerate}
+    \item Dashboard de Backend: latencia media y percentiles, throughput, tasa de errores, distribución de modos y tendencia de uso.
+    \item Dashboard de GPU: consumo de VRAM con alarmas de umbral (80\%), temperatura, utilización de cores y potencia.
+    \item Dashboard de Base de Datos: métricas de PostgreSQL (conexiones, queries/s) y de Qdrant (puntos indexados, latencia de búsqueda).
+\end{enumerate}
+
+\paragraph{Logs centralizados: Loki y Promtail.} Junto a las métricas, el sistema agrega los logs de todos los contenedores con \textbf{Promtail}, que los recolecta y los envía a \textbf{Loki}. Loki los indexa y los hace consultables desde el mismo Grafana, de modo que métricas y logs conviven en una única herramienta. Esto permite correlacionar un pico de latencia detectado en Prometheus con las líneas de log exactas de ese instante, acelerando el diagnóstico. La configuración reside en \texttt{config/promtail/config.yaml} y en el datasource \texttt{config/grafana/provisioning/datasources/loki.yml}.
+
+\paragraph{Impacto de la monitorización.} El stack de observabilidad condujo a decisiones concretas: se validó que $\sim$35\% de las consultas repetidas se beneficiaban de la caché Redis; se detectó que las consultas RAG con más de 5 fragmentos no mejoraban la calidad pero aumentaban la latencia (optimizando $k$); y se observó que PaddleOCR monopolizaba la GPU durante la ingesta, lo que motivó programarla en horarios de baja actividad.

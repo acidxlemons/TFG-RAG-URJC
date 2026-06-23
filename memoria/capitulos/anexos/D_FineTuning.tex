@@ -1,0 +1,30 @@
+\chapter{Fine-tuning con LoRA: procedimiento}
+\label{anexo:finetuning}
+
+Este anexo detalla el proceso de ajuste fino del modelo principal, resumido en el Capítulo~\ref{cap:implementacion}.
+
+% ============================================================
+\section{Generación del Dataset de Entrenamiento}
+% ============================================================
+
+Para adaptar el modelo base al dominio corporativo, se implementó un pipeline de generación automática de datos de entrenamiento. Un script extrae pares pregunta-respuesta directamente de los fragmentos indexados en Qdrant, utilizando un LLM base local como generador sintético de consultas plausibles.
+
+% ============================================================
+\section{Entrenamiento con Low-Rank Adaptation}
+% ============================================================
+
+El ajuste fino se realizó mediante LoRA, que inserta matrices de rango reducido ($r=8$) en las capas de atención del transformador sin modificar los pesos originales:
+
+\begin{equation}
+W' = W + \Delta W = W + BA
+\end{equation}
+
+donde $A \in \mathbb{R}^{r \times d}$ y $B \in \mathbb{R}^{k \times r}$ con $r \ll \min(d,k)$. Esto reduce el número de parámetros entrenables de millones a miles, haciendo viable el ajuste fino con una única GPU de consumo.
+
+% ============================================================
+\section{Resultado y Evaluación}
+% ============================================================
+
+El modelo resultante, \texttt{rag-qwen-ft:latest}, se registró en LiteLLM como el modelo primario para consultas RAG corporativas. En la versión académica del TFG se expone bajo el alias \textbf{JARVIS}; en el sistema empresarial derivado, desplegado en piloto desde diciembre de 2025, bajo el alias \textbf{europav-IA}. Ambos sistemas comparten el mismo modelo base y el mismo adaptador LoRA, lo que valida la portabilidad del enfoque de ajuste fino sobre documentación corporativa real.
+
+No obstante, se observó empíricamente que para tareas de RAG puras el \textit{fine-tuning} del LLM resultaba menos eficaz que un buen ajuste del \textit{prompt} combinado con un modelo de embeddings bien adaptado al dominio. La estrategia final del sistema descansa más sobre la calidad del contexto recuperado (chunking, embeddings, búsqueda híbrida, \textit{prompt} restrictivo) que sobre la modificación de los pesos del modelo generativo. El \textit{fine-tuning} sí aportó valor en la coherencia terminológica y en la adherencia al estilo de respuesta corporativo.

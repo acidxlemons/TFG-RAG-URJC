@@ -184,3 +184,5 @@ memoria/capitulos/*.aux
 *.toc
 *.run.xml
 *.synctex.gz
+*.fls
+*.fdb_latexmk

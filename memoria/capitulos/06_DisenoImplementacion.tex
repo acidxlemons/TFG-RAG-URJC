@@ -1,7 +1,7 @@
 \chapter{Diseño e Implementación}
 \label{cap:implementacion}
 
-Este capítulo constituye el núcleo técnico de mi Trabajo de Fin de Grado. Aquí describo cómo se ha construido el sistema, qué partes son desarrollo propio y qué partes reutilizan herramientas ya existentes, y cómo se han interconectado los distintos microservicios para convertir una colección de componentes sueltos en un asistente corporativo funcional. Acompaño la explicación con fragmentos de código reales extraídos del repositorio del proyecto.
+Este capítulo constituye el núcleo técnico de mi Trabajo de Fin de Grado. Aquí describo cómo se ha construido el sistema, qué partes son desarrollo propio y qué partes reutilizan herramientas ya existentes, y cómo se han interconectado los distintos microservicios para convertir una colección de componentes sueltos en un asistente corporativo funcional. Para no recargar la lectura, el detalle de implementación más extenso ---fragmentos de código, contratos de clase y flujos paso a paso--- se traslada a los Anexos~\ref{anexo:pipeline}--\ref{anexo:finetuning}, y aquí se mantiene la visión de arquitectura y las decisiones de diseño.
 
 % ============================================================
 \section{Filosofía de Diseño: Necesidad, Solución, Iteración}
@@ -21,7 +21,7 @@ El sistema no se diseñó como un bloque monolítico, sino que emergió de un pr
 
     \item Cuarta limitación: Los usuarios necesitaban acceder a información que no estaba en los documentos internos, como noticias, páginas web o normativa. \textit{Solución:} Se añadieron los modos de búsqueda web, scraping y consulta del BOE. En la interfaz principal, la consulta normativa se resuelve mediante API; además, se desarrolló un servidor MCP como línea de integración futura.
 
-    \item Quinta limitación: Sin visibilidad sobre el rendimiento del sistema, era imposible detectar cuellos de botella. \textit{Solución:} Se implementó el stack de observabilidad: métricas Prometheus en el backend, NVIDIA DCGM para GPU, y dashboards Grafana \cite{prometheus2026docs,dcgmExporter2026docs,grafana2026docs}.
+    \item Quinta limitación: Sin visibilidad sobre el rendimiento del sistema, era imposible detectar cuellos de botella. \textit{Solución:} Se implementó el stack de observabilidad: métricas Prometheus en el backend, NVIDIA DCGM para GPU, dashboards Grafana y logs centralizados con Loki/Promtail \cite{prometheus2026docs,dcgmExporter2026docs,grafana2026docs}.
 
     \item Sexta limitación: Las respuestas idénticas saturaban la GPU innecesariamente. \textit{Solución:} Se interpuso LiteLLM como proxy con caché en Redis.
 
@@ -29,11 +29,11 @@ El sistema no se diseñó como un bloque monolítico, sino que emergió de un pr
 
     \item Octava limitación: Los analistas de datos necesitaban consultar tablas de datos estructurados sin aprender SQL. \textit{Solución:} Se desarrolló un agente de traducción NL$\rightarrow$SQL (\texttt{core/sql\_agent.py}) que genera y ejecuta consultas \texttt{SELECT} seguras sobre PostgreSQL mediante LiteLLM, con validación por lista blanca y auto-corrección ante errores de sintaxis.
 
-    \item Novena limitación: El control de acceso mediante cabeceras HTTP era insuficiente para garantizar la seguridad en entornos multi-tenant con requisitos exigentes. \textit{Solución:} Se implementó validación criptográfica de tokens JWT de Azure AD (\texttt{core/auth.py}), con descarga dinámica de claves públicas JWKS, activable con la variable de entorno \texttt{AZURE\_JWT\_VALIDATION=true}.
+    \item Novena limitación: El control de acceso mediante cabeceras HTTP era insuficiente para entornos multi-tenant exigentes. \textit{Solución:} Se implementó validación criptográfica de tokens JWT de Azure AD (\texttt{core/auth.py}), con descarga dinámica de claves públicas JWKS, activable con \texttt{AZURE\_JWT\_VALIDATION=true}.
 
-    \item Décima limitación: La expansión de consulta en el endpoint de búsqueda lanzaba el cálculo en un \texttt{ThreadPoolExecutor} paralelo, pero el futuro resultante nunca se recogía: la expansión estaba efectivamente deshabilitada en producción sin que los tests unitarios lo detectaran. Adicionalmente, el módulo \texttt{core/retrieval.py} contenía imports perezosos de clases de Qdrant dentro de métodos y mensajes de log de depuración (\texttt{logger.info("DEBUG:~\ldots")}) que no debían estar en producción. \textit{Solución} (v2.2.0): se añadió la recogida asíncrona del futuro mediante \texttt{asyncio.wait\_for(shield(future), timeout=1s)}, se ejecutan búsquedas adicionales con las consultas expandidas y se incorporan sus resultados sin duplicados; se movieron los imports al nivel del módulo y se eliminaron los logs de depuración.
+    \item Décima limitación: La expansión de consulta en el endpoint de búsqueda lanzaba el cálculo en paralelo pero nunca recogía el resultado: estaba efectivamente deshabilitada en producción sin que los tests lo detectaran. \textit{Solución} (v2.2.0): se añadió la recogida asíncrona del futuro, se ejecutan búsquedas con las consultas expandidas y se incorporan sus resultados sin duplicados; además se limpiaron imports perezosos y logs de depuración en \texttt{core/retrieval.py}.
 
-    \item Undécima limitación: El pipeline RAG usaba siempre el mismo modelo LLM y los mismos parámetros de recuperación (\texttt{top\_k=5}) independientemente del tipo de consulta. Una pregunta factual puntual y un análisis comparativo multi-documento recibían exactamente el mismo tratamiento, lo que infrautilizaba el stack disponible. \textit{Solución} (v2.3.0): se desarrolló el componente \texttt{QueryProcessor} (\texttt{core/query\_processor.py}) con tres mecanismos: (1)~\textit{intent detection} mediante patrones regex que clasifica cada consulta en FACTUAL, PROCEDURAL, ANALYTICAL o CONVERSATIONAL y ajusta \texttt{top\_k} y estrategia de búsqueda; (2)~\textit{smart model routing} que enruta las consultas analíticas a \texttt{qwen2.5-32b} (32\,K contexto, mejor razonamiento) y las demás a JARVIS (fino, rápido, citas correctas); (3)~\textit{query expansion} que genera dos reformulaciones adicionales via LLM y fusiona los resultados de las tres variantes antes del reranker, mejorando el recall semántico. Adicionalmente, el \texttt{MemoryManager} fue actualizado para usar \texttt{qwen2.5-32b} en la summarización automática de conversaciones largas, aprovechando su ventana de 32\,K tokens para una síntesis de mayor calidad.
+    \item Undécima limitación: El pipeline RAG usaba siempre el mismo modelo y los mismos parámetros (\texttt{top\_k=5}) para cualquier consulta. \textit{Solución} (v2.3.0): se desarrolló el \texttt{QueryProcessor} con \textit{intent detection} (clasifica en FACTUAL/PROCEDURAL/ANALYTICAL/CONVERSATIONAL y ajusta \texttt{top\_k}), \textit{smart model routing} (analíticas a \texttt{qwen2.5-32b}; el resto a JARVIS) y \textit{query expansion} (reformula y fusiona resultados antes del reranker). El \texttt{MemoryManager} pasó a usar \texttt{qwen2.5-32b} para summarizar conversaciones largas.
 \end{enumerate}
 
 Esta aproximación iterativa ---identificar una carencia, evaluar alternativas, integrar la solución y validar el resultado--- se repitió a lo largo de los siete sprints del proyecto. Cada nueva pieza se acopló al ecosistema respetando la separación de responsabilidades y las interfaces HTTP estándar entre servicios, permitiendo sustituir cualquier componente sin afectar al resto.
@@ -43,7 +43,7 @@ Esta aproximación iterativa ---identificar una carencia, evaluar alternativas, 
 \label{sec:arquitectura-general}
 % ============================================================
 
-Para tener visibilidad técnica, se ha diseñado el sistema mediante una arquitectura compuesta por 15 servicios principales y varios servicios auxiliares de soporte y arranque, todos ellos contenerizados con Docker, orquestados mediante Docker Compose \cite{dockerCompose2026docs} y aislados en una red virtual propia (\texttt{rag-network}). El flujo resumido de tecnologías ya se ha presentado en el Capítulo~\ref{cap:tecnologias}; aquí se detalla la función de cada servicio dentro de la arquitectura funcional.
+El sistema se compone de 15 servicios principales y varios servicios auxiliares de soporte y arranque, todos contenerizados con Docker, orquestados mediante Docker Compose \cite{dockerCompose2026docs} y aislados en una red virtual propia (\texttt{rag-network}). El flujo resumido de tecnologías se presentó en el Capítulo~\ref{cap:tecnologias}; aquí se detalla la función de cada servicio dentro de la arquitectura funcional.
 
 \begin{table}[H]
 \centering
@@ -72,9 +72,9 @@ pgAdmin            & Administración de PostgreSQL           & 5050 (interno) \\
 \end{tabular}
 \end{table}
 
-Todos los servicios comparten una red Docker interna de tipo \textit{bridge} denominada \texttt{rag-network}. Únicamente NGINX expone un puerto al exterior (8443), garantizando que ningún servicio interno es accesible directamente desde fuera del servidor.
+Todos los servicios comparten una red Docker interna de tipo \textit{bridge} denominada \texttt{rag-network}. Únicamente NGINX expone un puerto al exterior (8443), garantizando que ningún servicio interno es accesible directamente desde fuera del servidor. Los servicios que requieren aceleración GPU (Ollama, PaddleOCR) la reciben mediante la directiva \texttt{deploy.resources.reservations} de Compose y el \texttt{nvidia-container-toolkit} del host; los servicios más intensivos declaran además límites de CPU y memoria (\texttt{deploy.resources.limits}) para que ninguno monopolice los recursos del host.
 
-En la validación final realizada el 26 de mayo de 2026, el despliegue convivía con otros servicios Docker en el mismo host. Para evitar colisiones de puertos se mantuvieron los puertos internos de los contenedores y se publicaron accesos locales diferenciados: OpenWebUI en \texttt{localhost:3002}, Backend en \texttt{localhost:8002}, Indexer en \texttt{localhost:8003}, Qdrant en \texttt{localhost:6335}/\texttt{6336}, Grafana en \texttt{localhost:3003}, Prometheus en \texttt{localhost:9091}, MinIO en \texttt{localhost:9002}/\texttt{9003}, pgAdmin en \texttt{localhost:5051}, Ollama en \texttt{localhost:11435} y LiteLLM en \texttt{localhost:4001}. Esta separación no modifica la arquitectura interna, pero permite ejecutar el sistema completo sin detener otros servicios del entorno de desarrollo.
+En la validación final (26 de mayo de 2026), el despliegue convivía con otros servicios Docker en el mismo host. Para evitar colisiones de puertos se mantuvieron los puertos internos y se publicaron accesos locales diferenciados (p.~ej. OpenWebUI en \texttt{localhost:3002}, Backend en \texttt{localhost:8002}, Qdrant en \texttt{localhost:6335}). Esta separación no modifica la arquitectura interna, pero permite ejecutar el sistema completo sin detener otros servicios del entorno de desarrollo.
 
 \begin{figure}[H]
 \centering
@@ -86,59 +86,9 @@ En la validación final realizada el 26 de mayo de 2026, el despliegue convivía
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_backend_swagger.png}
-\caption{Documentación interactiva del Backend FastAPI desplegado en el entorno local de validación. La captura muestra la API activa, los endpoints de scraping, búsqueda y salud, y confirma que el servicio expone su contrato OpenAPI.}
+\caption{Documentación interactiva del Backend FastAPI en el entorno local de validación: API activa, endpoints de scraping, búsqueda y salud, y contrato OpenAPI expuesto.}
 \label{fig:backend-swagger-final}
 \end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{cap_tfg_indexer_health.png}
-\caption{Endpoint de salud del servicio Indexer durante la demo final. El servicio opera en modo \texttt{backend}, observa la carpeta \texttt{/app/watch}, mantiene SharePoint desactivado en el entorno TFG y utiliza cabeceras de tenant para separar colecciones.}
-\label{fig:indexer-health-final}
-\end{figure}
-
-\subsection{Orquestación con Docker Compose}
-
-La totalidad del ecosistema se define de forma declarativa en un único fichero \texttt{docker-compose.yml}. Este manifiesto YAML, alineado con la especificación actual de Compose \cite{dockerCompose2026docs}, describe tanto los servicios principales de la arquitectura como varios servicios auxiliares de inicialización y observabilidad, además de sus dependencias (\texttt{depends\_on}), volúmenes persistentes para datos, variables de entorno, políticas de reinicio (\texttt{restart: unless-stopped}) y reservas de recursos GPU.
-
-Los servicios que requieren aceleración GPU (Ollama, PaddleOCR) utilizan la directiva de Docker Compose:
-
-\begin{lstlisting}[language=Python, caption={Reserva de GPU en Docker Compose.}]
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: all
-          capabilities: [gpu]
-\end{lstlisting}
-
-Esta configuración, combinada con el \texttt{nvidia-container-toolkit} instalado en el host, permite que los contenedores accedan a la GPU del servidor sin necesidad de instalar drivers CUDA dentro de cada contenedor.
-
-Además de las reservas de GPU, el manifiesto define límites de recursos (\texttt{deploy.resources.limits}) para los servicios más intensivos, garantizando que ningún servicio monopolice la CPU o la RAM del host en situaciones de carga máxima:
-
-\begin{lstlisting}[language=Python, caption={Límites de recursos por servicio en Docker Compose.}]
-# Ejemplos representativos
-rag-backend:
-  deploy:
-    resources:
-      limits:
-        cpus: "4"
-        memory: 8g
-qdrant:
-  deploy:
-    resources:
-      limits:
-        cpus: "2"
-        memory: 4g
-redis:
-  deploy:
-    resources:
-      limits:
-        memory: 600m
-\end{lstlisting}
-
-Estos límites protegen la estabilidad del sistema durante picos de ingesta masiva o procesamiento OCR prolongado, evitando que la presión de memoria sobre un servicio degradara al resto.
 
 \subsection{Flujo de Datos End-to-End}
 
@@ -161,7 +111,7 @@ Todo el flujo se completa típicamente en menos de 3.5 segundos, con el primer t
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{screenshot_openwebui_jarvis.png}
-\caption{Interfaz de OpenWebUI con el modelo JARVIS seleccionado. El usuario escribe su consulta en el campo de texto y recibe la respuesta en streaming.}
+\caption{Interfaz de OpenWebUI con el modelo JARVIS seleccionado. El usuario escribe su consulta y recibe la respuesta en streaming.}
 \label{fig:screenshot-openwebui}
 \end{figure}
 
@@ -170,7 +120,7 @@ Todo el flujo se completa típicamente en menos de 3.5 segundos, con el primer t
 \label{sec:propio-vs-externo}
 % ============================================================
 
-Una de las preguntas fundamentales en cualquier proyecto de integración es: ¿qué parte del trabajo es desarrollo original y qué parte es configuración de herramientas existentes? La Tabla~\ref{tab:propio-externo} clasifica cada componente del sistema según su origen.
+Una pregunta fundamental en cualquier proyecto de integración es: ¿qué parte del trabajo es desarrollo original y qué parte es configuración de herramientas existentes? La Tabla~\ref{tab:reuso-desarrollo} clasifica cada componente del sistema según su origen.
 
 \begin{table}[H]
 \centering
@@ -194,48 +144,7 @@ Prometheus, Grafana y DCGM & \checkmark & \checkmark & $\times$   & \checkmark &
 }
 \end{table}
 
-La tabla anterior resume de forma deliberadamente simple qué se reutiliza, qué se amplía y qué se implementa desde cero. La tabla siguiente añade más detalle sobre el trabajo concreto realizado en cada pieza.
-
-\begin{table}[p]
-\centering
-\scriptsize
-\caption{Clasificación de los componentes del sistema según su origen.}
-\label{tab:propio-externo}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llp{7cm}}
-\toprule
-\textbf{Componente} & \textbf{Tipo} & \textbf{Trabajo realizado} \\
-\midrule
-JARVIS Pipeline             & \textbf{Propio}        & 1.498 líneas de Python. Detección de intenciones, encaminamiento, memoria de sesión, control de acceso departamental. \\
-Backend FastAPI             & \textbf{Propio}        & ~3.000 líneas. Pipeline RAG, endpoints REST, chunking, scraping, búsqueda web, métricas Prometheus. \\
-Indexer                     & \textbf{Propio}        & ~1.200 líneas. Sincronización SharePoint, cron interno, ingesta automatizada, detección OCR. \\
-Servidor MCP-BOE            & \textbf{Propio}        & ~400 líneas. Resolución semántica de leyes, consulta API BOE. \\
-Pipeline Fine-Tuning        & \textbf{Propio}        & Scripts de generación de dataset sintético, entrenamiento LoRA, exportación GGUF. \\
-Docker Compose              & \textbf{Propio}        & Manifiesto de la arquitectura completa, incluyendo servicios principales, redes, volúmenes, GPU y dependencias. \\
-Configuración LiteLLM       & \textbf{Propio}        & YAML de modelos, aliases, caché Redis, fallbacks, rate limits. \\
-Configuración NGINX         & \textbf{Propio}        & Certificados TLS, proxy pass, WebSocket upgrade. \\
-Configuración Prometheus    & \textbf{Propio}        & Targets de scraping, intervalos, reglas. \\
-Dashboards Grafana          & \textbf{Propio}        & 3 dashboards diseñados para Backend, GPU y base de datos. \\
-\midrule
-OpenWebUI                   & \textbf{Externo}       & Interfaz de usuario. Configurado para SSO, PostgreSQL externo y conexión al Pipeline. \\
-Ollama                      & \textbf{Externo}       & Motor de LLM. Configurado con modelos descargados y cuantizados. \\
-Qdrant                      & \textbf{Externo}       & Base de datos vectorial. Colecciones y esquemas definidos por el backend propio. \\
-PostgreSQL                  & \textbf{Externo}       & Base de datos relacional. Esquema gestionado por OpenWebUI. \\
-Redis                       & \textbf{Externo}       & Caché. Configurado con TTL y conectado a LiteLLM. \\
-PaddleOCR                   & \textbf{Externo}       & Motor OCR. Integrado dentro del Indexer propio con fallback GPU/CPU. \\
-Playwright                  & \textbf{Externo}       & Automatización de navegador. Integrado en el backend propio. \\
-MinIO                       & \textbf{Externo}       & Almacenamiento S3. Configurado para backup de documentos. \\
-\midrule
-Microsoft Graph API         & \textbf{Integración}   & Autenticación MSAL, sincronización delta de SharePoint. \\
-Azure AD (OIDC)             & \textbf{Integración}   & SSO corporativo, extracción de grupos para control de acceso. \\
-API BOE                     & \textbf{Integración}   & Consulta del Boletín Oficial del Estado. \\
-DuckDuckGo                  & \textbf{Integración}   & Búsqueda en internet con fallback HTML. \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-En resumen, el trabajo de desarrollo propio abarca más de 6.000 líneas de código Python distribuidas entre el Pipeline JARVIS, el Backend, el Indexer y el servidor MCP-BOE, además de toda la configuración declarativa del ecosistema Docker. Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
+En resumen, el trabajo de desarrollo propio abarca más de 6.000 líneas de código Python distribuidas entre el Pipeline JARVIS (1.498 líneas), el Backend ($\sim$3.000), el Indexer ($\sim$1.200) y el servidor MCP-BOE ($\sim$400), además de toda la configuración declarativa del ecosistema Docker (Compose, LiteLLM, NGINX, Prometheus y los dashboards de Grafana). Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
 
 % ============================================================
 \section[Pipeline de OpenWebUI]{El Mecanismo Pipeline de OpenWebUI (Hook)}
@@ -244,127 +153,16 @@ En resumen, el trabajo de desarrollo propio abarca más de 6.000 líneas de cód
 
 El Pipeline de OpenWebUI es el punto de conexión fundamental entre la interfaz de usuario y todo el backend del sistema \cite{openwebui2024docs}. Sin este mecanismo, OpenWebUI sería simplemente una interfaz para chatear directamente con Ollama. El Pipeline es lo que convierte esa interfaz genérica en un asistente corporativo inteligente.
 
-\subsection{Concepto de Hook}
+En ingeniería de software, un \textit{hook} es un punto de extensión que permite inyectar código personalizado en un flujo de ejecución predefinido sin modificar el sistema original. En OpenWebUI, el \textit{hook} se materializa en el sistema de Pipelines: cuando un usuario envía un mensaje, en lugar de reenviarlo directamente a Ollama, OpenWebUI lo envía primero al servicio Pipeline, que procesa el mensaje, ejecuta la lógica necesaria y devuelve la respuesta. Desde la perspectiva de OpenWebUI, el Pipeline \textit{es} el modelo.
 
-En ingeniería de software, un \textit{hook} es un punto de extensión que permite inyectar código personalizado en un flujo de ejecución predefinido sin modificar el sistema original. En el caso de OpenWebUI, el \textit{hook} se materializa en el sistema de Pipelines: un mecanismo que permite interponer un servicio externo entre el usuario y el modelo de lenguaje.
-
-Cuando un usuario envía un mensaje en OpenWebUI, en lugar de reenviarlo directamente a Ollama, OpenWebUI lo envía primero al servicio Pipeline configurado. El Pipeline procesa el mensaje, ejecuta la lógica necesaria y devuelve la respuesta final al usuario. Desde la perspectiva de OpenWebUI, el Pipeline \textit{es} el modelo.
-
-\subsection{Descubrimiento y Conexión del Pipeline}
-
-La conexión entre OpenWebUI y el Pipeline se establece mediante configuración:
-
-\begin{enumerate}
-    \item El Pipeline se despliega como un contenedor Docker que expone una API HTTP en el puerto 9099.
-    \item OpenWebUI se configura con la variable de entorno \texttt{OPENAI\_API\_BASE\_URLS} apuntando al servicio Pipeline (\texttt{http://pipelines:9099}).
-    \item Al arrancar, OpenWebUI descubre el Pipeline por su nombre (\texttt{JARVIS}) y lo muestra como un modelo seleccionable en la interfaz.
-    \item Cuando el usuario selecciona el modelo ``JARVIS'' y envía un mensaje, OpenWebUI realiza un HTTP POST al Pipeline con el mensaje, el historial de conversación y los metadatos del usuario.
-\end{enumerate}
-
-\subsection{Contrato de la Clase Pipeline}
-
-El Pipeline se implementa como una clase Python que debe cumplir un contrato específico:
-
-\begin{lstlisting}[language=Python, caption={Estructura del Pipeline JARVIS.}]
-class Pipeline:
-    class Valves(BaseModel):
-        BACKEND_URL: str = "http://rag-backend:8000"
-        LITELLM_URL: str = "http://litellm:4000"
-        TEXT_MODEL: str = "JARVIS"
-        VISION_MODEL: str = "qwen2.5vl"
-        DEPARTMENT_MAPPING: Dict[str, str] = {
-            "CIVEX2": "documents_CIVEX2",
-        }
-        DEFAULT_COLLECTION: str = "documents"
-
-    def __init__(self):
-        self.name = "JARVIS"
-        self.id = "jarvis"
-        self.valves = self.Valves()
-        # Memoria de sesion por usuario
-        self._user_image_memory: Dict[str, str] = {}
-        self._user_web_memory: Dict[str, Dict] = {}
-
-    async def on_startup(self):
-        logger.info("Starting JARVIS")
-
-    async def on_shutdown(self):
-        logger.info("Shutting down JARVIS")
-
-    def pipe(self, user_message, model_id, messages, body):
-        # HOOK PRINCIPAL: toda la logica del sistema
-        intent = self._detect_intent(user_message, body, messages)
-        action = intent["action"]
-        # ... encaminamiento a subsistemas ...
-\end{lstlisting}
-
-\subsection{El Método \texttt{pipe()}: Corazón del Sistema}
-
-El método \texttt{pipe()} es el punto de entrada de toda la lógica del sistema. Recibe cuatro parámetros:
-
-\begin{itemize}
-    \item \texttt{user\_message} (\texttt{str}): El texto del mensaje del usuario.
-    \item \texttt{model\_id} (\texttt{str}): El identificador del modelo seleccionado (``jarvis'').
-    \item \texttt{messages} (\texttt{List[Dict]}): El historial completo de la conversación actual, con mensajes del usuario y del asistente.
-    \item \texttt{body} (\texttt{Dict}): Metadatos de la petición, incluyendo el objeto \texttt{user} con email, nombre, rol y grupos del usuario autenticado, así como archivos e imágenes adjuntos.
-\end{itemize}
-
-El método utiliza la palabra clave \texttt{yield} de Python para devolver la respuesta en modo streaming. En lugar de esperar a que se genere la respuesta completa, el Pipeline va devolviendo fragmentos de texto a medida que están disponibles. OpenWebUI recibe estos fragmentos y los muestra progresivamente en la interfaz:
-
-\begin{lstlisting}[language=Python, caption={Ejemplo de respuesta streaming en el Pipeline.}]
-def pipe(self, user_message, model_id, messages, body):
-    intent = self._detect_intent(user_message, body, messages)
-    action = intent["action"]
-
-    if action == "rag":
-        yield "Buscando en documentos internos...\n\n"
-        response = self._call_backend_chat(
-            user_message, "rag", user_data
-        )
-        yield response["content"]
-        yield "\n\n---\n### Fuentes:\n"
-        for source in response["sources"]:
-            yield f"- {source['filename']} (p.{source['page']})\n"
-
-    elif action == "web_search":
-        yield "Buscando en internet...\n\n"
-        # ... logica de busqueda web ...
-
-    elif action == "chat":
-        # Conversacion directa con LLM
-        # ...
-\end{lstlisting}
-
-\subsection{Sistema Valves: Configuración Dinámica}
-
-La clase anidada \texttt{Valves} hereda de \texttt{Pydantic BaseModel} y define todos los parámetros configurables del Pipeline. La particularidad es que OpenWebUI detecta automáticamente esta clase y expone sus campos como formulario editable en la interfaz de administración. Esto significa que un administrador puede modificar la URL del backend, cambiar el modelo de texto, añadir departamentos al mapeo o activar/desactivar el modo de depuración directamente desde el navegador, sin editar código ni reiniciar servicios.
-
-Los parámetros configurados como Valves incluyen:
-
-\begin{itemize}
-    \item \texttt{BACKEND\_URL}: URL del servicio Backend FastAPI.
-    \item \texttt{LITELLM\_URL}: URL del proxy LiteLLM.
-    \item \texttt{TEXT\_MODEL}: Modelo de texto por defecto.
-    \item \texttt{VISION\_MODEL}: Modelo de visión para análisis de imágenes.
-    \item \texttt{DEPARTMENT\_MAPPING}: Diccionario que mapea grupos de Azure AD a colecciones de Qdrant.
-    \item \texttt{DEFAULT\_COLLECTION}: Colección por defecto para usuarios sin grupo específico.
-    \item \texttt{PERMISSION\_CACHE\_TTL}: Tiempo de vida de la caché de permisos.
-    \item \texttt{INDEXER\_URL}: URL del servicio Indexer para consultas de estado.
-    \item \texttt{DEBUG\_MODE}: Activar/desactivar logs detallados.
-\end{itemize}
+La conexión se establece por configuración: el Pipeline se despliega como contenedor que expone una API HTTP en el puerto 9099, y OpenWebUI se configura con \texttt{OPENAI\_API\_BASE\_URLS} apuntando a él. Al arrancar, OpenWebUI descubre el Pipeline por su nombre (\texttt{JARVIS}) y lo muestra como un modelo seleccionable. El detalle de implementación ---el contrato de la clase \texttt{Pipeline}, el método \texttt{pipe()} con respuesta en \textit{streaming} (\texttt{yield}) y el sistema \textit{Valves} de configuración dinámica desde la interfaz de administración--- se recoge en el Anexo~\ref{anexo:pipeline}.
 
 % ============================================================
 \section{Agente Encaminador JARVIS: Inteligencia Central}
 \label{sec:jarvis-detalle}
 % ============================================================
 
-El agente JARVIS es la pieza de software más compleja del proyecto, con 1.498 líneas de código Python. Su función es analizar cada mensaje del usuario y decidir a cuál de los 10 modos de operación derivarlo.
-
-\subsection{Sistema de Detección de Intenciones}
-
-La detección de intenciones se implementa en el método \texttt{\_detect\_intent()}, que evalúa el mensaje del usuario contra un conjunto de reglas heurísticas basadas en coincidencia de palabras clave y expresiones regulares. Las reglas se evalúan en un \textit{orden de prioridad estricto}: las condiciones más específicas se verifican primero (presencia de archivos adjuntos, imágenes, URLs) y se desciende progresivamente hacia las heurísticas más genéricas (keywords de RAG, búsqueda web, conversación general).
-
-La Tabla~\ref{tab:intenciones-detalle} resume las categorías de intención, su prioridad y los criterios de activación.
+El agente JARVIS es la pieza de software más compleja del proyecto, con 1.498 líneas de código Python. Su función es analizar cada mensaje del usuario y decidir a cuál de los modos de operación derivarlo. La detección de intenciones se implementa en el método \texttt{\_detect\_intent()}, que evalúa el mensaje contra un conjunto de reglas heurísticas (coincidencia de palabras clave y expresiones regulares) en un \textit{orden de prioridad estricto}: primero las condiciones más específicas (archivos adjuntos, imágenes, URLs) y después las más genéricas (keywords de RAG, búsqueda web, conversación). La Tabla~\ref{tab:intenciones-detalle} resume las categorías, su prioridad y los criterios de activación.
 
 \begin{table}[H]
 \centering
@@ -395,419 +193,109 @@ La Tabla~\ref{tab:intenciones-detalle} resume las categorías de intención, su 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{cap_chat_lista_docs.png}
-\caption{Respuesta real del modo de listado documental. JARVIS consulta el estado del indexador y devuelve los documentos disponibles para consulta, junto con la información reciente de ingesta.}
+\caption{Respuesta real del modo de listado documental. JARVIS consulta el estado del indexador y devuelve los documentos disponibles, junto con la información reciente de ingesta.}
 \label{fig:documentos-disponibles}
 \end{figure}
 
-\subsection{Sticky Mode: Persistencia de Contexto}
-
-Una característica avanzada del encaminador es el \textit{Sticky Mode}: cuando un usuario está inmerso en una conversación RAG y formula una pregunta de seguimiento breve (``¿Y las fechas?'', ``Dime más''), el sistema detecta que la pregunta anterior era de tipo RAG y mantiene el mismo modo, evitando que keywords ambiguos como ``fechas'' o ``resultados'' desvíen la consulta al modo de búsqueda web.
-
-\begin{lstlisting}[language=Python, caption={Implementación del Sticky Mode.}]
-# Si el mensaje es corto y ambiguo, 
-# mirar de que hablaba la pregunta anterior
-if msg_len < 25 and is_ambiguous and messages:
-    last_user_msg = messages[-2].get("content", "").lower()
-    was_rag = any(kw in last_user_msg for kw in rag_keywords)
-    if was_rag:
-        logger.info("Sticky Mode: Reusing RAG intent")
-        return {"action": "rag", "metadata": {}}
-\end{lstlisting}
-
-\subsection{Memoria de Sesión por Usuario}
-
-JARVIS mantiene tres estructuras de estado en memoria para cada usuario, identificado por su dirección de correo electrónico:
-
-\begin{itemize}
-    \item \texttt{\_user\_image\_memory}: Almacena la última imagen enviada en formato Base64, permitiendo preguntas de seguimiento sin reenviar la imagen.
-    \item \texttt{\_user\_web\_memory}: Retiene el contenido extraído de la última URL analizada, habilitando consultas contextuales sobre la página.
-    \item \texttt{\_user\_pending\_decision}: Gestiona decisiones pendientes cuando el sistema detecta que una URL ya fue indexada previamente y ofrece al usuario la opción de reutilizar el contenido existente o volver a scrapearla.
-\end{itemize}
-
-\subsection{Control de Acceso Departamental}
-
-El Pipeline integra un sistema de permisos multi-departamento que segmenta el acceso a las colecciones vectoriales según los grupos de Azure Active Directory del usuario. El flujo es:
-
-\begin{enumerate}
-    \item Al recibir una petición, JARVIS extrae los grupos del objeto \texttt{user\_data} proporcionado por OpenWebUI.
-    \item Si los grupos no están disponibles en \texttt{user\_data}, JARVIS consulta directamente la API de Microsoft Graph para obtener los grupos del usuario mediante el flujo de credenciales de cliente.
-    \item Los grupos se mapean a colecciones de Qdrant mediante el diccionario configurable \texttt{DEPARTMENT\_MAPPING}.
-    \item Las colecciones autorizadas se envían al Backend en la cabecera HTTP \texttt{X-Tenant-Ids}, que filtra la búsqueda vectorial a solo los documentos permitidos.
-    \item Los permisos se cachean durante 300 segundos (configurable) para minimizar llamadas a Graph API.
-\end{enumerate}
+Más allá del encaminamiento, JARVIS incorpora tres mecanismos de contexto: el \textit{Sticky Mode} (mantiene el modo de la pregunta anterior ante consultas de seguimiento breves y ambiguas), la \textbf{memoria de sesión por usuario} (recuerda la última imagen y la última web analizadas, y gestiona decisiones pendientes) y el \textbf{control de acceso departamental} (mapea los grupos de Azure AD del usuario a colecciones de Qdrant y filtra la búsqueda). El detalle de estos tres mecanismos, con ejemplos de código, se recoge en el Anexo~\ref{anexo:pipeline}.
 
 % ============================================================
 \section{Backend RAG: Motor de Búsqueda Semántica}
 \label{sec:backend-rag}
 % ============================================================
 
-El Backend constituye el motor central de procesamiento del sistema. Implementado en FastAPI, fue objeto de una refactorización significativa durante el desarrollo: inicialmente era un único fichero \texttt{main.py} de más de 1.900 líneas que se dividió en una arquitectura modular con paquetes separados para esquemas (\texttt{schemas/}), servicios (\texttt{services/}), endpoints (\texttt{api/}), procesamiento (\texttt{processing/}) e integraciones (\texttt{integrations/}).
+El Backend constituye el motor central de procesamiento del sistema. Implementado en FastAPI, fue objeto de una refactorización significativa: inicialmente era un único fichero \texttt{main.py} de más de 1.900 líneas que se dividió en una arquitectura modular con paquetes separados para esquemas (\texttt{schemas/}), servicios (\texttt{services/}), endpoints (\texttt{api/}), procesamiento (\texttt{processing/}) e integraciones (\texttt{integrations/}).
 
-\subsection{Pipeline de Ingesta Documental}
-
-El proceso de ingesta de un documento sigue las siguientes etapas:
-
-\begin{enumerate}
-    \item Recepción: El documento llega al backend vía API REST (carga manual), vía Indexer (sincronización SharePoint) o vía scraper (extracción web).
-
-    \item Detección de tipo: Se intenta extraer texto directamente del PDF con \texttt{pdfplumber}. Si el texto extraído es insuficiente ($<100$ caracteres por página), se asume que el documento es escaneado y se redirige al motor OCR.
-
-    \item Extracción de texto: Para PDFs nativos se usa \texttt{pdfplumber}; para escaneados, PaddleOCR con aceleración GPU; para HTML, la cadena Trafilatura $\rightarrow$ Readability $\rightarrow$ BeautifulSoup.
-
-    \item Chunking semántico: El texto extraído se segmenta en fragmentos de 512--1024 tokens con un solapamiento del 10--15\% entre fragmentos consecutivos. El solapamiento es fundamental para no perder el hilo semántico de párrafos que cruzan los límites de ventana.
-
-    \item Generación de embeddings: Cada fragmento se transforma en un vector denso de 384 dimensiones mediante el modelo \path{paraphrase-multilingual-MiniLM-L12-v2} de SentenceTransformers, ejecutado en CPU para evitar conflictos de VRAM con los modelos de generación.
-
-    \item Almacenamiento en Qdrant: Los vectores se almacenan en la colección correspondiente de Qdrant junto con un payload de metadatos que incluye el texto original, nombre de fichero, página, índice de chunk, fuente, marca temporal y tenant\_id.
-\end{enumerate}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{cap_qdrant_dashboard.png}
-\caption{Panel de colecciones de Qdrant tras la ingesta documental. La colección \texttt{documents} muestra los puntos vectoriales almacenados, el estado operativo y la configuración de vectores densos y dispersos.}
-\label{fig:qdrant-collections}
-\end{figure}
-
-Además de las colecciones corporativas, para la validación final se creó una colección aislada denominada \texttt{documents\_TFGDEMO}. Esta colección contiene únicamente documentación sintética y segura del propio TFG, por lo que permite generar capturas y pruebas reproducibles sin exponer documentos internos reales. El estado de Qdrant confirma que la colección quedó en estado \texttt{green}, con 13 puntos vectoriales y búsqueda híbrida habilitada.
+La \textbf{ingesta} de un documento sigue seis etapas: recepción (API, Indexer o scraper), detección de tipo (texto nativo vs. escaneado), extracción de texto (\texttt{pdfplumber}, PaddleOCR o la cadena Trafilatura/Readability/BeautifulSoup), \textit{chunking} semántico (fragmentos de 512--1024 tokens con 10--15\% de solapamiento), generación de \textit{embeddings} (vector denso de 384 dimensiones con \path{paraphrase-multilingual-MiniLM-L12-v2}) y almacenamiento en Qdrant con metadatos. El procedimiento completo se detalla en el Anexo~\ref{anexo:backend}.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_qdrant_dashboard.png}
-\caption{Estado de las colecciones en Qdrant durante la demo final. La colección \texttt{documents\_TFGDEMO} aparece separada del resto de colecciones, con 13 puntos y configuración híbrida dense+sparse.}
+\caption{Estado de las colecciones en Qdrant durante la demo final. La colección \texttt{documents\_TFGDEMO} ---documentación sintética y segura del propio TFG--- aparece separada del resto, con 13 puntos y configuración híbrida dense+sparse.}
 \label{fig:qdrant-tfgdemo}
 \end{figure}
 
 \subsection{Búsqueda Híbrida}
+\label{subsec:busqueda-hibrida}
 
-La recuperación de contexto para consultas RAG combina dos estrategias complementarias:
+La recuperación de contexto combina tres etapas complementarias:
 
 \begin{enumerate}
-    \item Búsqueda densa (HNSW): La consulta del usuario se transforma en un embedding de 384 dimensiones y se buscan los fragmentos más próximos en el espacio vectorial mediante el índice HNSW de Qdrant.
-
-    \item Búsqueda dispersa (BM25): Se complementa con búsqueda léxica que favorece coincidencias exactas de términos. Esto es especialmente útil para identificadores, códigos de documento, siglas o artículos legales que la búsqueda semántica podría no capturar con precisión.
+    \item \textbf{Búsqueda densa (HNSW)}: la consulta se transforma en un embedding de 384 dimensiones y se buscan los fragmentos más próximos en el espacio vectorial mediante el índice HNSW de Qdrant.
+    \item \textbf{Búsqueda dispersa (BM25)}: se complementa con vectores dispersos generados con \texttt{Qdrant/bm25} (vía \texttt{fastembed}), que favorece coincidencias léxicas exactas ---identificadores, códigos, siglas o artículos legales--- que la búsqueda semántica podría no capturar.
+    \item \textbf{Reordenación con reranker}: los candidatos se fusionan y se reordenan con un \textit{Cross-Encoder} (\texttt{cross-encoder/ms-marco-MiniLM-L-6-v2}), que evalúa conjuntamente el par (consulta, fragmento) para obtener una relevancia más precisa antes de seleccionar los $k$ fragmentos finales (típicamente $k=5$).
 \end{enumerate}
 
-Los resultados de ambas búsquedas se combinan y se reordenan para seleccionar los $k$ fragmentos más relevantes (típicamente $k=5$).
-
-\subsection{Construcción del Prompt Contextual}
-
-El prompt que se envía al LLM se estructura en tres partes:
-
-\begin{lstlisting}[language=Python, caption={Estructura del prompt RAG.}]
-system_prompt = """Eres un asistente corporativo. 
-Responde UNICAMENTE basandote en el contexto proporcionado.
-Si la informacion no esta en el contexto, di que no la tienes.
-NO inventes informacion."""
-
-context = "\n\n".join([
-    f"[{r.filename} | pagina {r.page} | score={r.score:.2f}]\n{r.text}"
-    for r in search_results
-])
-
-user_prompt = f"CONTEXTO:\n{context}\n\nPREGUNTA:\n{query}"
-\end{lstlisting}
-
-El \textit{system prompt} restrictivo, combinado con una temperatura de inferencia baja ($0.1$--$0.2$), elimina prácticamente las alucinaciones en modo RAG: el modelo solo puede responder con información que esté presente en los fragmentos recuperados.
+El \textit{prompt} enviado al LLM combina un \textit{system prompt} restrictivo ---``responde únicamente con el contexto proporcionado, no inventes''--- con una temperatura baja ($0.1$--$0.2$), lo que elimina prácticamente las alucinaciones en modo RAG. La construcción exacta del \textit{prompt} se muestra en el Anexo~\ref{anexo:backend}.
 
 % ============================================================
-\section{Extracción Web: Scraping y Búsqueda en Internet}
-\label{sec:scraping-impl}
+\section{Extracción Web, OCR e integraciones}
+\label{sec:extraccion-integraciones}
 % ============================================================
 
-\subsection{Motor de Renderizado con Playwright}
-
-El módulo de scraping utiliza Playwright para instanciar un navegador Chromium completo en modo \textit{headless}. A diferencia de soluciones basadas en peticiones HTTP simples (como \texttt{requests}), este enfoque permite:
+El sistema añade varias fuentes de información más allá de los documentos internos, cuyo detalle de implementación se recoge en los anexos:
 
 \begin{itemize}
-    \item Renderizar páginas JavaScript complejas (React, Vue, Angular).
-    \item Ejecutar la carga diferida (\textit{lazy loading}) de contenido.
-    \item Resolver redirecciones y consentimientos de cookies.
-    \item Capturar el DOM final tras la ejecución de todos los scripts.
+    \item \textbf{Scraping y búsqueda web} (Anexo~\ref{anexo:backend}): un motor con Playwright renderiza páginas dinámicas (JavaScript) y una cadena de \textit{fallback} (Trafilatura $\rightarrow$ Readability $\rightarrow$ BeautifulSoup) extrae el contenido principal. La búsqueda en internet usa \texttt{duckduckgo\_search} con \textit{fallback} a scraping HTML.
+    \item \textbf{OCR} (Anexo~\ref{anexo:backend}): PaddleOCR con aceleración GPU ---y \textit{fallback} automático a CPU--- procesa los PDFs escaneados, con paralelización mediante Ray durante la ingesta.
+    \item \textbf{SharePoint} (Anexo~\ref{anexo:integraciones}): el Indexer sincroniza cada 5 minutos mediante MSAL y Microsoft Graph, con estrategia \textit{delta} incremental para no reprocesar documentos.
 \end{itemize}
-
-El scraper incorpora rotación de \textit{User-Agent}, reintentos con retroceso exponencial (\textit{exponential backoff}) y una espera inteligente configurable para aplicaciones de una sola página (SPA).
-
-\subsection{Cadena de Extracción con Fallback}
-
-Tras obtener el HTML renderizado, se aplica una cadena de extracción compuesta por tres estrategias de \textit{fallback}:
-
-\begin{enumerate}
-    \item Trafilatura: Algoritmo NLP que extrae el contenido principal eliminando menús, cabeceras y publicidad. Se prioriza por su alta precisión.
-    \item Readability: Algoritmo basado en heurísticas de densidad de texto, comparable al modo lectura de los navegadores.
-    \item BeautifulSoup: Extracción cruda de todo el texto visible del DOM como última alternativa si las dos anteriores producen menos de 200 caracteres.
-\end{enumerate}
-
-\subsection{Búsqueda en Internet}
-
-El modo de búsqueda web utiliza la librería \texttt{duckduckgo\_search} con un \textit{fallback} propio que realiza scraping HTML directo sobre el dominio \texttt{html.duckduckgo.com}. El sistema detecta automáticamente consultas que necesitan información fresca (noticias, precios, eventos) y enriquece el query con el año actual para obtener resultados actualizados.
-
-% ============================================================
-\section{Reconocimiento Óptico de Caracteres (OCR)}
-\label{sec:ocr-impl}
-% ============================================================
-
-El motor OCR PaddleOCR se integra en el servicio Indexer y se ejecuta con aceleración GPU. La inicialización implementa un mecanismo de \textit{fallback} automático:
-
-\begin{lstlisting}[language=Python, caption={Inicialización de PaddleOCR con fallback GPU/CPU.}]
-try:
-    self.ocr = PaddleOCR(
-        use_angle_cls=True, lang="latin",
-        use_gpu=True, gpu_mem=500
-    )
-except Exception:
-    logger.warning("GPU no disponible, modo CPU")
-    self.ocr = PaddleOCR(
-        use_angle_cls=True, lang="latin",
-        use_gpu=False
-    )
-\end{lstlisting}
-
-Si la GPU no está disponible (fallo de driver, VRAM agotada), el motor se reinicia automáticamente en modo CPU sin intervención manual, garantizando la continuidad del servicio de ingesta.
-
-% ============================================================
-\section{Integración con Microsoft SharePoint}
-\label{sec:sharepoint-impl}
-% ============================================================
-
-El módulo Indexer funciona como un servicio autónomo (\textit{worker}) que ejecuta un ciclo de sincronización periódica cada 5 minutos.
-
-\subsection{Autenticación MSAL}
-
-La conexión con SharePoint se realiza mediante OAuth 2.0 con flujo de credenciales de cliente (\textit{Client Credentials Flow}). El servicio obtiene un token de acceso del \textit{tenant} de Azure AD mediante la librería MSAL y utiliza la API REST de Microsoft Graph \cite{msgraph2024docs} para listar y descargar ficheros.
-
-\subsection{Sincronización Delta Incremental}
-
-Para evitar reprocesar documentos ya ingeridos, el Indexer implementa sincronización delta: consulta la marca temporal de modificación de cada fichero en SharePoint y la compara con los registros almacenados en PostgreSQL. Solo los ficheros nuevos o modificados se descargan, procesan e indexan. Esta estrategia reduce drásticamente el consumo de red y GPU en ciclos de sincronización recurrentes.
 
 % ============================================================
 \section{Integración con el Boletín Oficial del Estado (BOE)}
 \label{sec:boe-impl}
 % ============================================================
 
-La integración con el BOE se implementa mediante un servidor MCP (\textit{Model Context Protocol}) construido con la librería \texttt{fastmcp}. El servidor expone funciones de búsqueda y consulta que transforman peticiones en lenguaje natural en llamadas estructuradas a la API de Datos Abiertos del BOE.
+La integración con el BOE se implementa mediante un servidor MCP (\textit{Model Context Protocol}) construido con \texttt{fastmcp}, que transforma peticiones en lenguaje natural en llamadas estructuradas a la API de Datos Abiertos del BOE. Esta integración no es una búsqueda web genérica, y merece una justificación específica: en el tipo de empresa para la que se diseña el sistema, el acceso a normativa legal (legislación laboral, protección de datos, contratación pública) es frecuente y tiene consecuencias directas. Un error en la interpretación de una norma puede traducirse en incumplimientos o sanciones.
 
-Esta integración no es una búsqueda web genérica, y merece una justificación específica. En el contexto del tipo de empresa para la que se diseña este sistema, el acceso a normativa legal (legislación laboral, protección de datos, contratación pública) es frecuente y tiene consecuencias directas sobre decisiones operativas. Un error en la interpretación de una norma no es solo un fallo académico: puede traducirse en incumplimientos, sanciones o decisiones mal fundamentadas.
-
-El BOE presenta características que lo distinguen como caso de uso propio:
-\begin{itemize}
-    \item Las leyes se identifican por códigos oficiales (p.~ej. \texttt{BOE-A-2018-16673}), no por títulos que el usuario recuerde fielmente.
-    \item Un mismo texto legal puede referenciarse coloquialmente de docenas de formas distintas (``la LOPD'', ``la ley de privacidad'', ``el reglamento de protección de datos'').
-    \item La información relevante suele estar en artículos numerados concretos, no en un fragmento genérico.
-    \item Tanto la exactitud como la fuente de procedencia son cruciales: citar una norma derogada o una sección incorrecta tiene consecuencias.
-\end{itemize}
-
-Por todo ello se implementó una capa específica de resolución semántica y consulta estructurada —en lugar de delegar estas peticiones a un buscador generalista— que traduce el lenguaje del usuario al identificador normativo correcto antes de invocar la API oficial.
-
-\subsection{Resolución Semántica de Leyes}
-
-Para consultas como ``Resume la Ley de Protección de Datos'', el sistema implementa un mecanismo que mapea nombres coloquiales a identificadores oficiales del BOE:
-
-\begin{lstlisting}[language=Python, caption={Mapeo semántico de nombres de leyes.}]
-LAW_MAPPINGS = {
-    "proteccion de datos": "BOE-A-2018-16673",
-    "constitucion": "BOE-A-1978-31229",
-    "propiedad intelectual": "BOE-A-1996-8930",
-    "igualdad": "BOE-A-2007-6115",
-}
-\end{lstlisting}
-
-El resolvedor elimina palabras vacías comunes del español (``la'', ``de'', ``del'', ``ley'') y busca coincidencias parciales en el diccionario antes de acudir al endpoint de búsqueda general del BOE.
-
-En el alcance actual, el servidor MCP se ha validado en ejecución por terminal con un LLM y un cliente MCP compatible. Aunque OpenWebUI ya incorpora soporte MCP en versiones recientes \cite{openwebuiMcp2026}, la funcionalidad BOE dentro de la interfaz web se integra aquí mediante llamadas a API directas desde el pipeline JARVIS. Esta decisión permitió mantener un mayor control sobre autenticación, encaminamiento y trazabilidad durante el desarrollo, dejando preparada la migración a MCP como evolución posterior.
+El BOE presenta características que lo distinguen como caso de uso propio: las leyes se identifican por códigos oficiales (p.~ej. \texttt{BOE-A-2018-16673}) y no por títulos que el usuario recuerde; un mismo texto se referencia coloquialmente de muchas formas (``la LOPD'', ``la ley de privacidad''); la información relevante suele estar en artículos numerados concretos; y tanto la exactitud como la fuente son cruciales. Por ello se implementó una capa de resolución semántica que traduce el lenguaje del usuario al identificador normativo correcto antes de invocar la API oficial. El mecanismo de mapeo y la discusión sobre la integración MCP vs.\ API directa se detallan en el Anexo~\ref{anexo:integraciones}.
 
 % ============================================================
 \section{Seguridad Perimetral y Autenticación}
 \label{sec:seguridad-impl}
 % ============================================================
 
-\subsection{NGINX como Proxy Inverso}
-
-NGINX actúa como la primera barrera de seguridad y el único servicio expuesto al exterior. Su configuración incluye:
-
-\begin{itemize}
-    \item Terminación TLS: Todo el tráfico entre el navegador y el servidor se cifra con un certificado TLS autofirmado. Los microservicios internos se comunican en texto plano dentro de la red Docker aislada.
-    \item Proxy pass transparente: Las peticiones HTTPS se redirigen a OpenWebUI (puerto 8080) preservando las cabeceras \texttt{X-Forwarded-For} y \texttt{X-Real-IP} para la trazabilidad.
-    \item WebSocket upgrade: Se habilita la mejora de protocolo a WebSocket, requisito indispensable para el streaming de tokens en tiempo real.
-\end{itemize}
-
-\subsection{SSO con Azure Active Directory}
-
-OpenWebUI se configura con el protocolo OpenID Connect (OIDC) apuntando al \textit{tenant} corporativo de Azure AD. Los usuarios se autentican con sus credenciales corporativas sin crear cuenta separada. Los tokens JWT emitidos por Azure AD se validan en cada petición y sus atributos (nombre, correo, grupos) se utilizan para el control de acceso departamental en JARVIS.
+La seguridad del sistema se organiza en capas. \textbf{NGINX} actúa como primera barrera y único servicio expuesto al exterior: termina el TLS (los microservicios internos hablan en texto plano dentro de la red aislada), hace \textit{proxy pass} preservando cabeceras de trazabilidad y habilita el \textit{upgrade} a WebSocket necesario para el streaming. La autenticación de usuarios se delega en \textbf{Azure AD vía OpenID Connect (OIDC)}: los usuarios entran con sus credenciales corporativas y los atributos del token (nombre, correo, grupos) alimentan el control de acceso departamental.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{cap_openwebui_login_actual.png}
-\caption{Pantalla real de autenticación de OpenWebUI en el despliegue local. El formulario permite inicio de sesión clásico y conserva el acceso mediante SSO corporativo.}
+\caption{Pantalla real de autenticación de OpenWebUI en el despliegue local: inicio de sesión clásico y acceso mediante SSO corporativo.}
 \label{fig:login-sso}
 \end{figure}
 
-\subsection{Validación JWT en el Backend}
-\label{sec:jwt-backend}
-
-Además de la autenticación perimetral de OpenWebUI vía OIDC, el Backend implementa una segunda capa de validación directa de tokens JWT para clientes externos y herramientas MCP que llaman a los endpoints sin pasar por la interfaz web. La lógica, implementada en \texttt{backend/app/core/auth.py}, sigue el flujo estándar de validación de tokens Bearer de Azure AD:
-
-\begin{enumerate}
-    \item El backend descarga dinámicamente el conjunto de claves públicas del \textit{tenant} corporativo desde el endpoint JWKS de Azure AD.
-    \item Las claves se cachean en memoria para evitar latencia en peticiones sucesivas.
-    \item Cada token JWT recibido en la cabecera \texttt{Authorization: Bearer} se verifica criptográficamente contra esas claves.
-    \item Los grupos del usuario extraídos del token se mapean a colecciones de Qdrant autorizadas.
-    \item Si el token no es válido o el usuario carece de acceso a alguna colección, el backend devuelve \texttt{HTTP 403 Forbidden} antes de ejecutar ninguna búsqueda.
-\end{enumerate}
-
-Esta funcionalidad se activa con la variable de entorno \texttt{AZURE\_JWT\_VALIDATION=true} y es completamente transparente para los clientes que ya utilizan el flujo SSO de OpenWebUI.
-
-\subsection{Aislamiento de Red}
-
-Toda la malla de servicios convive dentro de un plano interno \texttt{rag-network}, una red Docker de tipo \textit{bridge}. Esto significa que servicios como PostgreSQL (5432), Redis (6379), Qdrant (6333) y Ollama (11434) no son accesibles desde fuera del servidor bajo ninguna circunstancia, eliminando vectores de ataque sobre estas bases de datos.
+Además de la autenticación perimetral, el Backend implementa una segunda capa de \textbf{validación criptográfica de tokens JWT} (\texttt{core/auth.py}) para clientes externos y herramientas MCP: descarga las claves públicas JWKS del \textit{tenant}, verifica cada token Bearer y mapea los grupos a colecciones autorizadas, devolviendo \texttt{HTTP 403} si el acceso no es válido. Se activa con \texttt{AZURE\_JWT\_VALIDATION=true}. Finalmente, el \textbf{aislamiento de red} (\texttt{rag-network}, tipo \textit{bridge}) impide el acceso externo directo a PostgreSQL, Redis, Qdrant u Ollama. El flujo JWT paso a paso se detalla en el Anexo~\ref{anexo:integraciones}.
 
 % ============================================================
-\section{Stack de Observabilidad: Prometheus y Grafana}
+\section{Observabilidad, caché y almacenamiento}
 \label{sec:observabilidad-impl}
 % ============================================================
 
-La monitorización del sistema fue una funcionalidad implementada en respuesta a una necesidad real: durante las primeras fases de desarrollo, no existía visibilidad sobre el rendimiento del sistema, la saturación de la GPU ni los patrones de uso. Sin métricas, la optimización era intuitiva en lugar de basada en datos. Para resolverlo se adoptó un stack apoyado en Prometheus, Grafana y NVIDIA DCGM Exporter \cite{prometheus2026docs,grafana2026docs,dcgmExporter2026docs}.
-
-\subsection{Métricas Personalizadas en el Backend}
-
-El backend FastAPI expone métricas en formato Prometheus a través del endpoint \texttt{/metrics}. Las métricas implementadas incluyen:
-
-\begin{itemize}
-    \item Contador de peticiones HTTP: Total de peticiones por endpoint, método y código de respuesta.
-    \item Histograma de latencia: Distribución de tiempos de respuesta por endpoint, permitiendo calcular percentiles (p50, p95, p99).
-    \item Distribución de modos: Contador de cuántas consultas se procesan en cada modo (RAG, chat, web search, scraping, OCR, BOE).
-    \item Errores: Tasa de errores por tipo (timeout, modelo no disponible, Qdrant inalcanzable).
-\end{itemize}
-
-\subsection{Telemetría GPU con NVIDIA DCGM Exporter}
-
-NVIDIA DCGM Exporter captura métricas de rendimiento de la GPU del servidor y las expone en formato Prometheus. Las métricas incluyen:
-
-\begin{itemize}
-    \item Consumo de VRAM (memoria GDDR6 utilizada vs. total).
-    \item Utilización de CUDA cores (porcentaje de uso del procesador gráfico).
-    \item Temperatura del chip GPU en grados Celsius.
-    \item Potencia consumida en vatios.
-\end{itemize}
-
-Estas métricas resultaron críticas para optimizar la gestión de modelos: la observación del consumo de VRAM en tiempo real permitió determinar qué combinaciones de modelos podían coexistir simultáneamente en los 24 GB de VRAM disponibles y cuándo era necesario recurrir a cuantizaciones más agresivas (Q4 en lugar de Q8).
-
-\subsection{Diseño de Dashboards en Grafana}
-
-Se diseñaron y configuraron tres dashboards interactivos en Grafana:
-
-\begin{enumerate}
-    \item Dashboard de Backend: Panel principal con latencia media y percentiles, throughput (peticiones/minuto), tasa de errores, distribución de modos de operación en tiempo real, y un gráfico de tendencia de uso a lo largo del tiempo.
-
-    \item Dashboard de GPU: Visualización en tiempo real del consumo de VRAM con alarmas de umbral (80\% de capacidad), temperatura del chip con evolución temporal, utilización de cores y potencia. Este dashboard permitió identificar que la coexistencia de modelos grandes de la familia Qwen 2.5 debía gestionarse con carga bajo demanda en Ollama para no comprometer el resto de servicios.
-
-    \item Dashboard de Base de Datos: Métricas de PostgreSQL (conexiones activas, queries por segundo) y estadísticas de Qdrant (número de puntos indexados, latencia de búsqueda).
-\end{enumerate}
+La monitorización respondió a una necesidad real: durante las primeras fases no existía visibilidad sobre el rendimiento, la saturación de la GPU ni los patrones de uso, y la optimización era intuitiva en lugar de basada en datos. El stack adoptado combina \textbf{Prometheus} (métricas del backend: latencias y percentiles, throughput, distribución de modos, errores), \textbf{NVIDIA DCGM Exporter} (VRAM, utilización, temperatura, potencia de la GPU), \textbf{Grafana} (tres dashboards: backend, GPU y base de datos) y \textbf{Loki + Promtail} (agregación de logs de todos los contenedores, consultables junto a las métricas en Grafana) \cite{prometheus2026docs,grafana2026docs,dcgmExporter2026docs}. El detalle de métricas, telemetría y dashboards está en el Anexo~\ref{anexo:integraciones}.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_grafana_jarvis_dashboard.png}
-\caption{Dashboard principal de Grafana durante la validación final. Se observa el estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
+\caption{Dashboard principal de Grafana durante la validación final: estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
 \label{fig:grafana-final}
 \end{figure}
 
-\subsection{Impacto de la Monitorización}
+Esta observabilidad condujo a decisiones concretas de optimización: se validó que $\sim$35\% de las consultas repetidas se beneficiaban de la caché, se ajustó el valor de $k$ al detectar que más de 5 fragmentos no mejoraban la respuesta, y se reprogramó la ingesta OCR a horarios de baja actividad al ver que monopolizaba la GPU.
 
-La implementación del stack de observabilidad no fue un ejercicio académico: proporcionó información que condujo directamente a decisiones de optimización:
-
-\begin{itemize}
-    \item Se identificó que el 35\% de las consultas repetidas se beneficiaban de la caché Redis, validando la decisión de interponer LiteLLM.
-    \item Se detectó que las consultas RAG con más de 5 fragmentos de contexto no mejoraban la calidad de la respuesta pero aumentaban significativamente la latencia, optimizando el valor de $k$.
-    \item Se observó que PaddleOCR monopolizaba la GPU durante los ciclos de ingesta, lo que motivó la programación de la ingesta en horarios de baja actividad.
-\end{itemize}
-
-% ============================================================
-\section{Caché y Rendimiento: Redis}
-\label{sec:redis-impl}
-% ============================================================
-
-Redis actúa como capa de caché integrada con LiteLLM. Su configuración es directa: LiteLLM almacena en Redis un hash de cada consulta (prompt + parámetros del modelo) junto con la respuesta generada. Las siguientes consultas idénticas se resuelven directamente desde la caché sin invocar a Ollama, eliminando la latencia de inferencia GPU.
-
-Cada entrada tiene un TTL (\textit{Time To Live}) configurable de 1 hora, tras el cual se invalida automáticamente. La tasa de aciertos de caché (\textit{cache hit rate}) observada en producción fue de aproximadamente el 35\%, lo que representó una reducción significativa de la carga sobre la GPU.
-
-Adicionalmente, el pipeline JARVIS utiliza su propio mecanismo de caché en memoria para los permisos departamentales, evitando consultas repetitivas a Microsoft Graph API. Este caché tiene un TTL independiente de 300 segundos.
-
-% ============================================================
-\section{Almacenamiento de Objetos: MinIO}
-\label{sec:minio-impl}
-% ============================================================
-
-MinIO proporciona un sistema de almacenamiento de objetos compatible con Amazon S3 dentro del ecosistema. Su función principal es preservar una réplica aislada de todos los documentos binarios ingeridos por el sistema, proporcionando un mecanismo de backup independiente que no depende de la base de datos vectorial ni de la relacional.
-
-En caso de que Qdrant pierda datos o se requiera una reindexación completa, los documentos originales pueden recuperarse desde MinIO y reprocesarse sin necesidad de acceder nuevamente a las fuentes originales (SharePoint, web).
+En cuanto al rendimiento y el almacenamiento, \textbf{Redis} actúa como caché integrada con LiteLLM: almacena un hash de cada consulta junto con su respuesta (TTL de 1 hora), con una tasa de aciertos observada de $\sim$35\% que reduce la carga sobre la GPU. \textbf{MinIO} proporciona almacenamiento de objetos compatible con S3 que preserva una réplica aislada de los documentos binarios ingeridos, permitiendo reindexar desde cero sin volver a las fuentes originales (SharePoint, web).
 
 % ============================================================
 \section{Agente SQL: Consultas en Lenguaje Natural sobre Datos Estructurados}
 \label{sec:sql-agent}
 % ============================================================
 
-Una limitación del pipeline RAG estándar es que opera exclusivamente sobre texto no estructurado: documentos, páginas web y fragmentos de texto. Sin embargo, muchos sistemas empresariales almacenan información crítica en tablas relacionales: métricas de uso, inventarios, datos financieros o registros de operaciones. Para cubrir esta necesidad sin requerir que los usuarios aprendan SQL, se desarrolló el agente SQL.
-
-\subsection{Arquitectura del Agente NL$\rightarrow$SQL}
-
-El agente, implementado en \texttt{backend/app/core/sql\_agent.py}, sigue un flujo de tres pasos:
-
-\begin{enumerate}
-    \item \textbf{Inspección del esquema:} Al inicializarse, el agente consulta el catálogo de PostgreSQL para obtener la estructura de las tablas autorizadas (columnas, tipos y restricciones), construyendo una representación textual del esquema que se inyecta como contexto al LLM.
-
-    \item \textbf{Generación de SQL:} La pregunta del usuario, junto con el esquema, se envía a LiteLLM para generar una consulta \texttt{SELECT}. El \textit{prompt} instruye explícitamente al modelo a generar solo consultas de lectura, sin \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE} ni \texttt{DROP}.
-
-    \item \textbf{Ejecución y auto-corrección:} La consulta generada se valida contra una lista blanca de operaciones permitidas. Si la ejecución produce un error de sintaxis, el agente reintenta con el mensaje de error como contexto adicional, hasta un máximo de dos reintentos antes de informar al usuario del fallo.
-\end{enumerate}
-
-\subsection{Mecanismos de Seguridad}
-
-El acceso no autorizado o accidental a datos sensibles se previene mediante varias capas de seguridad:
-
-\begin{lstlisting}[language=Python, caption={Validación de la consulta generada contra lista blanca.}]
-ALLOWED_PATTERN = re.compile(
-    r"^\s*(SELECT|WITH|EXPLAIN)\s",
-    re.IGNORECASE
-)
-
-def _validate_query(self, sql: str) -> bool:
-    if not ALLOWED_PATTERN.match(sql.strip()):
-        raise SecurityError("Solo se permiten consultas SELECT")
-    for forbidden in ["DROP", "DELETE", "INSERT",
-                       "UPDATE", "TRUNCATE"]:
-        if forbidden in sql.upper():
-            raise SecurityError(
-                f"Operacion prohibida detectada: {forbidden}"
-            )
-    return True
-\end{lstlisting}
-
-Adicionalmente, las consultas se ejecutan con un \textit{timeout} configurable para prevenir consultas costosas que saturen la base de datos.
-
-\subsection{Endpoint Unificado RAG+SQL}
-
-El módulo \texttt{backend/app/api/query.py} expone un endpoint unificado \texttt{POST /api/v1/query} que enruta automáticamente entre el pipeline RAG y el agente SQL según la naturaleza de la consulta. El enrutamiento se basa en expresiones regulares que detectan patrones propios de consultas sobre datos estructurados (``cuántos'', ``total de'', ``lista de registros'', ``promedio de'') frente a patrones de búsqueda documental. Este diseño es transparente para el usuario: la misma interfaz resuelve tanto preguntas sobre documentos como preguntas sobre datos tabulares.
+El pipeline RAG estándar opera solo sobre texto no estructurado, pero muchos sistemas empresariales guardan información crítica en tablas relacionales (métricas, inventarios, datos financieros). Para consultarlas sin saber SQL se desarrolló el agente SQL (\texttt{backend/app/core/sql\_agent.py}), que sigue tres pasos: (1)~\textbf{inspección del esquema} de PostgreSQL para inyectarlo como contexto; (2)~\textbf{generación} de una consulta \texttt{SELECT} con LiteLLM, instruyendo al modelo a producir solo lecturas; y (3)~\textbf{ejecución con auto-corrección}, reintentando con el mensaje de error como contexto (hasta dos veces). La consulta se valida contra una lista blanca (solo \texttt{SELECT}/\texttt{WITH}/\texttt{EXPLAIN}) y se ejecuta con \textit{timeout}; los mecanismos de seguridad se detallan en el Anexo~\ref{anexo:backend}. El endpoint unificado \texttt{POST /api/v1/query} enruta automáticamente entre RAG y SQL según la naturaleza de la consulta, de forma transparente para el usuario.
 
 % ============================================================
 \section{Fine-Tuning con LoRA}
 \label{sec:finetuning-impl}
 % ============================================================
 
-\subsection{Generación del Dataset de Entrenamiento}
+Para adaptar el modelo al dominio corporativo se exploró el ajuste fino con LoRA (\textit{Low-Rank Adaptation}), que inserta matrices de rango reducido en las capas de atención sin modificar los pesos originales, reduciendo los parámetros entrenables a una fracción y haciendo viable el entrenamiento con una sola GPU. El modelo resultante (\texttt{rag-qwen-ft:latest}) es el que sirve de base a JARVIS. El procedimiento completo ---generación del dataset, entrenamiento y evaluación--- se detalla en el Anexo~\ref{anexo:finetuning}.
 
-Para adaptar el modelo base al dominio corporativo, se implementó un pipeline de generación automática de datos de entrenamiento. Un script extrae pares pregunta-respuesta directamente de los fragmentos indexados en Qdrant, utilizando un LLM base local como generador sintético de consultas plausibles.
-
-\subsection{Entrenamiento con Low-Rank Adaptation}
-
-El ajuste fino se realizó mediante LoRA, que inserta matrices de rango reducido ($r=8$) en las capas de atención del transformador sin modificar los pesos originales:
-
-\begin{equation}
-W' = W + \Delta W = W + BA
-\end{equation}
-
-donde $A \in \mathbb{R}^{r \times d}$ y $B \in \mathbb{R}^{k \times r}$ con $r \ll \min(d,k)$. Esto reduce el número de parámetros entrenables de millones a miles, haciendo viable el ajuste fino con una única GPU de consumo.
-
-\subsection{Resultado y Evaluación}
-
-El modelo resultante, \texttt{rag-qwen-ft:latest}, se registró en LiteLLM como el modelo primario para consultas RAG corporativas. En la versión académica del TFG se expone bajo el alias \textbf{JARVIS}; en el sistema empresarial derivado, desplegado en piloto desde diciembre de 2025, bajo el alias \textbf{europav-IA}. Ambos sistemas comparten el mismo modelo base y el mismo adaptador LoRA, lo que valida la portabilidad del enfoque de ajuste fino sobre documentación corporativa real.
-
-No obstante, se observó empíricamente que para tareas de RAG puras el \textit{fine-tuning} del LLM resultaba menos eficaz que un buen ajuste del \textit{prompt} combinado con un modelo de embeddings bien adaptado al dominio. La estrategia final del sistema descansa más sobre la calidad del contexto recuperado (chunking, embeddings, búsqueda híbrida, \textit{prompt} restrictivo) que sobre la modificación de los pesos del modelo generativo. El \textit{fine-tuning} sí aportó valor en la coherencia terminológica y en la adherencia al estilo de respuesta corporativo.
+Una conclusión relevante del proyecto es que, para tareas de RAG puras, el \textit{fine-tuning} del LLM resultó \textit{menos} decisivo que un buen \textit{prompt} restrictivo combinado con una recuperación de calidad (chunking, embeddings, búsqueda híbrida y reranker). El ajuste fino sí aportó valor en la coherencia terminológica y en la adherencia al estilo de respuesta corporativo, pero la inteligencia del sistema descansa sobre todo en la calidad del contexto recuperado, no en la modificación de los pesos del modelo.
