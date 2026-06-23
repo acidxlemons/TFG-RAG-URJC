@@ -1519,7 +1519,7 @@ app = FastAPI(
     - 🌐 Web search y scraping
     - 📊 Métricas Prometheus
     """,
-    version="2.0.0",
+    version="2.3.0",
     openapi_tags=tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc",

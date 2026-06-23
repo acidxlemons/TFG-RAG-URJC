@@ -2,6 +2,34 @@
 
 **Proyecto**: TFG - Universidad Rey Juan Carlos
 
+## Versión 2.3.0 - Smart routing, pipeline único y robustez de despliegue (2026-06-23)
+
+### Contexto
+
+Consolidación final de la versión académica: encaminamiento inteligente de modelos,
+un único pipeline JARVIS y correcciones de robustez en el arranque del stack Docker.
+
+### Nuevas funcionalidades
+
+- **Smart Model Routing**: el `QueryProcessor` detecta la intención de cada consulta y
+  enruta al modelo óptimo — `JARVIS` para consultas rápidas/factuales y `qwen2.5-32b`
+  para análisis complejos multi-documento. Documentado en `docs/TECHNOLOGY_STACK.md`.
+- **MultiQueryRetriever**: genera reformulaciones adicionales de la consulta y fusiona
+  los resultados (eliminando duplicados) antes del reranker, mejorando el *recall* semántico.
+
+### Mantenimiento y fixes
+
+| Área | Problema | Fix |
+|------|----------|-----|
+| `services/openwebui/pipelines/` | Copias duplicadas del pipeline (`jarvis/jarvis.py` y `failed/jarvis.py`) que OpenWebUI cargaba como pipelines en conflicto | Eliminadas; se mantiene un único `pipelines/jarvis.py` |
+| `backend/app/main.py` | Versión de la API desincronizada (`2.0.0` en código vs `v2.3.0` en logs) | Unificada a `2.3.0` (app y endpoint raíz) |
+| `scripts/pull_models.sh` | `set -o pipefail` y `python3` no existen en la imagen `curlimages/curl` (busybox); `ollama-setup` salía con error y bloqueaba `backend`/`litellm`/`openwebui` vía `depends_on: service_completed_successfully` | `set -eu` + listado de modelos con `grep`/`sed` |
+| `.gitattributes` (nuevo) | Clones en Windows con `core.autocrlf=true` corrompían los `.sh` con CRLF al montarlos en contenedores Linux | `*.sh text eol=lf` |
+| `.gitignore` | Comentarios obsoletos sobre datos sensibles ya saneados (IPs/emails) | Actualizados |
+| `docs/TECHNICAL_ARCHITECTURE.md` | Snippet de la API con `version="2.0.0"` | Sincronizado a `2.3.0` |
+
+---
+
 ## Versión 2.2.0 - Sync con producción, Fix expansión asíncrona (2026-04-29)
 
 ### Contexto
