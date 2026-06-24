@@ -197,6 +197,8 @@ El agente JARVIS es el módulo individual más extenso del proyecto, con unas 4.
 \label{fig:documentos-disponibles}
 \end{figure}
 
+\paragraph{Reglas frente a un router basado en LLM.} La decisión de qué hacer con cada mensaje se toma, por tanto, mediante \textbf{reglas deterministas}, sin delegarla a un modelo de lenguaje. Es una elección de diseño deliberada: el enrutamiento por reglas es prácticamente instantáneo ($\sim$10\,ms), no consume tokens ni GPU, es reproducible y se puede validar de forma sistemática (alcanzó un 92\% de acierto, véase el Capítulo~\ref{cap:resultados}). A ello se añade que el modelo principal (\texttt{rag-qwen-ft}) se expone sin \textit{function calling}, por lo que no podría actuar como router fiable. La alternativa ---delegar la decisión en un LLM que actúe como \textit{agente router}, enfoque adoptado en la variante empresarial derivada de este TFG--- es más robusta ante fraseos inesperados, pero añade latencia, coste por consulta y pérdida de determinismo. Por qué no se ha integrado aquí y cómo podría hacerse (incluido un esquema híbrido) se detalla en el Anexo~\ref{anexo:pipeline}.
+
 Más allá del encaminamiento, JARVIS incorpora tres mecanismos de contexto: el \textit{Sticky Mode} (mantiene el modo de la pregunta anterior ante consultas de seguimiento breves y ambiguas), la \textbf{memoria de sesión por usuario} (recuerda la última imagen y la última web analizadas, y gestiona decisiones pendientes) y el \textbf{control de acceso departamental} (mapea los grupos de Azure AD del usuario a colecciones de Qdrant y filtra la búsqueda). El detalle de estos tres mecanismos, con ejemplos de código, se recoge en el Anexo~\ref{anexo:pipeline}.
 
 % ============================================================

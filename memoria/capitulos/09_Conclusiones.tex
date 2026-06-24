@@ -125,6 +125,8 @@ El proyecto abre varias líneas de evolución razonables:
     \item \textit{Refinar la adaptación al dominio}: seguir explorando embeddings especializados y técnicas de ajuste fino cuando aporten valor real.
     \item \textit{Generalizar el control de acceso}: ampliar la compatibilidad con otros proveedores de identidad y políticas más detalladas.
     \item \textit{Evaluación cuantitativa del Query Processor}: medir el impacto real de la expansión de consultas y el smart routing con métricas específicas de RAG como RAGAS (\textit{RAG Assessment}, un marco de evaluación automática de sistemas RAG) o MRR (\textit{Mean Reciprocal Rank}, que premia que la primera respuesta correcta aparezca lo más arriba posible), usando un conjunto de preguntas etiquetadas sobre los documentos corporativos.
+
+    \item \textit{Router híbrido reglas + LLM}: para fraseos que las reglas no cubran, delegar la detección de intención en un LLM con \textit{function calling} únicamente en los casos ambiguos, manteniendo las reglas ---rápidas y deterministas--- para los claros. El esquema concreto se describe en el Anexo~\ref{anexo:router-llm}.
 \end{enumerate}
 
 % ============================================================

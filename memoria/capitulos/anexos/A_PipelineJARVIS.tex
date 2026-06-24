@@ -149,3 +149,27 @@ El Pipeline integra un sistema de permisos multi-departamento que segmenta el ac
     \item Las colecciones autorizadas se envían al Backend en la cabecera HTTP \texttt{X-Tenant-Ids}, que filtra la búsqueda vectorial a solo los documentos permitidos.
     \item Los permisos se cachean durante 300 segundos (configurable) para minimizar llamadas a Graph API.
 \end{enumerate}
+
+% ============================================================
+\section{Enrutamiento por reglas frente a un router basado en LLM}
+\label{anexo:router-llm}
+% ============================================================
+
+Como se indica en el Capítulo~\ref{cap:implementacion}, todo el enrutamiento del sistema ---tanto la detección de modo en \texttt{\_detect\_intent()} como la clasificación de intención del \texttt{QueryProcessor}--- se resuelve con expresiones regulares y listas de palabras clave, no con un modelo de lenguaje.
+
+\paragraph{Por qué no se ha integrado un router por LLM.} Tres motivos:
+\begin{itemize}
+    \item \textbf{Determinismo y reproducibilidad}: las reglas siempre dan el mismo resultado ante la misma entrada, lo que permite testearlas (92\% de acierto en la evaluación) y depurarlas; un LLM como router introduce variabilidad.
+    \item \textbf{Coste y latencia}: la decisión por reglas es instantánea ($\sim$10\,ms) y gratuita; un router por LLM añade una llamada de inferencia (cientos de ms y consumo de GPU) a \emph{cada} consulta, antes incluso de empezar a responder.
+    \item \textbf{Limitación del modelo}: el modelo principal (\texttt{rag-qwen-ft}) se sirve sin \textit{function calling} (\texttt{supports\_function\_calling: false} en LiteLLM), por lo que no puede emitir decisiones estructuradas de forma fiable.
+\end{itemize}
+
+\paragraph{Cómo podría integrarse.} Si el caso de uso lo requiriese ---por ejemplo, ante fraseos muy variados que las reglas no cubran---, la migración a un router por LLM seguiría estos pasos:
+\begin{enumerate}
+    \item Emplear un modelo con \textit{function calling} fiable (p.~ej. \texttt{qwen2.5-32b} en modo herramientas) en lugar del modelo fine-tuned para la fase de decisión.
+    \item Sustituir (o complementar) \texttt{\_detect\_intent()} por una llamada al LLM que, dado el mensaje y el catálogo de modos/herramientas, devuelva la acción y sus parámetros en formato estructurado (JSON / \textit{tool call}), o bien exponer las herramientas vía MCP y dejar que el modelo las invoque.
+    \item Mantener un \textbf{esquema híbrido}: aplicar primero las reglas (rápidas y deterministas) para los casos claros y recurrir al LLM solo en los ambiguos o de baja confianza, acotando así coste y latencia.
+    \item Conservar alrededor de la decisión del LLM las garantías que hoy aporta el pipeline: control de acceso por \textit{tenant}, trazabilidad y formato de citas.
+\end{enumerate}
+
+En síntesis, el router por reglas es la opción coherente con las prioridades de este TFG (control, reproducibilidad y coste nulo); el router por LLM gana cuando se prioriza la flexibilidad ante lenguaje libre y se dispone de un modelo con \textit{tool-calling} robusto.
