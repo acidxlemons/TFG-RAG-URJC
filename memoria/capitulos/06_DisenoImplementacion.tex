@@ -144,7 +144,7 @@ Prometheus, Grafana y DCGM & \checkmark & \checkmark & $\times$   & \checkmark &
 }
 \end{table}
 
-En resumen, el trabajo de desarrollo propio abarca más de 6.000 líneas de código Python distribuidas entre el Pipeline JARVIS (1.498 líneas), el Backend ($\sim$3.000), el Indexer ($\sim$1.200) y el servidor MCP-BOE ($\sim$400), además de toda la configuración declarativa del ecosistema Docker (Compose, LiteLLM, NGINX, Prometheus y los dashboards de Grafana). Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
+En resumen, el trabajo de desarrollo propio abarca alrededor de 24.000 líneas de código Python distribuidas entre el Backend ($\sim$17.400 líneas), el Pipeline JARVIS ($\sim$4.400), el Indexer ($\sim$1.700) y el servidor MCP-BOE ($\sim$490), además de toda la configuración declarativa del ecosistema Docker (Compose, LiteLLM, NGINX, Prometheus y los dashboards de Grafana). Las herramientas externas proporcionan las capacidades de infraestructura (base de datos, motor LLM, OCR, navegador), pero la lógica de negocio, la orquestación y la inteligencia del sistema son enteramente originales.
 
 % ============================================================
 \section[Pipeline de OpenWebUI]{El Mecanismo Pipeline de OpenWebUI (Hook)}
@@ -162,7 +162,7 @@ La conexión se establece por configuración: el Pipeline se despliega como cont
 \label{sec:jarvis-detalle}
 % ============================================================
 
-El agente JARVIS es la pieza de software más compleja del proyecto, con 1.498 líneas de código Python. Su función es analizar cada mensaje del usuario y decidir a cuál de los modos de operación derivarlo. La detección de intenciones se implementa en el método \texttt{\_detect\_intent()}, que evalúa el mensaje contra un conjunto de reglas heurísticas (coincidencia de palabras clave y expresiones regulares) en un \textit{orden de prioridad estricto}: primero las condiciones más específicas (archivos adjuntos, imágenes, URLs) y después las más genéricas (keywords de RAG, búsqueda web, conversación). La Tabla~\ref{tab:intenciones-detalle} resume las categorías, su prioridad y los criterios de activación.
+El agente JARVIS es el módulo individual más extenso del proyecto, con unas 4.400 líneas de código Python concentradas en un único fichero (\texttt{jarvis.py}). Su función es analizar cada mensaje del usuario y decidir a cuál de los modos de operación derivarlo. La detección de intenciones se implementa en el método \texttt{\_detect\_intent()}, que evalúa el mensaje contra un conjunto de reglas heurísticas (coincidencia de palabras clave y expresiones regulares) en un \textit{orden de prioridad estricto}: primero las condiciones más específicas (archivos adjuntos, imágenes, URLs) y después las más genéricas (keywords de RAG, búsqueda web, conversación). La Tabla~\ref{tab:intenciones-detalle} resume las categorías, su prioridad y los criterios de activación.
 
 \begin{table}[H]
 \centering

@@ -13,6 +13,7 @@
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick%20Start-5%20min-brightgreen?style=for-the-badge" alt="Quick Start"></a>
   <a href="#-características"><img src="https://img.shields.io/badge/Features-20+-blue?style=for-the-badge" alt="Features"></a>
   <a href="https://acidxlemons.github.io/TFG-RAG-URJC/"><img src="https://img.shields.io/badge/Landing-Page-purple?style=for-the-badge" alt="Landing Page"></a>
+  <a href="memoria/main.pdf"><img src="https://img.shields.io/badge/Memoria-PDF-red?style=for-the-badge&logo=adobeacrobatreader&logoColor=white" alt="Memoria PDF"></a>
 </p>
 
 <p align="center">
