@@ -32,7 +32,18 @@ LAW_MAPPINGS = {
 
 El resolvedor elimina palabras vacías comunes del español (``la'', ``de'', ``del'', ``ley'') y busca coincidencias parciales en el diccionario antes de acudir al endpoint de búsqueda general del BOE.
 
-En el alcance actual, el servidor MCP se ha validado en ejecución por terminal con un LLM y un cliente MCP compatible. Aunque OpenWebUI ya incorpora soporte MCP en versiones recientes \cite{openwebuiMcp2026}, la funcionalidad BOE dentro de la interfaz web se integra mediante llamadas a API directas desde el pipeline JARVIS. Esta decisión permitió mantener un mayor control sobre autenticación, encaminamiento y trazabilidad durante el desarrollo, dejando preparada la migración a MCP como evolución posterior.
+En el alcance actual, el servidor MCP se ha validado en ejecución por terminal con un LLM y un cliente MCP compatible, pero la funcionalidad BOE \emph{dentro de la interfaz web} se resuelve mediante llamadas a la API REST del backend desde el pipeline JARVIS, no por MCP. Conviene explicar por qué, ya que es una fuente habitual de confusión.
+
+\paragraph{Por qué el flujo web no pasa por MCP.} MCP es un protocolo cliente-servidor a nivel de aplicación: el cliente reside en la herramienta (Claude Desktop, OpenWebUI), no en el motor de inferencia. Ollama, por tanto, no «usa» MCP; se limita a servir el modelo. Para que OpenWebUI invocara las herramientas del servidor BOE por MCP tendrían que cumplirse dos condiciones que el diseño actual no satisface:
+
+\begin{itemize}
+    \item \textbf{Un modelo con \textit{function calling}.} El \textit{tool-calling} por MCP requiere que sea el propio LLM quien decida invocar la herramienta y construya sus argumentos. El modelo principal (\texttt{rag-qwen-ft}, alias JARVIS) está ajustado para responder en modo RAG con citas y se expone en LiteLLM con \texttt{supports\_function\_calling: false}; no emite llamadas a herramientas de forma fiable.
+    \item \textbf{Que el modelo conduzca la conversación.} El \textit{tool-calling} de OpenWebUI opera en el diálogo modelo$\leftrightarrow$interfaz, pero en este sistema el método \texttt{pipe()} del pipeline JARVIS intercepta cada mensaje \emph{antes} y enruta por su cuenta (detección de intención por expresiones regulares). Como el pipeline ya decide todo, la capa de herramientas MCP de OpenWebUI nunca llega a activarse.
+\end{itemize}
+
+A esto se añade la cronología: el soporte MCP nativo de OpenWebUI maduró después de construir el pipeline, por lo que la vía integrada y validada fue API-vía-pipeline, que además da control directo sobre autenticación, filtrado por \textit{tenant}, métricas y formato de citas.
+
+\paragraph{¿Merece la pena habilitar MCP de forma activa?} Para el caso concreto del BOE ---un dominio acotado, con siete herramientas y la resolución semántica ya resuelta en el pipeline--- la integración por API es suficiente y más controlada; activar MCP no aportaría una mejora proporcional a su coste: obligaría a adoptar un modelo con \textit{function calling} fiable, a reimplementar en la capa MCP las garantías de acceso y trazabilidad que hoy ofrece el pipeline, y a asumir mayor latencia y el riesgo de que el modelo elija o parametrice mal la herramienta (frente al determinismo del enrutamiento por reglas). El MCP activo sí compensaría en otro escenario: cuando se quieran incorporar \emph{muchas} herramientas o fuentes nuevas, interoperar con clientes MCP externos, o adoptar un modelo con \textit{tool-calling} robusto como núcleo del sistema; en ese caso MCP reduce el acoplamiento y escala mejor que seguir añadiendo ramas al pipeline. El camino intermedio más razonable es mantener el pipeline como orquestador pero hacer que sea \emph{él} quien actúe como cliente MCP de las herramientas nuevas, combinando el estándar con el control actual.
 
 % ============================================================
 \section{Validación JWT en el Backend}
