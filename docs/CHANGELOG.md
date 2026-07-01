@@ -62,7 +62,7 @@ comprensión del español, instrucciones complejas, y contexto de 32K tokens.
 
 | Nombre | Modelo base | VRAM | Rol |
 |--------|------------|------|-----|
-| `JARVIS` | `rag-qwen-ft:latest` (Qwen 2.5 14B + LoRA) | ~8 GB | Chat RAG principal |
+| `JARVIS` | `rag-qwen-ft:latest` (Qwen 2.5 7B + LoRA) | ~8 GB | Chat RAG principal |
 | `qwen2.5-32b` | `qwen2.5:32b-instruct-q4_K_M` | ~19 GB | Fallback y análisis complejo |
 | `qwen2.5vl` | `qwen2.5vl:7b` | ~6 GB | Visión / OCR asistido |
 | MiniLM-L12-v2 | `paraphrase-multilingual-MiniLM-L12-v2` | CPU | Embeddings (384 dims) |
@@ -295,7 +295,7 @@ Sistema: ✅ Mantiene contexto del documento anterior
 
 ### 🧠 Nuevo Motor de IA
 Reemplazo del modelo generalista Llama 3.1 por una versión especializada:
-- **Modelo Base**: Qwen 2.5 14B (Superior en razonamiento e instrucciones).
+- **Modelo Base**: Qwen 2.5 7B (Superior en razonamiento e instrucciones).
 - **Fine-Tuning**: Adaptador LoRA `tfg-qwen-ft` entrenado con documentación interna.
 - **Formato**: ChatML template corregido para evitar bucles de generación.
 - **Mejora**: Respuestas más precisas, menos alucinaciones y mejor adherencia al formato español.

@@ -21,7 +21,7 @@ El sistema no llegó al modelo de producción actual en un único paso. La elecc
 \midrule
 1 & \texttt{llama3.1:8b-instruct-q4\_0}  & Oct 2025 (Sprint~1) & 4\,K  & $\sim$5\,GB & Calidad de respuesta insuficiente (Q4) \\
 2 & \texttt{llama3.1:8b-instruct-q8\_0}  & Nov--Dic 2025       & 4\,K  & $\sim$8\,GB & Contexto 4\,K y español limitados; generación repetitiva \\
-3 & Qwen 2.5 14B (base)                   & Dic 2025 (evaluación) & 32\,K & $\sim$8\,GB & \textit{Model loop}: tokens de parada incompatibles \\
+3 & Qwen 2.5 7B (base)                    & Dic 2025 (evaluación) & 32\,K & $\sim$8\,GB & \textit{Model loop}: tokens de parada incompatibles \\
 4 & \texttt{rag-qwen-ft:latest} (LoRA FT) & Dic 2025 -- actualidad & 32\,K & $\sim$8\,GB & \textbf{Modelo en producción (TFG y sistema empresarial)} \\
 \bottomrule
 \end{tabular}%
@@ -34,7 +34,7 @@ La cuantización Q4 (4 bits) reducía el consumo de VRAM a $\sim$5\,GB, lo que f
 \paragraph{Etapa 2 --- Llama 3.1 8B Q8 (prototipo de mayor calidad, noviembre--diciembre 2025).}
 La migración a la variante Q8 (8 bits) mejoró la precisión de forma apreciable. Durante las primeras semanas de uso real en el entorno corporativo se identificaron dos limitaciones estructurales: la ventana de contexto de 4\,K tokens era insuficiente para consultas RAG con múltiples fragmentos documentales ---los fragmentos más alejados se truncaban antes de que el modelo pudiera considerarlos--- y el rendimiento en español continuaba siendo inferior al esperado para un asistente empresarial hispanohablante.
 
-\paragraph{Etapa 3 --- Qwen 2.5 14B base (evaluación, diciembre 2025).}
+\paragraph{Etapa 3 --- Qwen 2.5 7B base (evaluación, diciembre 2025).}
 La familia Qwen~2.5, desarrollada por Alibaba Cloud, ofrecía ventana de contexto de 32\,K tokens y mejor rendimiento en español. Sin embargo, durante la integración se detectó un problema técnico crítico: el modelo generaba respuestas sin fin (\textit{model loop}). La causa era una incompatibilidad en los \textit{tokens de parada}: mientras Llama~3.1 utiliza \texttt{</s>} para indicar el fin de la respuesta, el formato ChatML de Qwen~2.5 emplea \texttt{<|im\_end|>}. Fue necesario reconstruir el Modelfile de Ollama declarando explícitamente los stop tokens correctos antes de poder usar el modelo de forma fiable.
 
 \paragraph{Etapa 4 --- rag-qwen-ft:latest con LoRA (producción, diciembre 2025 -- actualidad).}

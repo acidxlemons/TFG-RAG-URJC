@@ -58,7 +58,7 @@ docker compose logs -f
 
 ### Paso 4: Descargar Modelo LLM
 ```bash
-# Descargar modelo principal JARVIS (Qwen 2.5 14B fine-tuned, requiere ~8GB)
+# Descargar modelo principal JARVIS (Qwen 2.5 7B fine-tuned, requiere ~8GB)
 docker compose exec ollama ollama pull rag-qwen-ft:latest
 # Fallback (opcional, requiere ~19GB VRAM)
 # docker compose exec ollama ollama pull qwen2.5:32b-instruct-q4_K_M

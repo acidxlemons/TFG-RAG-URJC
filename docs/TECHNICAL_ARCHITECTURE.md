@@ -2069,7 +2069,7 @@ Invoke-RestMethod -Uri http://localhost:8002/health
 ### 9.1 Estrategia de Modelos
 
 Utilizamos **LoRA (Low-Rank Adaptation)** para especializar el modelo sin reentrenamiento completo.
-- **Modelo Base**: Qwen 2.5 14B.
+- **Modelo Base**: Qwen 2.5 7B.
 - **Adaptador**: `tfg-qwen-ft` (Entrenado con scripts en `scripts/`).
 
 ### 9.2 Riesgos y Mantenimiento
