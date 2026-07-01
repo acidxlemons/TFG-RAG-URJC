@@ -92,7 +92,7 @@
 ### 📄 Procesamiento de Documentos
 - **📑 OCR Inteligente** — PaddleOCR con aceleración GPU para PDFs escaneados
 - **📊 Multi-formato** — PDF, DOCX, TXT, imágenes
-- **✂️ Chunking Semántico** — Fragmentación con solapamiento del 10-15%
+- **✂️ Chunking Semántico** — Fragmentos de ~500 tokens con solapamiento de ~10%
 
 ### 📊 Observabilidad
 - **📈 Prometheus + Grafana** — 3 dashboards: Backend, GPU y Base de Datos

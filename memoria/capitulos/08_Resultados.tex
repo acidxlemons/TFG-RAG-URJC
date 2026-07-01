@@ -268,7 +268,7 @@ La eliminación de alucinaciones en modo RAG se logró mediante la combinación 
 
     \item \textbf{Prompt de sistema restrictivo:} El \textit{system prompt} inyectado instruye explícitamente al modelo para que responda \textbf{únicamente} basándose en el contexto recuperado, prohibiendo la generación libre de información no respaldada por los fragmentos.
 
-    \item \textbf{Solapamiento de ventanas contextuales:} El solapamiento del 10--15\% en el chunking asegura que el hilo semántico de párrafos extensos no se pierde en los límites de fragmento, proporcionando al modelo contexto suficiente para generar respuestas coherentes.
+    \item \textbf{Solapamiento de ventanas contextuales:} El solapamiento (50 tokens sobre 500, $\sim$10\%) en el chunking asegura que el hilo semántico de párrafos extensos no se pierde en los límites de fragmento, proporcionando al modelo contexto suficiente para generar respuestas coherentes.
 \end{enumerate}
 
 En las pruebas realizadas, no se detectó ninguna instancia de alucinación en modo RAG con la configuración descrita. El modelo respondió ``No dispongo de esa información en los documentos consultados'' cuando la pregunta no encontraba coincidencias relevantes en Qdrant, que es el comportamiento deseado.

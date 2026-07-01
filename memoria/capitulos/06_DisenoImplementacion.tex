@@ -208,7 +208,7 @@ Más allá del encaminamiento, JARVIS incorpora tres mecanismos de contexto: el 
 
 El Backend constituye el motor central de procesamiento del sistema. Implementado en FastAPI, fue objeto de una refactorización significativa: inicialmente era un único fichero \texttt{main.py} de más de 1.900 líneas que se dividió en una arquitectura modular con paquetes separados para esquemas (\texttt{schemas/}), servicios (\texttt{services/}), endpoints (\texttt{api/}), procesamiento (\texttt{processing/}) e integraciones (\texttt{integrations/}).
 
-La \textbf{ingesta} de un documento sigue seis etapas: recepción (API, Indexer o scraper), detección de tipo (texto nativo vs. escaneado), extracción de texto (\texttt{pdfplumber}, PaddleOCR o la cadena Trafilatura/Readability/BeautifulSoup), \textit{chunking} semántico (fragmentos de 512--1024 tokens con 10--15\% de solapamiento), generación de \textit{embeddings} (vector denso de 384 dimensiones con \path{paraphrase-multilingual-MiniLM-L12-v2}) y almacenamiento en Qdrant con metadatos. El procedimiento completo se detalla en el Anexo~\ref{anexo:backend}.
+La \textbf{ingesta} de un documento sigue seis etapas: recepción (API, Indexer o scraper), detección de tipo (texto nativo vs. escaneado), extracción de texto (\texttt{pdfplumber}, PaddleOCR o la cadena Trafilatura/Readability/BeautifulSoup), \textit{chunking} semántico (fragmentos de unos 500 tokens con 50 de solapamiento, $\sim$10\%), generación de \textit{embeddings} (vector denso de 384 dimensiones con \path{paraphrase-multilingual-MiniLM-L12-v2}) y almacenamiento en Qdrant con metadatos. El procedimiento completo se detalla en el Anexo~\ref{anexo:backend}.
 
 \begin{figure}[H]
 \centering

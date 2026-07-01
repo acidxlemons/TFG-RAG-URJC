@@ -122,7 +122,7 @@ La elección del LLM principal no fue inmediata: evolucionó a lo largo del proy
 \midrule
 JARVIS / europav-IA & \texttt{rag-qwen-ft:latest}            & Chat RAG principal con fine-tuning LoRA & $\sim$8\,GB  & 32\,K \\
 qwen2.5-32b         & \texttt{qwen2.5:32b-instruct-q4\_K\_M} & Fallback y análisis complejos         & $\sim$19\,GB & 32\,K \\
-qwen2.5vl           & \texttt{qwen2.5vl:7b}                  & Visión e interpretación de imágenes & $\sim$6\,GB  & 32\,K \\
+qwen2.5vl           & \texttt{qwen2.5vl:7b}                  & Visión e interpretación de imágenes & $\sim$6\,GB  & 128\,K \\
 Embeddings (densos) & \texttt{paraphrase-multilingual-MiniLM-L12-v2} & Vectorización semántica de texto (CPU) & ---         & 512 tok. \\
 Sparse (BM25)       & \texttt{Qdrant/bm25} (\texttt{fastembed}) & Vectores dispersos para búsqueda léxica (CPU) & --- & --- \\
 Reranker            & \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2} & Reordenación de candidatos por relevancia (CPU) & --- & --- \\

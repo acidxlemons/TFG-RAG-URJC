@@ -17,7 +17,7 @@ El proceso de ingesta de un documento sigue las siguientes etapas:
 
     \item Extracción de texto: Para PDFs nativos se usa \texttt{pdfplumber}; para escaneados, PaddleOCR con aceleración GPU; para HTML, la cadena Trafilatura $\rightarrow$ Readability $\rightarrow$ BeautifulSoup.
 
-    \item Chunking semántico: El texto extraído se segmenta en fragmentos de 512--1024 tokens con un solapamiento del 10--15\% entre fragmentos consecutivos. El solapamiento es fundamental para no perder el hilo semántico de párrafos que cruzan los límites de ventana.
+    \item Chunking semántico: El texto extraído se segmenta en fragmentos de unos 500 tokens con un solapamiento de 50 ($\sim$10\%) entre fragmentos consecutivos. El solapamiento es fundamental para no perder el hilo semántico de párrafos que cruzan los límites de ventana.
 
     \item Generación de embeddings: Cada fragmento se transforma en un vector denso de 384 dimensiones mediante el modelo \path{paraphrase-multilingual-MiniLM-L12-v2} de SentenceTransformers, ejecutado en CPU para evitar conflictos de VRAM con los modelos de generación.
 
