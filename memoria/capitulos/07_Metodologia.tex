@@ -1,7 +1,7 @@
 \chapter{Metodología}
 \label{cap:metodologia}
 
-En este capítulo se describe el proceso de desarrollo seguido, el entorno hardware utilizado, los criterios de selección tecnológica y la estrategia de documentación adoptada. El objetivo es mostrar cómo se ha organizado el trabajo y con qué medios se ha llevado a cabo.
+En este capítulo se describe cómo se ha organizado el trabajo: el proceso de desarrollo seguido, la organización del código resultante y, sobre todo, el detalle de cada sprint ---qué se hizo, qué tecnologías se eligieron frente a qué alternativas y qué lecciones dejó cada etapa---. El capítulo se cierra documentando el uso de herramientas de inteligencia artificial como apoyo. El balance cuantitativo del proyecto (horas dedicadas, planificación temporal, presupuesto y riesgos) se recoge en el Capítulo~\ref{cap:conclusiones}, junto al resto de conclusiones.
 
 % ============================================================
 \section{Proceso de Desarrollo}
@@ -17,273 +17,166 @@ Se estableció un ciclo de vida con las siguientes fases:
     \item \textbf{Pruebas y Validación:} Validación funcional del encaminamiento inteligente y de las capacidades del RAG mediante métricas comparativas empíricas y experimentación cualitativa.
 \end{enumerate}
 
-\subsection{Iteraciones de Desarrollo}
-El proyecto se dividió en iteraciones incrementales de tipo sprint, cada una enfocada en un módulo funcional del sistema. La Tabla~\ref{tab:iteraciones} resume las iteraciones de desarrollo junto con sus entregables principales y las horas dedicadas estimadas.
-
-\begin{table}[H]
-\centering
-\caption{Iteraciones principales del desarrollo, entregables y horas dedicadas.}
-\label{tab:iteraciones}
-\begin{tabular}{clp{6cm}c}
-\toprule
-\textbf{Sprint} & \textbf{Período} & \textbf{Entregable Principal} & \textbf{Horas} \\
-\midrule
-1 & Oct 2025 & Infraestructura Docker, PostgreSQL, Qdrant, Ollama. Pruebas de concepto con LLaMA. & 25 h \\
-2 & Nov 2025 & Backend FastAPI con pipeline RAG básico. Ingesta de PDFs y generación de embeddings. & 35 h \\
-3 & Dic 2025 & Integración SharePoint (MSAL/Graph API). Motor OCR PaddleOCR con GPU. & 30 h \\
-4 & Ene 2026 & Agente JARVIS Pipeline. Web scraping con Playwright. Búsqueda DuckDuckGo. & 40 h \\
-5 & Feb 2026 & Servidor MCP del BOE. Fine-tuning LoRA (Qwen). Stack Prometheus/Grafana. & 30 h \\
-6 & Mar--Abr 2026 & Agente SQL (NL$\rightarrow$SQL) con lista blanca y auto-corrección. Validación JWT Azure AD en backend. Corrección de expansión de consulta asíncrona (v2.2.0). & 25 h \\
-7 & May 2026 & \texttt{QueryProcessor}: intent detection, smart model routing (JARVIS/qwen2.5-32b) y query expansion multi-variante. Summarización con 32B en \texttt{MemoryManager} (v2.3.0). & 20 h \\
-\midrule
- & & \textbf{Total desarrollo técnico} & \textbf{205 h} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Diagrama de GANTT}
-La distribución temporal del proyecto se representa en el diagrama de GANTT de la Figura~\ref{fig:gantt}. Cada barra horizontal corresponde a una fase o sprint de desarrollo, con las dependencias marcadas implícitamente por la secuencia temporal.
-
-\begin{figure}[H]
-\centering
-\resizebox{\textwidth}{!}{%
-\begin{ganttchart}[
-    hgrid,
-    vgrid={*{4}{dotted}},
-    x unit=0.65cm,
-    y unit chart=0.6cm,
-    title height=1,
-    bar height=0.5,
-    bar label font=\footnotesize,
-    title label font=\footnotesize,
-    group label font=\footnotesize\bfseries
-]{1}{32}
-\gantttitle{Oct}{4}
-\gantttitle{Nov}{4}
-\gantttitle{Dic}{4}
-\gantttitle{Ene}{4}
-\gantttitle{Feb}{4}
-\gantttitle{Mar}{4}
-\gantttitle{Abr}{4}
-\gantttitle{May}{4} \\
-\ganttbar{Infraestructura Docker}{1}{4} \\
-\ganttbar{Backend FastAPI + RAG}{5}{8} \\
-\ganttbar{SharePoint + OCR}{9}{12} \\
-\ganttbar{JARVIS + Scraping}{13}{16} \\
-\ganttbar{BOE + LoRA + Grafana}{17}{20} \\
-\ganttbar{SQL + JWT + v2.2.0}{21}{28} \\
-\ganttbar{QueryProcessor + v2.3.0}{29}{32} \\
-\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{32}
-\end{ganttchart}
-}
-\caption{Diagrama de GANTT del proyecto.}
-\label{fig:gantt}
-\end{figure}
+El trabajo se dividió en \textbf{siete sprints} de aproximadamente un mes de duración, desarrollados entre octubre de 2025 y mayo de 2026, a los que siguió una fase final de documentación, redacción de la memoria y difusión del proyecto hasta julio de 2026. Cada sprint se centró en un módulo funcional del sistema y terminó con un entregable operativo. La distribución temporal completa (diagrama de Gantt) y las horas dedicadas a cada sprint se presentan en la Sección~\ref{sec:esfuerzo}.
 
 % ============================================================
-\section{Entorno Hardware}
+\section{Organización del Código}
+\label{sec:organizacion-codigo}
 % ============================================================
 
-El sistema fue diseñado para ejecutarse en un servidor físico on-premise con las siguientes especificaciones:
+Antes de describir cada sprint conviene tener presente la estructura del repositorio del proyecto, porque cada directorio se corresponde de forma bastante directa con el sprint en el que nació. Esta correspondencia entre organización del código y evolución temporal facilita tanto el mantenimiento como la lectura del historial del proyecto:
 
-\begin{table}[H]
-\centering
-\caption{Especificaciones del entorno hardware de despliegue.}
-\label{tab:hardware}
-\begin{tabular}{ll}
-\toprule
-\textbf{Componente} & \textbf{Especificación} \\
-\midrule
-Sistema Operativo  & Ubuntu Server 22.04 LTS \\
-CPU                & AMD / Intel x86\_64 (multi-core) \\
-RAM                & 32 GB DDR4 mínimo \\
-GPU                & NVIDIA con $\geq$ 16 GB VRAM (p.ej. RTX 4090, A4000) \\
-CUDA Toolkit       & 12.x \\
-Almacenamiento     & SSD NVMe $\geq$ 500 GB \\
-Docker Engine      & 24.x con NVIDIA Container Toolkit \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-La GPU es el recurso más crítico del sistema, dado que los tres modelos de lenguaje, el motor OCR y los modelos de visión comparten la misma tarjeta gráfica. La gestión eficiente de la VRAM mediante cuantización (Q8, Q4) y la carga/descarga dinámica de modelos en Ollama resultó una decisión arquitectónica determinante.
-
-% ============================================================
-\section{Stack Tecnológico}
-% ============================================================
-
-La selección de tecnologías priorizó tres criterios: licencia de código abierto, ejecutabilidad local sin dependencias de nube y madurez del ecosistema. Conviene recordar que muchas de estas tecnologías son herramientas preexistentes reutilizadas en el proyecto, mientras que la lógica de integración y buena parte de los servicios que las conectan constituyen el desarrollo propio del TFG. La Tabla~\ref{tab:stack} enumera la totalidad de tecnologías empleadas.
-
-\begin{table}[H]
-\centering
-\caption{Stack tecnológico completo del proyecto.}
-\label{tab:stack}
-\begin{tabular}{lll}
-\toprule
-\textbf{Categoría} & \textbf{Tecnología} & \textbf{Versión / Detalle} \\
-\midrule
-\multirow{2}{*}{Lenguajes}      & Python      & 3.11 \\
-                                  & YAML / Bash & Configuración y scripts \\
-\midrule
-Framework Web       & FastAPI      & 0.104+ \\
-Motor de IA Local   & Ollama       & latest  \\
-Proxy de Modelos    & LiteLLM      & latest  \\
-Frontend Chat       & OpenWebUI    & main \\
-\midrule
-BD Vectorial        & Qdrant       & latest \\
-BD Relacional       & PostgreSQL   & 16 con pgvector \\
-Caché               & Redis        & 7 Alpine \\
-Objetos             & MinIO        & latest \\
-\midrule
-Web Scraping        & Playwright   & Chromium \\
-Extracción NLP      & Trafilatura  & latest \\
-OCR                 & PaddleOCR    & 2.x con CUDA \\
-\midrule
-Embeddings          & SentenceTransformers & MiniLM-L12-v2 \\
-Autenticación       & Azure AD (OIDC) & MSAL Python \\
-SharePoint          & Microsoft Graph API & v1.0 \\
-\midrule
-Métricas            & Prometheus   & 2.x \\
-Dashboards          & Grafana      & latest \\
-GPU Exporter        & NVIDIA DCGM  & latest \\
-\midrule
-Contenerización     & Docker + Compose & 24.x \\
-Control de Versiones& Git + GitHub & --- \\
-Proxy Inverso       & NGINX        & Alpine \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{lstlisting}[numbers=none, basicstyle=\ttfamily\footnotesize, caption={Estructura del repositorio y sprint en el que se desarrolló cada componente.}, label={lst:estructura-repo}]
+TFG-RAG-URJC/
+|-- backend/          <- Servicio FastAPI (sprints 2, 4, 6 y 7)
+|   `-- app/          <- api, core (RAG, SQL, QueryProcessor),
+|                        integrations, processing, storage...
+|-- services/
+|   |-- ollama/       <- Motor de inferencia local (sprint 1)
+|   |-- litellm/      <- Proxy unificado de modelos (sprint 1)
+|   |-- indexer/      <- Sincronizacion SharePoint+OCR (sprint 3)
+|   `-- openwebui/    <- Interfaz y pipeline JARVIS (sprint 4)
+|-- mcp-boe-server/   <- Servidor MCP del BOE (sprint 5)
+|-- scripts/          <- Fine-tuning, datasets, backups (spr. 5)
+|-- config/           <- NGINX, Prometheus, Grafana (spr. 1 y 5)
+|-- database/         <- Esquema inicial PostgreSQL (sprint 1)
+|-- tests/            <- Pruebas del sistema (transversal)
+|-- docs/             <- Documentacion tecnica (transversal)
+|-- github_pages/     <- Pagina web del proyecto
+`-- memoria/          <- Esta memoria (LaTeX)
+\end{lstlisting}
 
 % ============================================================
-\section{Herramientas y Control de Versiones}
-% ============================================================
-Para la correcta organización del proyecto se utilizó el sistema de control de versiones Git, alojando el repositorio principal en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}}. El seguimiento de incidencias, errores y nuevas características se realizó mediante trabajo por ramas, separando el código estable del trabajo en progreso.
-
-El entorno de desarrollo integrado (IDE) empleado primordialmente fue Visual Studio Code en Windows, acoplado al subsistema WSL (\textit{Windows Subsystem for Linux}) o a contenedores Docker en remoto para igualar la paridad funcional con el entorno de despliegue real Linux, evitando fricciones a nivel de sistema de archivos o librerías específicas compiladas para CUDA/NVIDIA.
-
-\subsection{Integración Continua con GitHub Actions}
-Se configuró un flujo de integración continua (CI) mediante GitHub Actions \cite{githubActions2026docs} para automatizar el despliegue de la documentación del proyecto en GitHub Pages. Cada vez que se realiza un \textit{push} a la rama \texttt{main}, el workflow compila y publica automáticamente la landing page del proyecto, accesible públicamente en \url{https://acidxlemons.github.io/TFG-RAG-URJC/}.
-
-% ============================================================
-\section{Estimación de Presupuesto}
+\section{Los Sprints en Detalle}
+\label{sec:sprints}
 % ============================================================
 
-Aunque el proyecto se ha desarrollado íntegramente con software de código abierto, se estiman los costes asociados al despliegue profesional del sistema si se deseara replicar o escalar:
+A continuación se define cada sprint siguiendo un esquema común: descripción y objetivo, tareas realizadas, tecnologías elegidas frente a las alternativas valoradas, y estado final con las lecciones aprendidas. Todos los sprints finalizaron con su entregable operativo, por lo que el estado se detalla junto a las lecciones de cada uno.
 
-\begin{table}[H]
-\centering
-\caption{Estimación de presupuesto para el despliegue del sistema.}
-\label{tab:presupuesto}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lcc}
-\toprule
-\textbf{Concepto} & \textbf{Coste Unitario} & \textbf{Coste Total} \\
-\midrule
-Servidor GPU (NVIDIA RTX 4090 24GB) & --- & 2.500 \euro{} \\
-Servidor torre (CPU, RAM 64GB, SSD) & --- & 1.500 \euro{} \\
-Licencias de software & --- & 0 \euro{} (Open Source) \\
-Dominio y certificados SSL & 15 \euro{}/año & 15 \euro{} \\
-Electricidad servidor 24/7 (año) & $\sim$50 \euro{}/mes & 600 \euro{} \\
-\midrule
-Horas de desarrollo (205h $\times$ 25 \euro{}/h) & 25 \euro{}/h & 5.125 \euro{} \\
-\midrule
-\multicolumn{2}{r}{\textbf{Total estimado}} & \textbf{9.740 \euro{}} \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
+\subsection{Sprint 1 (octubre de 2025): Infraestructura base}
 
-Cabe destacar que el coste de licencias de software es \textbf{cero euros}, dado que todas las tecnologías empleadas son de código abierto. Esto representa una ventaja competitiva significativa frente a soluciones comerciales como Microsoft Copilot o AWS Bedrock, cuyos costes recurrentes por token procesado pueden escalar rápidamente en entornos de uso intensivo.
+\textbf{Descripción.} Construir los cimientos del sistema: la plataforma de contenedores, los servicios de datos y el motor de inferencia local, validando que era viable ejecutar un LLM útil en el hardware disponible.
 
-% ============================================================
-\section{Gestión de Riesgos}
-% ============================================================
+\textbf{Tareas.} Definición del \texttt{docker-compose} inicial y de la red interna aislada; despliegue de PostgreSQL con su esquema inicial (\texttt{database/init.sql}), Qdrant y Redis; instalación de Ollama con los primeros modelos (Llama 3.1) y del proxy LiteLLM; pruebas de concepto de chat local.
 
-Dado el carácter experimental del proyecto y la velocidad de evolución del campo de los LLMs, se identificaron los siguientes riesgos técnicos y sus respectivas mitigaciones:
-
-\begin{table}[H]
-\centering
-\caption{Riesgos técnicos identificados y estrategias de mitigación.}
-\label{tab:riesgos}
-\begin{tabular}{p{5cm}p{7cm}}
-\toprule
-\textbf{Riesgo} & \textbf{Mitigación} \\
-\midrule
-Agotamiento de VRAM con múltiples modelos cargados & Cuantización Q4/Q8 y carga dinámica bajo demanda en Ollama \\
-Obsolescencia de un modelo de IA & Arquitectura desacoplada vía LiteLLM que permite cambiar modelos sin alterar código \\
-Fallo de la GPU o driver CUDA & Fallback automático a CPU en PaddleOCR y SentenceTransformer \\
-Cambios en la API de SharePoint & Capa de abstracción con MSAL que aísla los cambios de endpoints \\
-Pérdida de datos en Qdrant & Backup periódico de colecciones y réplica en MinIO S3 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% ============================================================
-\section{Impacto de Asignaturas Cursadas en la Carrera}
-% ============================================================
-
-El desarrollo de este TFG ha sido posible gracias a la base de conocimientos adquirida en múltiples asignaturas del Grado en Ingeniería de Tecnologías de Telecomunicación, aunque también ha revelado áreas donde fue necesario un aprendizaje autónomo complementario.
-
-\subsection{Conocimientos Aplicados del Grado}
-
+\textbf{Tecnologías y alternativas valoradas.}
 \begin{itemize}
-    \item \textbf{Ingeniería del Software:} Los patrones de diseño, la separación de responsabilidades y la metodología ágil aprendidos en esta asignatura fueron directamente aplicables al diseño de la arquitectura de microservicios y a la gestión iterativa del proyecto.
-
-    \item \textbf{Bases de Datos:} Los fundamentos de SQL, diseño relacional y normalización permitieron la configuración y administración de PostgreSQL, así como la comprensión del modelo de datos empleado por OpenWebUI para almacenar conversaciones y usuarios.
-
-    \item \textbf{Redes de Computadores:} El conocimiento de protocolos TCP/IP, DNS, proxies inversos y certificados TLS fue indispensable para la configuración de NGINX, la red Docker interna y la securización del tráfico HTTPS.
-
-    \item \textbf{Sistemas Operativos:} La gestión de contenedores Docker, volúmenes, procesos, y la interacción con drivers NVIDIA/CUDA se nutre directamente de los conceptos de virtualización, gestión de memoria y planificación de procesos.
-
-    \item \textbf{Inteligencia Artificial:} Los fundamentos de aprendizaje automático, redes neuronales y procesamiento del lenguaje natural proporcionaron la base teórica para comprender el funcionamiento de los LLMs y los modelos de embeddings.
-
-    \item \textbf{Programación Web:} El desarrollo de APIs REST con FastAPI, la gestión de peticiones HTTP asíncronas y el manejo de formatos JSON se basan en los conocimientos de programación web adquiridos durante la carrera.
+    \item \textbf{Ollama} frente a \texttt{llama.cpp} puro o vLLM: Ollama aporta gestión de modelos, carga/descarga automática de VRAM y una API estable con mínima configuración. vLLM ofrece mayor rendimiento bruto, pero está orientado a servir un único modelo de forma intensiva; aquí se necesitaba rotar varios modelos sobre una sola GPU.
+    \item \textbf{Qdrant} frente a pgvector, Chroma o Pinecone: se buscaba una base vectorial \textit{on-premise} con índice HNSW, colecciones separadas y filtrado por metadatos (la base del control de acceso por departamento). Pinecone se descartó por ser un servicio en la nube, contrario al requisito de soberanía del dato.
+    \item \textbf{Docker Compose} frente a Kubernetes: para un despliegue de nodo único, Kubernetes añadía complejidad operativa sin beneficio real.
 \end{itemize}
 
-\subsection{Conocimientos Adquiridos de Forma Autónoma}
+\textbf{Estado y lecciones.} Completado. La lección central llegó ya en este sprint: la GPU es un recurso compartido y escaso, y esa restricción condicionó todas las decisiones posteriores (cuantización, modelos de embeddings en CPU, carga bajo demanda).
 
+\subsection{Sprint 2 (noviembre de 2025): Backend y pipeline RAG}
+
+\textbf{Descripción.} Desarrollar el motor del sistema: un backend propio con el pipeline RAG completo, desde la ingesta del documento hasta la respuesta con citas.
+
+\textbf{Tareas.} API REST con FastAPI; ingesta de PDFs con \texttt{pdfplumber}; \textit{chunking} con solapamiento (500 tokens, solapamiento de 50); generación de embeddings con \path{paraphrase-multilingual-MiniLM-L12-v2} en CPU; búsqueda semántica en Qdrant; construcción del prompt restrictivo con citas de fuente y página.
+
+\textbf{Tecnologías y alternativas valoradas.}
 \begin{itemize}
-    \item \textbf{Modelos de Lenguaje Grande (LLMs):} La comprensión profunda de la arquitectura Transformer, los mecanismos de atención, la tokenización y las técnicas de cuantización no forman parte del Plan de Estudios actual y fueron adquiridos mediante documentación técnica y papers académicos.
-
-    \item \textbf{Bases de Datos Vectoriales:} El concepto de embeddings, búsqueda por similitud del coseno e índices HNSW no se cubre en las asignaturas de Bases de Datos convencionales.
-
-    \item \textbf{Fine-Tuning con LoRA:} Las técnicas de ajuste fino paramétrico eficiente requirieron inmersión en bibliografía especializada \cite{hu2021lora}.
-
-    \item \textbf{Docker avanzado y GPU passthrough:} La orquestación de contenedores con acceso a GPU mediante \texttt{nvidia-container-toolkit} excede significativamente los contenidos del grado.
-
-    \item \textbf{Integración con Microsoft Graph y MSAL:} La autenticación OAuth 2.0 con flujo de credenciales de cliente y la interacción con la API Graph de Microsoft requirieron aprendizaje específico de la plataforma Azure.
+    \item \textbf{FastAPI} frente a Flask o Django: asincronía nativa (esencial para no bloquear durante inferencias largas), validación con Pydantic y documentación OpenAPI generada automáticamente.
+    \item \textbf{Pipeline RAG propio} frente a LangChain o LlamaIndex: los \textit{frameworks} aceleran el prototipo, pero ocultan los pasos intermedios. Implementar el pipeline a mano dio control fino sobre chunking, búsqueda y prompt, y sobre todo trazabilidad completa para depurar; esa comprensión del flujo es además parte del valor académico del trabajo.
+    \item \textbf{Embeddings en CPU} frente a GPU: el modelo MiniLM es lo bastante ligero para ejecutarse en CPU, reservando la VRAM para los modelos generativos.
 \end{itemize}
 
-% ============================================================
-\section{Estrategia de Documentación}
-% ============================================================
-La documentación es una de las esquinas vertebradoras del proyecto, debido a la alta mantenibilidad exigida. \textit{Markdown} sirvió como estándar \textit{de facto} para manuales de despliegue, la guía técnica de arquitectura y los documentos de referencia del repositorio.
+\textbf{Estado y lecciones.} Completado. La calidad del RAG depende tanto de la ingesta (tamaño de fragmento, solapamiento, limpieza) como del propio modelo generativo: gran parte de las mejoras posteriores vinieron de recuperar mejor, no de generar mejor.
 
-Se elaboraron los siguientes documentos técnicos complementarios a esta memoria:
+\subsection{Sprint 3 (diciembre de 2025): SharePoint y OCR}
+
+\textbf{Descripción.} Conectar el sistema a las fuentes documentales corporativas reales: la biblioteca SharePoint de la organización y los documentos escaneados.
+
+\textbf{Tareas.} Servicio Indexer con sincronización periódica (cron cada 5 minutos); autenticación MSAL con flujo de credenciales de cliente y descarga incremental vía Microsoft Graph API; motor OCR PaddleOCR con aceleración GPU y \textit{fallback} automático a CPU; paralelización del OCR con Ray.
+
+\textbf{Tecnologías y alternativas valoradas.}
 \begin{itemize}
-    \item \texttt{README.md}: Visión general del proyecto con instrucciones de despliegue rápido.
-    \item \texttt{TECHNICAL\_ARCHITECTURE.md}: Documentación detallada de la arquitectura de microservicios.
-    \item \texttt{USER\_GUIDE.md}: Guía de usuario con ejemplos de uso de cada funcionalidad.
-    \item \texttt{DEPLOYMENT\_CHECKLIST.md}: Lista de verificación paso a paso para el despliegue en producción.
+    \item \textbf{PaddleOCR} frente a Tesseract: mejor precisión sobre los documentos escaneados reales del entorno de validación y soporte GPU nativo.
+    \item \textbf{Sondeo incremental} frente a \textit{webhooks} de Graph: los webhooks exigen exponer un endpoint público accesible desde Microsoft, incompatible con un despliegue cerrado; el sondeo cada pocos minutos resultó suficiente para la frecuencia de cambio real de los documentos.
 \end{itemize}
 
-Adicionalmente, se configuró un ecosistema de documentación de APIs de manera autónoma cumpliendo los estándares OpenAPI en el motor web de FastAPI. Esto generó de forma automática esquemas visuales de Swagger (\texttt{/docs} y \texttt{/redoc}), vitales para la fase de prototipado y depuración del tráfico de microservicios e ingestores hacia el motor central.
+\textbf{Estado y lecciones.} Completado. Al paralelizar la ingesta apareció una \textit{race condition} en la generación de embeddings que hubo que serializar; y quedó claro que las fuentes corporativas cambian constantemente, lo que convirtió la sincronización incremental en pieza central del diseño.
 
-\subsection{Redacción de la Memoria}
-La redacción, edición y organización de la presente memoria del proyecto requirió aproximadamente \textbf{40 horas}, incluyendo la recopilación de referencias bibliográficas, la generación de tablas y diagramas, y la revisión del formato académico según las normativas de la Universidad Rey Juan Carlos.
+\subsection{Sprint 4 (enero de 2026): Agente JARVIS, scraping y búsqueda web}
 
+\textbf{Descripción.} Dar al sistema su cara visible y sus capacidades web: el pipeline JARVIS sobre OpenWebUI, que enruta cada consulta al modo adecuado, y la extracción de contenido de internet.
+
+\textbf{Tareas.} Desarrollo del pipeline JARVIS como \textit{hook} de OpenWebUI con detección de intenciones por reglas y sistema de \textit{valves} de configuración; scraping con Playwright (renderizado JavaScript completo) y cadena de extracción Trafilatura $\rightarrow$ Readability $\rightarrow$ BeautifulSoup; búsqueda en internet con DuckDuckGo.
+
+\textbf{Tecnologías y alternativas valoradas.}
+\begin{itemize}
+    \item \textbf{OpenWebUI con pipeline propio} frente a interfaz web desarrollada desde cero: OpenWebUI ya resuelve autenticación, historial, streaming y gestión de usuarios; el valor diferencial estaba en la lógica de enrutamiento, no en reconstruir un chat.
+    \item \textbf{Playwright} frente a peticiones HTTP con BeautifulSoup: gran parte de las páginas corporativas y de noticias actuales requieren ejecutar JavaScript para mostrar su contenido.
+    \item \textbf{Router por reglas} frente a un LLM decisor: las reglas son instantáneas, gratuitas y deterministas, y el modelo local desplegado no ofrecía \textit{function calling} fiable. Esta decisión se analiza en detalle en el Capítulo~\ref{cap:implementacion}.
+\end{itemize}
+
+\textbf{Estado y lecciones.} Completado. Dos incidencias de despliegue dejaron lección: un pipeline duplicado por el mecanismo de descubrimiento de OpenWebUI y un script de inicialización de Ollama roto por los finales de línea CRLF al editar desde Windows; ambas reforzaron la necesidad de probar el despliegue completo desde cero, no solo el código.
+
+\subsection{Sprint 5 (febrero de 2026): BOE, \textit{fine-tuning} y observabilidad}
+
+\textbf{Descripción.} Ampliar el sistema en tres frentes: la fuente normativa oficial (BOE), la adaptación del modelo al dominio mediante \textit{fine-tuning} y la monitorización del conjunto.
+
+\textbf{Tareas.} Servidor MCP del BOE e integración funcional por API; generación de un dataset sintético de preguntas y respuestas a partir de los documentos indexados en Qdrant; entrenamiento de un adaptador LoRA (PEFT, bitsandbytes, TRL) que dio lugar a \texttt{rag-qwen-ft}, el modelo JARVIS; despliegue del stack de observabilidad (Prometheus, Grafana, exportador DCGM para GPU, y posteriormente Loki y Promtail para logs).
+
+\textbf{Tecnologías y alternativas valoradas.}
+\begin{itemize}
+    \item \textbf{LoRA} frente a \textit{fine-tuning} completo: ajustar todos los pesos de un modelo de 7B parámetros excede la VRAM disponible; LoRA entrena una fracción mínima de parámetros con resultados comparables para adaptación de dominio.
+    \item \textbf{MCP} frente a integración directa por API: se implementaron ambas. MCP se adoptó como apuesta de estandarización futura, pero la interfaz web principal no lo soporta de forma nativa, por lo que la vía de producción siguió siendo la API (la valoración completa está en el Anexo~\ref{anexo:integraciones}).
+    \item \textbf{Prometheus y Grafana} frente a soluciones de monitorización en la nube: coherencia con el requisito \textit{on-premise} del proyecto.
+\end{itemize}
+
+\textbf{Estado y lecciones.} Completado. La lección más importante de todo el proyecto salió de aquí: el \textit{fine-tuning} rindió resultados modestos para RAG, mientras que las mejoras de recuperación (búsqueda híbrida y reranking) tuvieron un impacto muy superior. Esto reorientó el esfuerzo restante hacia la calidad de la recuperación.
+
+\subsection{Sprint 6 (marzo--abril de 2026): Agente SQL, seguridad y v2.2.0}
+
+\textbf{Descripción.} Incorporar la consulta de datos estructurados en lenguaje natural y endurecer la seguridad del sistema, además de corregir defectos detectados en producción.
+
+\textbf{Tareas.} Agente NL$\rightarrow$SQL sobre PostgreSQL con lista blanca de operaciones (\texttt{SELECT}) y auto-corrección ante errores; validación de tokens JWT de Azure AD contra JWKS en el backend; diagnóstico y corrección de la expansión de consultas asíncrona (versión 2.2.0).
+
+\textbf{Tecnologías y alternativas valoradas.}
+\begin{itemize}
+    \item \textbf{Validación por lista blanca y expresiones regulares} frente a confiar en las instrucciones del prompt: un LLM puede ser inducido a generar SQL destructivo; la validación programática actúa como defensa en profundidad independiente del modelo.
+    \item \textbf{Validación JWT en el backend} frente a delegar la autenticación en la interfaz: cada microservicio verifica la identidad por sí mismo, de modo que un fallo en la capa de presentación no expone los datos.
+\end{itemize}
+
+\textbf{Estado y lecciones.} Completado. La incidencia más formativa: la expansión de consultas llevaba tiempo desactivada por un defecto de configuración sin que ninguna prueba lo detectara. La lección es que los tests deben cubrir también la configuración efectiva del sistema en ejecución, no solo la lógica del código.
+
+\subsection{Sprint 7 (mayo de 2026): QueryProcessor y v2.3.0}
+
+\textbf{Descripción.} Cerrar el sistema con la capa de orquestación inteligente: decidir, para cada consulta, qué modelo y qué estrategia de recuperación usar.
+
+\textbf{Tareas.} Módulo \texttt{QueryProcessor} con detección de intención, encaminamiento inteligente entre modelos (JARVIS para consultas factuales y procedimentales; Qwen 2.5 32B para las analíticas) y expansión de consultas multivariante; summarización del historial de conversación con el modelo de 32B en el \texttt{MemoryManager} (versión 2.3.0).
+
+\textbf{Tecnologías y alternativas valoradas.}
+\begin{itemize}
+    \item \textbf{Encaminamiento por intención entre dos modelos} frente a usar siempre el modelo mayor: las pruebas comparativas mostraron que el modelo ajustado de 7B domina en recuperación precisa con citas mientras que el de 32B destaca en razonamiento analítico; usar cada uno donde sobresale mejora calidad y latencia a la vez.
+\end{itemize}
+
+\textbf{Estado y lecciones.} Completado. El modelo más grande no siempre es la mejor opción: adaptar la elección del modelo a la intención de la consulta resultó más eficiente que cualquier elección fija.
 
 % ============================================================
 \section{Uso de herramientas de inteligencia artificial como apoyo}
 \label{sec:uso-ia}
 % ============================================================
 
-En aras de la transparencia, se documenta que durante el desarrollo de este Trabajo de Fin de Grado se han utilizado diversas herramientas de inteligencia artificial generativa como apoyo en distintas fases del proyecto. En particular, se ha recurrido a asistentes como Gemini (Google), Claude (Anthropic) y ChatGPT (OpenAI) para las siguientes tareas:
+En aras de la transparencia, se documenta con detalle el papel que han desempeñado las herramientas de inteligencia artificial generativa durante el desarrollo de este Trabajo de Fin de Grado. Se ha recurrido a asistentes conversacionales como Gemini (Google), Claude (Anthropic) y ChatGPT (OpenAI), en distintas fases y con distinta intensidad según la tarea.
+
+\subsection*{Ámbitos de uso}
 
 \begin{itemize}
-    \item Consultar dudas t\'ecnicas y contrastar alternativas de dise\~no durante la implementaci\'on del backend, el pipeline y las integraciones.
-    \item Depurar errores de c\'odigo y revisar configuraciones de Docker, NGINX y servicios auxiliares.
-    \item Asistir en la redacci\'on, correcci\'on y revisi\'on de estilo de la presente memoria.
-    \item Generar borradores de secciones t\'ecnicas que posteriormente fueron revisados, editados y verificados manualmente.
+    \item \textbf{Diseño y contraste de alternativas:} durante la selección tecnológica (base vectorial, estrategia de chunking, motor OCR, enfoque de enrutamiento) se utilizaron estos asistentes como interlocutores técnicos para enumerar ventajas e inconvenientes de cada opción. La decisión final se tomó siempre tras validar las afirmaciones contra la documentación oficial y, cuando fue posible, mediante pruebas empíricas sobre el propio sistema.
+
+    \item \textbf{Depuración e infraestructura:} análisis de trazas de error de Docker, incompatibilidades de versiones CUDA, configuraciones de NGINX y de Docker Compose. En este ámbito los asistentes resultaron especialmente útiles para acotar hipótesis de fallo, aunque varias de sus sugerencias fueron incorrectas y solo la verificación sobre el sistema real permitió cerrar los problemas.
+
+    \item \textbf{Generación de código de apoyo:} fragmentos repetitivos o de bajo riesgo (esquemas de validación, plantillas de configuración, scripts auxiliares) se generaron con asistencia de IA y se revisaron línea a línea antes de incorporarse. La lógica central del sistema ---el pipeline RAG, el enrutamiento de JARVIS, el agente SQL y sus mecanismos de seguridad--- se diseñó y desarrolló de forma propia, empleando la IA como apoyo puntual de revisión.
+
+    \item \textbf{Redacción y revisión de la memoria:} corrección de estilo, sugerencias de estructura, revisión de coherencia entre capítulos y generación de borradores de secciones descriptivas que fueron posteriormente reescritos, contrastados con el comportamiento real del sistema y completados manualmente. Los diagramas técnicos se generaron a partir de descripciones de la arquitectura real y se verificaron contra la configuración desplegada.
 \end{itemize}
 
-En todos los casos, las respuestas proporcionadas por estas herramientas fueron contrastadas con la documentaci\'on oficial de cada tecnolog\'ia y validadas contra el comportamiento real del sistema. No se acept\'o ning\'un contenido generado de forma autom\'atica sin revisi\'on previa. El uso de estas herramientas se enmarca dentro de la filosof\'ia del propio proyecto: utilizar la inteligencia artificial disponible como apoyo al trabajo humano, no como sustituto del criterio t\'ecnico ni de la toma de decisiones.
+\subsection*{Lo que no hizo la IA}
+
+Las decisiones de arquitectura, la selección final de tecnologías, el diseño de los experimentos, la evaluación de los resultados y las conclusiones de este trabajo son responsabilidad exclusiva del autor. Ningún contenido generado automáticamente se aceptó sin revisión, y las cifras y afirmaciones técnicas de esta memoria se han contrastado con el sistema en ejecución (configuraciones reales, métricas de los dashboards y comportamiento observado), no con las respuestas de los asistentes.
+
+\subsection*{Una reflexión final}
+
+El uso de estas herramientas se enmarca en la filosofía del propio proyecto: emplear la inteligencia artificial disponible como apoyo al trabajo humano, no como sustituto del criterio técnico. Trabajar a diario con estos asistentes permitió, además, conocer de primera mano sus limitaciones ---en particular su tendencia a afirmar con seguridad datos incorrectos---, una experiencia que refuerza precisamente la motivación central del sistema desarrollado: la necesidad de respuestas fundamentadas en fuentes verificables y trazables.

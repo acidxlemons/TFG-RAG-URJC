@@ -1,6 +1,8 @@
 \chapter{Conclusiones y Trabajo Futuro}
 \label{cap:conclusiones}
 
+Este capítulo cierra la memoria haciendo balance del trabajo: qué se ha conseguido y con qué medios, cuánto esfuerzo ha requerido, qué conocimientos ---del grado y adquiridos por cuenta propia--- lo han hecho posible, qué lecciones deja y hacia dónde puede evolucionar. Al final del capítulo se recogen las direcciones públicas del código y de la página web del proyecto.
+
 % ============================================================
 \section{Resumen General}
 % ============================================================
@@ -62,6 +64,89 @@ Summarización de historial con modelo de 32B & \checkmark \\
 \end{table}
 
 % ============================================================
+\section{Tecnologías y Entorno Empleados}
+\label{sec:tecnologias-entorno}
+% ============================================================
+
+Como complemento a la evaluación de objetivos, esta sección deja constancia de con qué se ha construido y ejecutado todo lo anterior: el stack tecnológico completo, el entorno hardware de despliegue y las herramientas de trabajo.
+
+\subsection{Stack Tecnológico}
+
+La selección de tecnologías priorizó tres criterios: licencia de código abierto, ejecutabilidad local sin dependencias de nube y madurez del ecosistema. Conviene recordar que muchas de estas tecnologías son herramientas preexistentes reutilizadas en el proyecto, mientras que la lógica de integración y buena parte de los servicios que las conectan constituyen el desarrollo propio del TFG (las decisiones de selección y sus alternativas se justifican sprint a sprint en la Sección~\ref{sec:sprints}). La Tabla~\ref{tab:stack} enumera la totalidad de tecnologías empleadas.
+
+\begin{table}[H]
+\centering
+\caption{Stack tecnológico completo del proyecto.}
+\label{tab:stack}
+\begin{tabular}{lll}
+\toprule
+\textbf{Categoría} & \textbf{Tecnología} & \textbf{Versión / Detalle} \\
+\midrule
+\multirow{2}{*}{Lenguajes}      & Python      & 3.11 \\
+                                  & YAML / Bash & Configuración y scripts \\
+\midrule
+Framework Web       & FastAPI      & 0.104+ \\
+Motor de IA Local   & Ollama       & latest  \\
+Proxy de Modelos    & LiteLLM      & latest  \\
+Frontend Chat       & OpenWebUI    & main \\
+\midrule
+BD Vectorial        & Qdrant       & latest \\
+BD Relacional       & PostgreSQL   & 16 con pgvector \\
+Caché               & Redis        & 7 Alpine \\
+Objetos             & MinIO        & latest \\
+\midrule
+Web Scraping        & Playwright   & Chromium \\
+Extracción NLP      & Trafilatura  & latest \\
+OCR                 & PaddleOCR    & 2.x con CUDA \\
+\midrule
+Embeddings          & SentenceTransformers & MiniLM-L12-v2 \\
+Autenticación       & Azure AD (OIDC) & MSAL Python \\
+SharePoint          & Microsoft Graph API & v1.0 \\
+\midrule
+Métricas            & Prometheus   & 2.x \\
+Dashboards          & Grafana      & latest \\
+Logs                & Loki + Promtail & latest \\
+GPU Exporter        & NVIDIA DCGM  & latest \\
+\midrule
+Contenerización     & Docker + Compose & 24.x \\
+Control de Versiones& Git + GitHub & --- \\
+Proxy Inverso       & NGINX        & Alpine \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Entorno Hardware}
+
+El sistema fue diseñado para ejecutarse en un servidor físico on-premise con las especificaciones de la Tabla~\ref{tab:hardware}.
+
+\begin{table}[H]
+\centering
+\caption{Especificaciones del entorno hardware de despliegue.}
+\label{tab:hardware}
+\begin{tabular}{ll}
+\toprule
+\textbf{Componente} & \textbf{Especificación} \\
+\midrule
+Sistema Operativo  & Ubuntu Server 22.04 LTS \\
+CPU                & AMD / Intel x86\_64 (multi-core) \\
+RAM                & 32 GB DDR4 mínimo \\
+GPU                & NVIDIA con $\geq$ 16 GB VRAM (p.ej. RTX 4090, A4000) \\
+CUDA Toolkit       & 12.x \\
+Almacenamiento     & SSD NVMe $\geq$ 500 GB \\
+Docker Engine      & 24.x con NVIDIA Container Toolkit \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La GPU es el recurso más crítico del sistema, dado que los tres modelos de lenguaje, el motor OCR y los modelos de visión comparten la misma tarjeta gráfica. La gestión eficiente de la VRAM mediante cuantización (Q8, Q4) y la carga/descarga dinámica de modelos en Ollama resultó una decisión arquitectónica determinante.
+
+\subsection{Herramientas de Trabajo y Control de Versiones}
+
+Para la correcta organización del proyecto se utilizó el sistema de control de versiones Git, alojando el repositorio principal en GitHub (Sección~\ref{sec:codigo-web}). El seguimiento de incidencias, errores y nuevas características se realizó mediante trabajo por ramas, separando el código estable del trabajo en progreso.
+
+El entorno de desarrollo integrado (IDE) empleado primordialmente fue Visual Studio Code en Windows, acoplado al subsistema WSL (\textit{Windows Subsystem for Linux}) o a contenedores Docker en remoto para igualar la paridad funcional con el entorno de despliegue real Linux, evitando fricciones a nivel de sistema de archivos o librerías específicas compiladas para CUDA/NVIDIA.
+
+% ============================================================
 \section{Comparación con Otros Sistemas}
 % ============================================================
 
@@ -70,14 +155,192 @@ El análisis realizado en el Capítulo~\ref{cap:sistemas} sitúa la propuesta en
 La conclusión más relevante de esa comparación es que la propuesta de este TFG no pretende competir con todos los productos del mercado en amplitud funcional, sino resolver de forma sólida una combinación muy concreta de requisitos: despliegue local, documentos corporativos cambiantes, integración con herramientas reales de empresa y respuestas trazables.
 
 % ============================================================
-\section{Código del proyecto}
+\section{Esfuerzo Realizado, Planificación y Presupuesto}
+\label{sec:esfuerzo}
 % ============================================================
 
-El código del proyecto, junto con la configuración de despliegue y la documentación técnica, está disponible en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}}. Se destaca de nuevo aquí porque la memoria describe una solución cuyo valor depende tanto del diseño conceptual como de la implementación reproducible de sus componentes.
+\subsection{Dedicación Total}
+
+La Tabla~\ref{tab:horas} resume la dedicación total al proyecto. La redacción, edición y organización de la presente memoria requirió aproximadamente 65 horas, incluyendo la recopilación de referencias bibliográficas, la generación de tablas y diagramas, y la revisión del formato académico según las normativas de la Universidad Rey Juan Carlos.
+
+\begin{table}[H]
+\centering
+\caption{Distribución de horas dedicadas al proyecto.}
+\label{tab:horas}
+\begin{tabular}{lc}
+\toprule
+\textbf{Concepto} & \textbf{Horas} \\
+\midrule
+Desarrollo técnico (7 sprints) & 450 h \\
+Aprendizaje y pruebas previas & 40 h \\
+Redacción y maquetación de la memoria y documentación & 65 h \\
+\midrule
+\textbf{Total estimado} & \textbf{555 horas} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Planificación Temporal por Sprints}
+
+La Tabla~\ref{tab:iteraciones} desglosa las horas de desarrollo técnico entre los siete sprints definidos en la Sección~\ref{sec:sprints}, junto con sus entregables principales.
+
+\begin{table}[H]
+\centering
+\caption{Sprints del desarrollo, entregables y horas dedicadas.}
+\label{tab:iteraciones}
+\begin{tabular}{clp{6cm}c}
+\toprule
+\textbf{Sprint} & \textbf{Período} & \textbf{Entregable Principal} & \textbf{Horas} \\
+\midrule
+1 & Oct 2025 & Infraestructura Docker, PostgreSQL, Qdrant, Ollama. Pruebas de concepto con LLaMA. & 55 h \\
+2 & Nov 2025 & Backend FastAPI con pipeline RAG básico. Ingesta de PDFs y generación de embeddings. & 75 h \\
+3 & Dic 2025 & Integración SharePoint (MSAL/Graph API). Motor OCR PaddleOCR con GPU. & 65 h \\
+4 & Ene 2026 & Agente JARVIS Pipeline. Web scraping con Playwright. Búsqueda DuckDuckGo. & 90 h \\
+5 & Feb 2026 & Servidor MCP del BOE. Fine-tuning LoRA (Qwen). Stack Prometheus/Grafana. & 65 h \\
+6 & Mar--Abr 2026 & Agente SQL (NL$\rightarrow$SQL) con lista blanca y auto-corrección. Validación JWT Azure AD en backend. Corrección de expansión de consulta asíncrona (v2.2.0). & 55 h \\
+7 & May 2026 & \texttt{QueryProcessor}: intent detection, smart model routing (JARVIS/qwen2.5-32b) y query expansion multi-variante. Summarización con 32B en \texttt{MemoryManager} (v2.3.0). & 45 h \\
+\midrule
+ & & \textbf{Total desarrollo técnico} & \textbf{450 h} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La distribución temporal completa del proyecto, incluida la redacción de la memoria y su difusión y defensa, se representa en el diagrama de GANTT de la Figura~\ref{fig:gantt}.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{ganttchart}[
+    hgrid,
+    vgrid={*{4}{dotted}},
+    x unit=0.65cm,
+    y unit chart=0.6cm,
+    title height=1,
+    bar height=0.5,
+    bar label font=\footnotesize,
+    title label font=\footnotesize,
+    group label font=\footnotesize\bfseries
+]{1}{40}
+\gantttitle{Oct}{4}
+\gantttitle{Nov}{4}
+\gantttitle{Dic}{4}
+\gantttitle{Ene}{4}
+\gantttitle{Feb}{4}
+\gantttitle{Mar}{4}
+\gantttitle{Abr}{4}
+\gantttitle{May}{4}
+\gantttitle{Jun}{4}
+\gantttitle{Jul}{4} \\
+\ganttbar{Infraestructura Docker}{1}{4} \\
+\ganttbar{Backend FastAPI + RAG}{5}{8} \\
+\ganttbar{SharePoint + OCR}{9}{12} \\
+\ganttbar{JARVIS + Scraping}{13}{16} \\
+\ganttbar{BOE + LoRA + Grafana}{17}{20} \\
+\ganttbar{SQL + JWT + v2.2.0}{21}{28} \\
+\ganttbar{QueryProcessor + v2.3.0}{29}{32} \\
+\ganttbar[bar/.style={fill=gray!40}]{Memoria LaTeX}{13}{38} \\
+\ganttbar[bar/.style={fill=gray!70}]{Difusión y defensa}{35}{40}
+\end{ganttchart}
+}
+\caption{Diagrama de GANTT del proyecto (octubre de 2025 -- julio de 2026).}
+\label{fig:gantt}
+\end{figure}
+
+\subsection{Estimación de Presupuesto}
+
+Aunque el proyecto se ha desarrollado íntegramente con software de código abierto, se estiman los costes asociados al despliegue profesional del sistema si se deseara replicar o escalar:
+
+\begin{table}[H]
+\centering
+\caption{Estimación de presupuesto para el despliegue del sistema.}
+\label{tab:presupuesto}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+\textbf{Concepto} & \textbf{Coste Unitario} & \textbf{Coste Total} \\
+\midrule
+Servidor GPU (NVIDIA RTX 4090 24GB) & --- & 2.500 \euro{} \\
+Servidor torre (CPU, RAM 64GB, SSD) & --- & 1.500 \euro{} \\
+Licencias de software & --- & 0 \euro{} (Open Source) \\
+Dominio y certificados SSL & 15 \euro{}/año & 15 \euro{} \\
+Electricidad servidor 24/7 (año) & $\sim$50 \euro{}/mes & 600 \euro{} \\
+\midrule
+Horas de desarrollo (450h $\times$ 25 \euro{}/h) & 25 \euro{}/h & 11.250 \euro{} \\
+\midrule
+\multicolumn{2}{r}{\textbf{Total estimado}} & \textbf{15.865 \euro{}} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Cabe destacar que el coste de licencias de software es \textbf{cero euros}, dado que todas las tecnologías empleadas son de código abierto. Esto representa una ventaja competitiva significativa frente a soluciones comerciales como Microsoft Copilot o AWS Bedrock, cuyos costes recurrentes por token procesado pueden escalar rápidamente en entornos de uso intensivo.
+
+\subsection{Gestión de Riesgos}
+
+Dado el carácter experimental del proyecto y la velocidad de evolución del campo de los LLMs, se identificaron desde el inicio los siguientes riesgos técnicos y sus respectivas mitigaciones, que en retrospectiva funcionaron adecuadamente:
+
+\begin{table}[H]
+\centering
+\caption{Riesgos técnicos identificados y estrategias de mitigación.}
+\label{tab:riesgos}
+\begin{tabular}{p{5cm}p{7cm}}
+\toprule
+\textbf{Riesgo} & \textbf{Mitigación} \\
+\midrule
+Agotamiento de VRAM con múltiples modelos cargados & Cuantización Q4/Q8 y carga dinámica bajo demanda en Ollama \\
+Obsolescencia de un modelo de IA & Arquitectura desacoplada vía LiteLLM que permite cambiar modelos sin alterar código \\
+Fallo de la GPU o driver CUDA & Fallback automático a CPU en PaddleOCR y SentenceTransformer \\
+Cambios en la API de SharePoint & Capa de abstracción con MSAL que aísla los cambios de endpoints \\
+Pérdida de datos en Qdrant & Backup periódico de colecciones y réplica en MinIO S3 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ============================================================
-\section{Lecciones Aprendidas}
+\section{Conocimientos del Grado Aplicados}
+\label{sec:conocimientos-grado}
 % ============================================================
+
+El desarrollo de este TFG ha sido posible gracias a la base adquirida en múltiples asignaturas del Grado en Ingeniería de Tecnología de Telecomunicaciones. Más allá de los contenidos concretos, las asignaturas aportaron los fundamentos sobre los que se pudo construir el aprendizaje autónomo posterior:
+
+\begin{itemize}
+    \item \textbf{Ingeniería de Sistemas de Información (ISI):} probablemente la asignatura con mayor impacto directo en el proyecto. En ella se aprendió a trabajar con proyectos en Git y a usarlo con criterio ---incluida la importancia de subir cambios con frecuencia---, se introdujeron los contenedores Docker, se insistió en la importancia de hacer tests sobre el código y se trabajó con bases de datos y SQL. Todos estos elementos son pilares del día a día de este trabajo.
+
+    \item \textbf{Sistemas Operativos:} los conceptos de procesos, gestión de memoria y virtualización permitieron entender qué es realmente un contenedor y razonar sobre el rendimiento de la CPU, algo crítico en un sistema donde varios servicios compiten por los mismos recursos.
+
+    \item \textbf{Asignaturas de programación de la carrera:} desde Programación de Sistemas de Telecomunicación (PST) hasta Aplicaciones Telemáticas ---donde se aprendió HTML, aplicado en la página web del proyecto---, la cadena de asignaturas de programación proporcionó la soltura necesaria para desarrollar los servicios propios del sistema.
+
+    \item \textbf{Álgebra:} entender los vectores y las matrices es imprescindible para comprender qué es un embedding, cómo se mide la similitud entre textos y qué hace internamente la base de datos vectorial.
+
+    \item \textbf{Teoría de la Comunicación:} el estudio de los procesos deterministas y estocásticos y del concepto de entropía proporciona la base conceptual sobre la que se apoya la generación probabilística de texto de los LLMs.
+
+    \item \textbf{Introducción a la Bioingeniería:} incluyó una primera aproximación al \textit{Machine Learning} que, sin estar directamente relacionada con este proyecto, aportó un conocimiento previo mínimo sobre el aprendizaje automático que facilitó la entrada en el campo.
+
+    \item \textbf{Proyectos de Ingeniería:} la planificación por hitos y los diagramas de Gantt aprendidos en esta asignatura resultaron muy útiles para organizar, dirigir y hacer avanzar un proyecto de esta envergadura.
+\end{itemize}
+
+% ============================================================
+\section{Conocimientos Adquiridos Fuera del Grado y Lecciones Aprendidas}
+\label{sec:conocimientos-autonomos}
+% ============================================================
+
+\subsection{Conocimientos Adquiridos de Forma Autónoma}
+
+Si las asignaturas aportaron los cimientos, casi todo el conocimiento específico de este trabajo hubo que adquirirlo de forma autónoma: el Plan de Estudios no cubre (todavía) el ecosistema moderno de la IA generativa. Las fuentes principales fueron la documentación oficial de cada tecnología, artículos académicos y contenido audiovisual especializado, entre el que destacan los canales de YouTube de IBM Technology y de Cole Medin \cite{ibmtechnology2026youtube,colemedin2026youtube}, de los que se consultaron numerosos vídeos sobre RAG, agentes y despliegue local de LLMs.
+
+\begin{itemize}
+    \item \textbf{Modelos de Lenguaje Grande (LLMs):} La comprensión de la arquitectura Transformer, los mecanismos de atención, la tokenización y las técnicas de cuantización no forman parte del Plan de Estudios actual y fueron adquiridos mediante documentación técnica y papers académicos.
+
+    \item \textbf{Bases de Datos Vectoriales:} El concepto de embeddings, búsqueda por similitud del coseno e índices HNSW no se cubre en las asignaturas de bases de datos convencionales.
+
+    \item \textbf{Fine-Tuning con LoRA:} Las técnicas de ajuste fino paramétrico eficiente requirieron inmersión en bibliografía especializada \cite{hu2021lora}.
+
+    \item \textbf{Docker avanzado y GPU passthrough:} La orquestación de contenedores con acceso a GPU mediante \texttt{nvidia-container-toolkit} excede significativamente los contenidos del grado.
+
+    \item \textbf{Integración con Microsoft Graph y MSAL:} La autenticación OAuth 2.0 con flujo de credenciales de cliente y la interacción con la API Graph de Microsoft requirieron aprendizaje específico de la plataforma Azure.
+\end{itemize}
+
+\subsection{Lecciones Aprendidas}
 
 Las lecciones más importantes del proyecto pueden resumirse en los siguientes puntos:
 
@@ -89,27 +352,6 @@ Las lecciones más importantes del proyecto pueden resumirse en los siguientes p
     \item \textit{Guiar al usuario también es una decisión técnica}: en este tipo de sistemas, una buena experiencia no depende solo de acertar la respuesta, sino de dejar claro qué está haciendo el sistema y en qué documentos se basa.
     \item \textit{El modelo más grande no siempre es la mejor opción}: el fine-tuning domina en consultas de recuperación precisa con citas, mientras que un modelo base de mayor tamaño destaca en razonamiento analítico. Usar ambos adaptándose a la intención de la query es más eficiente que elegir uno solo.
 \end{itemize}
-
-% ============================================================
-\section{Estimación de Dedicación Total}
-% ============================================================
-
-\begin{table}[H]
-\centering
-\caption{Distribución de horas dedicadas al proyecto.}
-\label{tab:horas}
-\begin{tabular}{lc}
-\toprule
-\textbf{Concepto} & \textbf{Horas} \\
-\midrule
-Desarrollo técnico (7 sprints) & 205 h \\
-Aprendizaje y pruebas previas & 30 h \\
-Redacción y maquetación de la memoria & 40 h \\
-\midrule
-\textbf{Total estimado} & \textbf{275 horas} \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 % ============================================================
 \section{Trabajo Futuro y Líneas de Expansión}
@@ -135,4 +377,18 @@ El proyecto abre varias líneas de evolución razonables:
 
 El sistema desarrollado muestra que una organización puede construir una solución propia de consulta documental asistida por IA utilizando software abierto y hardware accesible, sin renunciar al control sobre sus datos. Esto resulta especialmente relevante en entornos donde la documentación cambia con frecuencia y donde no es aceptable depender completamente de servicios externos.
 
-La arquitectura propuesta también tiene valor transferible: aunque la implementación y las pruebas se han realizado sobre SharePoint, la idea de fondo es aplicable a documentos cambiantes en la nube y a otras fuentes corporativas de naturaleza similar. La publicación del código en GitHub\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}} facilita su replicabilidad y su adaptación a otros contextos.
+La arquitectura propuesta también tiene valor transferible: aunque la implementación y las pruebas se han realizado sobre SharePoint, la idea de fondo es aplicable a documentos cambiantes en la nube y a otras fuentes corporativas de naturaleza similar. La publicación del código (Sección~\ref{sec:codigo-web}) facilita su replicabilidad y su adaptación a otros contextos.
+
+% ============================================================
+\section{Código y Sitio Web del Proyecto}
+\label{sec:codigo-web}
+% ============================================================
+
+Todo el material del proyecto está disponible públicamente:
+
+\begin{itemize}
+    \item \textbf{Repositorio de código:} \url{https://github.com/acidxlemons/TFG-RAG-URJC} --- código fuente completo, configuración de despliegue reproducible y documentación técnica.
+    \item \textbf{Página web del proyecto:} \url{https://acidxlemons.github.io/TFG-RAG-URJC/} --- presentación del sistema, arquitectura interactiva y guía de puesta en marcha.
+\end{itemize}
+
+Se destacan aquí, como cierre de la memoria, porque el valor de la solución descrita depende tanto del diseño conceptual como de que su implementación sea reproducible y verificable por cualquiera.

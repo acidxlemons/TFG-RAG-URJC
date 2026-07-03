@@ -1,13 +1,11 @@
 \chapter*{Resumen}
 \addcontentsline{toc}{chapter}{Resumen}
 
-Este Trabajo de Fin de Grado presenta el diseño, desarrollo y despliegue de un sistema de Generación Aumentada mediante Recuperación (\textit{Retrieval-Augmented Generation}, RAG) de ámbito corporativo, ejecutado íntegramente en infraestructura local (\textit{on-premise}) y basado en la integración de modelos y herramientas existentes de código abierto junto con desarrollo propio.
+Este Trabajo de Fin de Grado presenta el diseño, desarrollo y despliegue de un sistema de Generación Aumentada mediante Recuperación (\textit{Retrieval-Augmented Generation}, RAG) de ámbito corporativo, ejecutado íntegramente en infraestructura local (\textit{on-premise}) e integrando herramientas y modelos de código abierto con desarrollo propio.
 
-El sistema permite a los empleados de una organización interactuar con sus documentos internos, páginas web y fuentes legislativas oficiales mediante una interfaz conversacional basada en lenguaje natural. La arquitectura emplea una pila de microservicios contenerizados con Docker que integra modelos de lenguaje ejecutados localmente mediante Ollama, una base de datos vectorial Qdrant para la búsqueda semántica y un agente encaminador denominado JARVIS, que detecta automáticamente la intención del usuario y delega cada consulta al modo de operación más adecuado.
+El sistema permite consultar en lenguaje natural los documentos internos de una organización, páginas web y fuentes legislativas oficiales, respondiendo siempre con las fuentes citadas. Una pila de microservicios contenerizados con Docker integra modelos de lenguaje locales (Ollama), una base de datos vectorial (Qdrant) y un agente encaminador denominado JARVIS que detecta la intención de cada consulta y la delega al modo de operación más adecuado. Entre las fuentes integradas destacan Microsoft SharePoint ---principal entorno de validación práctica---, páginas web extraídas mediante scraping, documentos escaneados tratados con OCR acelerado por GPU y el Boletín Oficial del Estado.
 
-Entre las fuentes de información integradas se incluyen Microsoft SharePoint, que ha sido la fuente principal de validación práctica del sistema; páginas web procesadas mediante scraping y extracción de contenido; documentos PDF escaneados tratados con OCR acelerado por GPU; y el Boletín Oficial del Estado (BOE), integrado funcionalmente por API y complementado con un servidor MCP desarrollado como línea de evolución futura.
-
-El sistema ha sido desplegado y validado en un entorno real con resultados satisfactorios, alcanzando tiempos de respuesta inferiores a 3.5 segundos y reduciendo de forma muy significativa las alucinaciones en modo RAG mediante prompts restrictivos, baja temperatura de inferencia y una estrategia de recuperación documental diseñada para priorizar la trazabilidad.
+El sistema ha sido desplegado y validado en un entorno real con resultados satisfactorios: tiempos de respuesta inferiores a 3.5 segundos y una reducción muy significativa de las alucinaciones en modo RAG gracias a una estrategia de recuperación documental orientada a la trazabilidad.
 
 \vspace{0.5cm}
 \noindent\textbf{Palabras clave:} RAG, LLM, inteligencia artificial, embeddings, base de datos vectorial, microservicios, Docker, Ollama, Qdrant, on-premise, código abierto.
@@ -17,13 +15,11 @@ El sistema ha sido desplegado y validado en un entorno real con resultados satis
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-This Bachelor's Thesis presents the design, development and deployment of a corporate Retrieval-Augmented Generation (RAG) system, executed entirely on local infrastructure (on-premise) and based on the integration of existing open-source models and tools together with original development.
+This Bachelor's Thesis presents the design, development and deployment of a corporate Retrieval-Augmented Generation (RAG) system, executed entirely on local infrastructure (on-premise) and built by integrating open-source tools and models together with original development.
 
-The system enables employees of an organization to interact with internal documents, web pages and official legislative sources through a natural-language conversational interface. The architecture relies on containerized microservices orchestrated with Docker, integrating locally executed language models through Ollama, a Qdrant vector database for semantic search, and a routing agent called JARVIS that automatically detects user intent and delegates each query to the most suitable operating mode.
+The system allows the internal documents of an organization, web pages and official legislative sources to be queried in natural language, always answering with cited sources. A stack of Docker-containerized microservices integrates locally executed language models (Ollama), a vector database (Qdrant) and a routing agent called JARVIS, which detects the intent of each query and delegates it to the most suitable operating mode. Integrated sources include Microsoft SharePoint ---the main real-world validation environment---, web pages processed through scraping, scanned documents handled with GPU-accelerated OCR, and the Spanish Official State Gazette (BOE).
 
-Integrated information sources include Microsoft SharePoint, which served as the main real-world validation source; web pages processed through scraping and content extraction; scanned PDF documents handled through GPU-accelerated OCR; and the Spanish Official State Gazette (BOE), functionally integrated through API calls and complemented by an MCP server developed as a future integration path.
-
-The system has been deployed and validated in a real environment with satisfactory results, achieving response times under 3.5 seconds and significantly reducing hallucinations in RAG mode through restrictive prompting, low-temperature inference and a retrieval strategy focused on traceable evidence.
+The system has been deployed and validated in a real environment with satisfactory results: response times under 3.5 seconds and a very significant reduction of hallucinations in RAG mode thanks to a document retrieval strategy focused on traceability.
 
 \vspace{0.5cm}
 \noindent\textbf{Keywords:} RAG, LLM, artificial intelligence, embeddings, vector database, microservices, Docker, Ollama, Qdrant, on-premise, open source.
