@@ -113,6 +113,9 @@
                     JARVIS -->|Vision| VISION((Qwen 2.5 VL 7B)):::model
 
                     BACKEND --> QDRANT[(Qdrant :6335)]:::db
+                    BACKEND --> BM25((BM25 Qdrant/bm25 disperso)):::model
+                    QDRANT --> RERANK((Reranker Cross-Encoder)):::model
+                    RERANK -.-> BACKEND
                     BACKEND -->|"SQL Agent v2.1"| PG[(PostgreSQL :5433)]:::db
                     BACKEND --> REDIS[(Redis :6380)]:::db
                     BACKEND --> MINIO[(MinIO S3 :9002)]:::db
@@ -133,7 +136,10 @@
                     PROM --> DCGM
                     PROM -->|/metrics| BACKEND
                     PGADMIN -->|SQL| PG
+                    PROMTAIL[Promtail]:::monitor --> LOKI[(Loki logs)]:::monitor
+                    LOKI --> GRAF
                     end
+                    BACKEND -.->|logs| PROMTAIL
                 </div>
                 <div
                     style="display:flex; flex-wrap:wrap; justify-content:center; gap:1.5rem; margin-top:1.5rem; font-size:0.85rem;">
