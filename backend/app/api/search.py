@@ -275,7 +275,6 @@ async def get_query_processor() -> QueryProcessor:
         logger.info("Inicializando QueryProcessor global...")
         # En producción, pasar un LLM client real
         _global_processor = QueryProcessor(
-            llm_client=None,
             enable_expansion=True,  # LiteLLM HTTP se detecta automáticamente via env vars
             max_expansions=3,
         )
