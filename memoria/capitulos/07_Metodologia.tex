@@ -1,13 +1,9 @@
-\chapter{Metodología}
+\chapter{Proceso de desarrollo del proyecto}
 \label{cap:metodologia}
 
-En este capítulo se describe cómo se ha organizado el trabajo: el proceso de desarrollo seguido, la organización del código resultante y, sobre todo, el detalle de cada sprint ---qué se hizo, qué tecnologías se eligieron frente a qué alternativas y qué lecciones dejó cada etapa---. El capítulo se cierra documentando el uso de herramientas de inteligencia artificial como apoyo. El balance cuantitativo del proyecto (horas dedicadas, planificación temporal, presupuesto y riesgos) se recoge en el Capítulo~\ref{cap:conclusiones}, junto al resto de conclusiones.
+Este capítulo describe cómo se ha construido el proyecto a lo largo del tiempo. Tras situar la organización del código, el grueso del capítulo ---y su verdadero contenido--- es el recorrido \textbf{sprint a sprint}: qué se hizo en cada etapa, qué tecnologías se eligieron frente a qué alternativas y qué lecciones dejó cada una. El balance cuantitativo del proyecto (horas dedicadas, planificación temporal, presupuesto y riesgos) se recoge en el Capítulo~\ref{cap:conclusiones}, junto al resto de conclusiones.
 
-% ============================================================
-\section{Proceso de Desarrollo}
-% ============================================================
-
-El diseño e implementación de este Trabajo de Fin de Grado se ha conducido siguiendo un marco de trabajo ágil (\textit{Agile}), caracterizado por entregas iterativas e incrementales. Dada la naturaleza cambiante del ámbito de la Inteligencia Artificial y de los Modelos de Lenguaje Grande (LLMs), la flexibilidad para revisar decisiones técnicas, sustituir herramientas o ajustar el encaminamiento resultó especialmente importante durante el desarrollo.
+El desarrollo se ha conducido siguiendo un marco de trabajo ágil (\textit{Agile}), caracterizado por entregas iterativas e incrementales. Dada la naturaleza cambiante del ámbito de la Inteligencia Artificial y de los Modelos de Lenguaje Grande (LLMs), la flexibilidad para revisar decisiones técnicas, sustituir herramientas o ajustar el encaminamiento resultó especialmente importante durante el desarrollo.
 
 Se estableció un ciclo de vida con las siguientes fases:
 \begin{enumerate}
@@ -153,30 +149,3 @@ A continuación se define cada sprint siguiendo un esquema común: descripción 
 \end{itemize}
 
 \textbf{Estado y lecciones.} Completado. El modelo más grande no siempre es la mejor opción: adaptar la elección del modelo a la intención de la consulta resultó más eficiente que cualquier elección fija.
-
-% ============================================================
-\section{Uso de herramientas de inteligencia artificial como apoyo}
-\label{sec:uso-ia}
-% ============================================================
-
-En aras de la transparencia, se documenta con detalle el papel que han desempeñado las herramientas de inteligencia artificial generativa durante el desarrollo de este Trabajo de Fin de Grado. Se ha recurrido a asistentes conversacionales como Gemini (Google), Claude (Anthropic) y ChatGPT (OpenAI), en distintas fases y con distinta intensidad según la tarea.
-
-\subsection*{Ámbitos de uso}
-
-\begin{itemize}
-    \item \textbf{Diseño y contraste de alternativas:} durante la selección tecnológica (base vectorial, estrategia de chunking, motor OCR, enfoque de enrutamiento) se utilizaron estos asistentes como interlocutores técnicos para enumerar ventajas e inconvenientes de cada opción. La decisión final se tomó siempre tras validar las afirmaciones contra la documentación oficial y, cuando fue posible, mediante pruebas empíricas sobre el propio sistema.
-
-    \item \textbf{Depuración e infraestructura:} análisis de trazas de error de Docker, incompatibilidades de versiones CUDA, configuraciones de NGINX y de Docker Compose. En este ámbito los asistentes resultaron especialmente útiles para acotar hipótesis de fallo, aunque varias de sus sugerencias fueron incorrectas y solo la verificación sobre el sistema real permitió cerrar los problemas.
-
-    \item \textbf{Generación de código de apoyo:} fragmentos repetitivos o de bajo riesgo (esquemas de validación, plantillas de configuración, scripts auxiliares) se generaron con asistencia de IA y se revisaron línea a línea antes de incorporarse. La lógica central del sistema ---el pipeline RAG, el enrutamiento de JARVIS, el agente SQL y sus mecanismos de seguridad--- se diseñó y desarrolló de forma propia, empleando la IA como apoyo puntual de revisión.
-
-    \item \textbf{Redacción y revisión de la memoria:} corrección de estilo, sugerencias de estructura, revisión de coherencia entre capítulos y generación de borradores de secciones descriptivas que fueron posteriormente reescritos, contrastados con el comportamiento real del sistema y completados manualmente. Los diagramas técnicos se generaron a partir de descripciones de la arquitectura real y se verificaron contra la configuración desplegada.
-\end{itemize}
-
-\subsection*{Lo que no hizo la IA}
-
-Las decisiones de arquitectura, la selección final de tecnologías, el diseño de los experimentos, la evaluación de los resultados y las conclusiones de este trabajo son responsabilidad exclusiva del autor. Ningún contenido generado automáticamente se aceptó sin revisión, y las cifras y afirmaciones técnicas de esta memoria se han contrastado con el sistema en ejecución (configuraciones reales, métricas de los dashboards y comportamiento observado), no con las respuestas de los asistentes.
-
-\subsection*{Una reflexión final}
-
-El uso de estas herramientas se enmarca en la filosofía del propio proyecto: emplear la inteligencia artificial disponible como apoyo al trabajo humano, no como sustituto del criterio técnico. Trabajar a diario con estos asistentes permitió, además, conocer de primera mano sus limitaciones ---en particular su tendencia a afirmar con seguridad datos incorrectos---, una experiencia que refuerza precisamente la motivación central del sistema desarrollado: la necesidad de respuestas fundamentadas en fuentes verificables y trazables.

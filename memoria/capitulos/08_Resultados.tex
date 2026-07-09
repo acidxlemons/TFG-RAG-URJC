@@ -96,7 +96,7 @@ El cuello de botella principal es la inferencia del LLM en GPU, que representa m
 };
 \end{axis}
 \end{tikzpicture}
-\caption{Descomposición de la latencia por componente para una consulta RAG típica. La inferencia del LLM domina el tiempo total del flujo.}
+\caption[Descomposición de la latencia por componente (consulta RAG).]{Descomposición de la latencia por componente para una consulta RAG típica. La inferencia del LLM domina el tiempo total del flujo.}
 \label{fig:latencia-barras}
 \end{figure}
 
@@ -154,7 +154,7 @@ Para facilitar la reproducción de la demo, los accesos utilizados fueron cuenta
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_documentos_demo_backend.png}
-\caption{Listado real de documentos cargados en \texttt{documents\_TFGDEMO}. La captura procede del endpoint \texttt{GET /documents/list} y muestra los documentos, sus chunks, la extracción nativa y el instante de ingesta.}
+\caption[Listado real de documentos cargados en la colección de demo.]{Listado real de documentos cargados en \texttt{documents\_TFGDEMO}. La captura procede del endpoint \texttt{GET /documents/list} y muestra los documentos, sus chunks, la extracción nativa y el instante de ingesta.}
 \label{fig:tfgdemo-documentos}
 \end{figure}
 
@@ -163,7 +163,7 @@ Sobre esa colección se lanzó una consulta RAG de control preguntando por los p
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_backend_chat_respuesta.png}
-\caption{Respuesta RAG real sobre la colección de demostración. La captura muestra la pregunta, la respuesta generada por el Backend y las fuentes recuperadas con sus puntuaciones de relevancia.}
+\caption[Respuesta RAG real sobre la colección de demostración.]{Respuesta RAG real sobre la colección de demostración. La captura muestra la pregunta, la respuesta generada por el Backend y las fuentes recuperadas con sus puntuaciones de relevancia.}
 \label{fig:tfgdemo-rag}
 \end{figure}
 
@@ -172,7 +172,7 @@ La misma consulta se ejecutó desde OpenWebUI mediante el modelo \texttt{JARVIS}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_openwebui_chat_rag.png}
-\caption{Consulta RAG desde OpenWebUI durante la demo final. JARVIS responde con los puertos del entorno limpio, explica el papel de Qdrant y muestra las fuentes documentales utilizadas.}
+\caption[Consulta RAG desde OpenWebUI durante la demo final.]{Consulta RAG desde OpenWebUI durante la demo final. JARVIS responde con los puertos del entorno limpio, explica el papel de Qdrant y muestra las fuentes documentales utilizadas.}
 \label{fig:tfg-openwebui-rag}
 \end{figure}
 
@@ -181,7 +181,7 @@ Como apoyo a la defensa, se actualizó también la página de GitHub Pages del p
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_github_pages_demo_video.png}
-\caption{Sección de demo publicada en GitHub Pages. La página incluye el vídeo de demostración y las métricas principales del sistema.}
+\caption[Sección de demo publicada en GitHub Pages.]{Sección de demo publicada en GitHub Pages. La página incluye el vídeo de demostración y las métricas principales del sistema.}
 \label{fig:tfg-pages-demo}
 \end{figure}
 
@@ -276,7 +276,7 @@ En las pruebas realizadas, no se detectó ninguna instancia de alucinación en m
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{screenshot_rag_response_no_documents.png}
-\caption{Comportamiento del sistema cuando no existen documentos disponibles para el usuario. En lugar de inventar una respuesta, JARVIS informa explícitamente de la ausencia de documentos consultables y muestra las colecciones evaluadas.}
+\caption[Comportamiento del sistema sin documentos disponibles.]{Comportamiento del sistema cuando no existen documentos disponibles para el usuario. En lugar de inventar una respuesta, JARVIS informa explícitamente de la ausencia de documentos consultables y muestra las colecciones evaluadas.}
 \label{fig:no-documentos-disponibles}
 \end{figure}
 

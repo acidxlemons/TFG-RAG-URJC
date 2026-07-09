@@ -1,0 +1,48 @@
+\chapter{Contenido del repositorio entregado}
+\label{anexo:repositorio}
+
+Junto con esta memoria se entrega el código fuente completo del proyecto en un fichero comprimido (\texttt{TFG-RAG-URJC-codigo.zip}). Este anexo documenta qué contiene ese archivo, qué se ha excluido deliberadamente y por qué, de modo que quien lo reciba pueda reproducir el sistema con garantías. El mismo contenido está disponible de forma pública en el repositorio del proyecto\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}}.
+
+% ============================================================
+\section{Estructura del archivo}
+% ============================================================
+
+El archivo reproduce la estructura del repositorio versionado (unos 240 ficheros). Los directorios principales son los siguientes:
+
+\begin{lstlisting}[numbers=none, basicstyle=\ttfamily\footnotesize, caption={Contenido principal del archivo entregado.}, label={lst:contenido-zip}]
+TFG-RAG-URJC/
+|-- backend/            <- Servicio FastAPI: RAG, SQL, QueryProcessor,
+|                          integraciones, procesamiento y almacenamiento
+|-- services/           <- Ollama, LiteLLM, Indexer y OpenWebUI (pipeline)
+|-- mcp-boe-server/     <- Servidor MCP del BOE
+|-- scripts/            <- Fine-tuning LoRA, generacion de datasets, backups
+|-- config/            <- NGINX, Prometheus, Grafana, Promtail, plantillas
+|-- database/           <- Esquema inicial de PostgreSQL (init.sql)
+|-- tests/              <- Pruebas del sistema
+|-- docs/               <- Documentacion tecnica (arquitectura, despliegue)
+|-- github_pages/       <- Pagina web del proyecto y material de demo
+|-- memoria/            <- Fuentes LaTeX de esta memoria y PDF compilado
+|-- docker-compose.yml  <- Orquestacion de los servicios
+|-- .env.example        <- Plantilla de configuracion (sin secretos)
+|-- README.md           <- Guia de despliegue y puesta en marcha
+`-- LICENSE             <- Licencia MIT del software
+\end{lstlisting}
+
+% ============================================================
+\section{Elementos excluidos y su justificación}
+% ============================================================
+
+Para que el archivo sea seguro de compartir y de un tamaño razonable, se han excluido de forma intencionada los siguientes elementos, siguiendo las reglas del fichero \texttt{.gitignore} del proyecto:
+
+\begin{itemize}
+    \item \textbf{Secretos y credenciales:} el fichero \texttt{.env} real y cualquier configuración con identificadores de Azure (\texttt{config/sharepoint\_sites.json}). Se entrega únicamente la plantilla \texttt{.env.example}, sin valores sensibles.
+    \item \textbf{Datos locales y volúmenes:} los directorios de datos de las bases de datos (\texttt{postgres\_data/}, \texttt{qdrant\_data/}), los documentos indexados (\texttt{data/}) y las cachés de OCR y modelos. Son datos de ejecución, no código, y pueden contener información corporativa.
+    \item \textbf{Pesos de modelos:} los modelos de lenguaje se descargan mediante Ollama durante el despliegue (véase el \texttt{README.md}); no se incluyen por tamaño y por licencia propia de cada modelo.
+    \item \textbf{Historial de Git y artefactos de compilación:} el directorio \texttt{.git}, entornos virtuales, \texttt{node\_modules} y ficheros \texttt{\_\_pycache\_\_}.
+\end{itemize}
+
+% ============================================================
+\section{Verificación del contenido}
+% ============================================================
+
+Antes de la entrega se comprobó que el archivo: (i) \textbf{no contiene ningún secreto} ---se verificó la ausencia de \texttt{.env} y de configuraciones con credenciales---; (ii) incluye todo el \textbf{código fuente} de los servicios propios y su configuración de despliegue; (iii) incorpora el \texttt{README.md} con las instrucciones necesarias para levantar el sistema con \texttt{docker compose up}; y (iv) se corresponde exactamente con la versión publicada del repositorio. El software se distribuye bajo licencia MIT y la presente memoria bajo licencia Creative Commons BY-SA 4.0, tal como se indica en la página de licencia inicial.

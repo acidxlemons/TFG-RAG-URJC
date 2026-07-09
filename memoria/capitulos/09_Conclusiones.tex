@@ -155,7 +155,7 @@ El análisis realizado en el Capítulo~\ref{cap:sistemas} sitúa la propuesta en
 La conclusión más relevante de esa comparación es que la propuesta de este TFG no pretende competir con todos los productos del mercado en amplitud funcional, sino resolver de forma sólida una combinación muy concreta de requisitos: despliegue local, documentos corporativos cambiantes, integración con herramientas reales de empresa y respuestas trazables.
 
 % ============================================================
-\section{Esfuerzo Realizado, Planificación y Presupuesto}
+\section{Esfuerzo Realizado y Presupuesto}
 \label{sec:esfuerzo}
 % ============================================================
 
@@ -354,6 +354,19 @@ Las lecciones más importantes del proyecto pueden resumirse en los siguientes p
 \end{itemize}
 
 % ============================================================
+\subsection{Uso de herramientas de IA: una nueva forma de trabajar}
+\label{subsec:uso-ia}
+% ============================================================
+
+Una de las conclusiones más honestas de este trabajo tiene que ver con el propio método de trabajo. El desarrollo se ha apoyado de forma consciente en herramientas de inteligencia artificial generativa ---asistentes como Gemini (Google), Claude (Anthropic) y ChatGPT (OpenAI)---. Merece la pena explicar para qué se han usado y qué han aportado, no como una disculpa, sino como parte del aprendizaje que deja el proyecto.
+
+El trabajo propio es lo que sostiene todo el sistema: el diseño de la arquitectura, la selección final de cada tecnología, el desarrollo de la lógica central ---el pipeline RAG, el enrutamiento de JARVIS, el agente SQL y sus mecanismos de seguridad---, el diseño de los experimentos y la evaluación de los resultados son aportación directa del autor. Sobre esa base, la IA se ha empleado como apoyo en tareas concretas: contrastar alternativas de diseño durante la selección tecnológica, acotar hipótesis al depurar errores de Docker o CUDA, generar fragmentos de código repetitivo o de bajo riesgo ---revisados después línea a línea--- y asistir en la corrección de estilo y estructura de la memoria.
+
+Conviene dejar constancia expresa de que \textbf{el autor ha revisado y leído íntegramente todo el contenido de esta memoria}, así como el código del proyecto. Ninguna afirmación técnica, cifra o fragmento se ha dado por bueno sin verificarlo: los datos se han contrastado contra el sistema en ejecución ---configuraciones reales, métricas de los \textit{dashboards} y comportamiento observado--- y no contra las respuestas de los asistentes, que en más de una ocasión resultaron incorrectas.
+
+\paragraph{Ventajas percibidas.} Empleadas así, con criterio y bajo control, estas herramientas han supuesto una forma de trabajar más productiva: permiten avanzar más rápido en las tareas mecánicas, explorar más alternativas antes de decidir y detectar antes los errores propios. De hecho, integrar en el tiempo disponible un sistema con tantas piezas ---más de veinte tecnologías coordinadas--- difícilmente habría sido posible sin este apoyo. La lección de fondo es que la IA amplifica el trabajo del ingeniero, pero no lo sustituye: la responsabilidad de las decisiones, la verificación y el criterio técnico siguen siendo humanos. Trabajar a diario con estos asistentes sirvió, además, para conocer de primera mano sus limitaciones ---en especial su tendencia a afirmar con seguridad datos incorrectos---, algo que refuerza precisamente la motivación central del sistema desarrollado: la necesidad de respuestas fundamentadas en fuentes verificables y trazables.
+
+% ============================================================
 \section{Trabajo Futuro y Líneas de Expansión}
 % ============================================================
 
@@ -387,8 +400,8 @@ La arquitectura propuesta también tiene valor transferible: aunque la implement
 Todo el material del proyecto está disponible públicamente:
 
 \begin{itemize}
-    \item \textbf{Repositorio de código:} \url{https://github.com/acidxlemons/TFG-RAG-URJC} --- código fuente completo, configuración de despliegue reproducible y documentación técnica.
-    \item \textbf{Página web del proyecto:} \url{https://acidxlemons.github.io/TFG-RAG-URJC/} --- presentación del sistema, arquitectura interactiva y guía de puesta en marcha.
+    \item \textbf{Repositorio de código en GitHub}\footnote{\url{https://github.com/acidxlemons/TFG-RAG-URJC}}: código fuente completo, configuración de despliegue reproducible y documentación técnica.
+    \item \textbf{Página web del proyecto en GitHub Pages}\footnote{\url{https://acidxlemons.github.io/TFG-RAG-URJC/}}: presentación del sistema, arquitectura interactiva y guía de puesta en marcha.
 \end{itemize}
 
 Se destacan aquí, como cierre de la memoria, porque el valor de la solución descrita depende tanto del diseño conceptual como de que su implementación sea reproducible y verificable por cualquiera.

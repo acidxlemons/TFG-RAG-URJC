@@ -7,6 +7,15 @@ En este capítulo se describe el sistema desde la perspectiva del usuario final.
 \section{Visión General}
 % ============================================================
 
+Antes de describir en detalle qué hace el sistema, conviene ver su aspecto real. La Figura~\ref{fig:screenshot-openwebui} muestra JARVIS en funcionamiento: una interfaz de chat en el navegador donde el usuario formula su pregunta en lenguaje natural y recibe la respuesta acompañada de las fuentes documentales utilizadas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{screenshot_openwebui_jarvis.png}
+\caption[Interfaz de JARVIS (sobre OpenWebUI) en funcionamiento.]{Interfaz de JARVIS en funcionamiento. La capa visual la proporciona OpenWebUI; el usuario escribe su consulta y recibe la respuesta en \textit{streaming}, con las fuentes citadas.}
+\label{fig:screenshot-openwebui}
+\end{figure}
+
 JARVIS (\textit{Just A Rather Very Intelligent System}) es un asistente conversacional corporativo desplegado en la infraestructura interna de la organización. Los empleados acceden al sistema a través de un navegador web y pueden interactuar con él en lenguaje natural para realizar las siguientes tareas:
 
 \begin{itemize}
@@ -19,6 +28,8 @@ JARVIS (\textit{Just A Rather Very Intelligent System}) es un asistente conversa
     \item Consultar el estado de la indexación de documentos.
     \item Listar los documentos disponibles en la base de conocimiento.
 \end{itemize}
+
+Lo que el usuario ve es una interfaz de chat familiar, proporcionada por OpenWebUI ---una herramienta de código abierto que se ha reutilizado como capa de presentación, en lugar de construir una interfaz desde cero---. Ahora bien, el valor de este proyecto no reside en esa interfaz. OpenWebUI, por sí solo, se limita a conversar con un modelo de lenguaje que responde ``de memoria''. Lo que convierte esa ventana de chat en JARVIS es la capa desarrollada en este TFG que se sitúa detrás de ella: un \textit{pipeline} propio y un backend que interceptan cada mensaje antes de que llegue al modelo, detectan la intención del usuario, buscan en los documentos corporativos, consultan fuentes externas cuando hace falta y devuelven respuestas trazables citando su origen. Dicho de otro modo, OpenWebUI aporta la ventana; el trabajo de este proyecto aporta la inteligencia que hay al otro lado. Esta distinción se desarrolla en profundidad en el Capítulo~\ref{cap:implementacion}.
 
 El sistema se ha diseñado para que detecte automáticamente la intención del usuario a partir del texto del mensaje, sin necesidad de comandos explícitos, menús ni modos manuales. El usuario simplemente escribe su pregunta o solicitud y el sistema decide internamente qué funcionalidad activar. Esta transparencia busca que la experiencia sea natural e intuitiva, similar a interactuar con un asistente humano.
 

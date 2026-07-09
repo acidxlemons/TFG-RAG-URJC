@@ -1,7 +1,9 @@
 \chapter{Diseño e Implementación}
 \label{cap:implementacion}
 
-Este capítulo constituye el núcleo técnico de mi Trabajo de Fin de Grado. Aquí describo cómo se ha construido el sistema, qué partes son desarrollo propio y qué partes reutilizan herramientas ya existentes, y cómo se han interconectado los distintos microservicios para convertir una colección de componentes sueltos en un asistente corporativo funcional. Para no recargar la lectura, el detalle de implementación más extenso ---fragmentos de código, contratos de clase y flujos paso a paso--- se traslada a los Anexos~\ref{anexo:pipeline}--\ref{anexo:finetuning}, y aquí se mantiene la visión de arquitectura y las decisiones de diseño.
+Este capítulo constituye el núcleo técnico de mi Trabajo de Fin de Grado. La idea de fondo que conviene tener presente al leerlo es sencilla: el sistema no es una única aplicación escrita de principio a fin, sino un \textbf{conjunto de piezas integradas}. Algunas son herramientas de código abierto ya existentes que he reutilizado ---empezando por las dos sobre las que se apoya todo lo demás: \textbf{Ollama}, que ejecuta los modelos de lenguaje en local, y \textbf{OpenWebUI}, que aporta la interfaz de chat---; otras son desarrollo propio ---el \textit{pipeline} de encaminamiento, el backend RAG, el servicio de indexación, el agente SQL y las integraciones con cada fuente---. El trabajo de este TFG consiste precisamente en diseñar esa arquitectura y en escribir el código que conecta unas piezas con otras hasta convertir componentes sueltos en un asistente corporativo coherente.
+
+Por eso el capítulo se lee mejor como un recorrido: parte del sistema mínimo ---un simple chat local montado sobre Ollama y OpenWebUI--- y va explicando, paso a paso, qué pieza se añadió después y por qué, distinguiendo en cada caso qué es reutilización de una herramienta existente y qué es aportación propia. Para no recargar la lectura, el detalle de implementación más extenso ---fragmentos de código, contratos de clase y flujos paso a paso--- se traslada a los Anexos~\ref{anexo:pipeline}--\ref{anexo:finetuning}, y aquí se mantiene la visión de arquitectura y las decisiones de diseño.
 
 % ============================================================
 \section{Filosofía de Diseño: Necesidad, Solución, Iteración}
@@ -79,14 +81,14 @@ En la validación final (26 de mayo de 2026), el despliegue convivía con otros 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\textwidth]{cap_tfg_docker_stack.png}
-\caption{Estado del stack Docker en la validación final. La captura muestra los servicios principales de \texttt{TFG-RAG-Clean}, su estado de ejecución y los puertos alternativos publicados para la demo local.}
+\caption[Estado del stack Docker en la validación final.]{Estado del stack Docker en la validación final. La captura muestra los servicios principales de \texttt{TFG-RAG-Clean}, su estado de ejecución y los puertos alternativos publicados para la demo local.}
 \label{fig:docker-stack-final}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_backend_swagger.png}
-\caption{Documentación interactiva del Backend FastAPI en el entorno local de validación: API activa, endpoints de scraping, búsqueda y salud, y contrato OpenAPI expuesto.}
+\caption[Documentación interactiva del Backend FastAPI.]{Documentación interactiva del Backend FastAPI en el entorno local de validación: API activa, endpoints de scraping, búsqueda y salud, y contrato OpenAPI expuesto.}
 \label{fig:backend-swagger-final}
 \end{figure}
 
@@ -108,12 +110,7 @@ Para ilustrar cómo se conectan las piezas, se describe el recorrido completo de
 
 Todo el flujo se completa típicamente en menos de 3.5 segundos, con el primer token visible para el usuario en menos de 1.2 segundos gracias al streaming.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{screenshot_openwebui_jarvis.png}
-\caption{Interfaz de OpenWebUI con el modelo JARVIS seleccionado. El usuario escribe su consulta y recibe la respuesta en streaming.}
-\label{fig:screenshot-openwebui}
-\end{figure}
+El aspecto real de esta interfaz en funcionamiento, con la respuesta y sus fuentes, se mostró en la Figura~\ref{fig:screenshot-openwebui} del Capítulo~\ref{cap:funcional}.
 
 % ============================================================
 \section{Desarrollo Propio vs. Herramientas Externas}
@@ -193,7 +190,7 @@ El agente JARVIS es el módulo individual más extenso del proyecto, con unas 4.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{cap_chat_lista_docs.png}
-\caption{Respuesta real del modo de listado documental. JARVIS consulta el estado del indexador y devuelve los documentos disponibles, junto con la información reciente de ingesta.}
+\caption[Respuesta real del modo de listado documental.]{Respuesta real del modo de listado documental. JARVIS consulta el estado del indexador y devuelve los documentos disponibles, junto con la información reciente de ingesta.}
 \label{fig:documentos-disponibles}
 \end{figure}
 
@@ -213,7 +210,7 @@ La \textbf{ingesta} de un documento sigue seis etapas: recepción (API, Indexer 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_qdrant_dashboard.png}
-\caption{Estado de las colecciones en Qdrant durante la demo final. La colección \texttt{documents\_TFGDEMO} ---documentación sintética y segura del propio TFG--- aparece separada del resto, con 13 puntos y configuración híbrida dense+sparse.}
+\caption[Estado de las colecciones en Qdrant durante la demo final.]{Estado de las colecciones en Qdrant durante la demo final. La colección \texttt{documents\_TFGDEMO} ---documentación sintética y segura del propio TFG--- aparece separada del resto, con 13 puntos y configuración híbrida dense+sparse.}
 \label{fig:qdrant-tfgdemo}
 \end{figure}
 
@@ -262,7 +259,7 @@ La seguridad del sistema se organiza en capas. \textbf{NGINX} actúa como primer
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{cap_openwebui_login_actual.png}
-\caption{Pantalla real de autenticación de OpenWebUI en el despliegue local: inicio de sesión clásico y acceso mediante SSO corporativo.}
+\caption[Pantalla de autenticación de OpenWebUI.]{Pantalla real de autenticación de OpenWebUI en el despliegue local: inicio de sesión clásico y acceso mediante SSO corporativo.}
 \label{fig:login-sso}
 \end{figure}
 
@@ -278,7 +275,7 @@ La monitorización respondió a una necesidad real: durante las primeras fases n
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{cap_tfg_grafana_jarvis_dashboard.png}
-\caption{Dashboard principal de Grafana durante la validación final: estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
+\caption[Dashboard principal de Grafana durante la validación final.]{Dashboard principal de Grafana durante la validación final: estado operativo del backend, Qdrant y Prometheus, además de métricas de memoria, CPU y ficheros abiertos.}
 \label{fig:grafana-final}
 \end{figure}
 
