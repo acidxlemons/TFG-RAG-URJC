@@ -7,13 +7,44 @@ En este capítulo se describe el sistema desde la perspectiva del usuario final.
 \section{Visión General}
 % ============================================================
 
-Antes de describir en detalle qué hace el sistema, conviene ver su aspecto real. La Figura~\ref{fig:screenshot-openwebui} muestra JARVIS en funcionamiento: una interfaz de chat en el navegador donde el usuario formula su pregunta en lenguaje natural y recibe la respuesta acompañada de las fuentes documentales utilizadas.
+Antes de entrar en las funcionalidades conviene tener una imagen global del sistema. La Figura~\ref{fig:arquitectura-general} muestra su arquitectura a vista de pájaro: las piezas que lo componen ---unas reutilizadas y otras de desarrollo propio--- y el recorrido que sigue una consulta desde que el usuario la escribe hasta que recibe la respuesta. El detalle técnico de cada componente se aborda en el Capítulo~\ref{cap:implementacion}, y el diagrama completo de tecnologías, en el Anexo~\ref{anexo:evolucion}.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{screenshot_openwebui_jarvis.png}
-\caption[Interfaz de JARVIS (sobre OpenWebUI) en funcionamiento.]{Interfaz de JARVIS en funcionamiento. La capa visual la proporciona OpenWebUI; el usuario escribe su consulta y recibe la respuesta en \textit{streaming}, con las fuentes citadas.}
-\label{fig:screenshot-openwebui}
+\resizebox{0.9\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rounded corners=4pt, minimum width=3.3cm, minimum height=0.95cm, align=center, inner sep=4pt},
+  own/.style={box, fill=blue!12, draw=blue!60!black},
+  ext/.style={box, fill=green!12, draw=green!50!black},
+  db/.style={box, fill=violet!13, draw=violet!60!black},
+  mon/.style={box, fill=orange!15, draw=orange!65!black},
+  fl/.style={-Latex, line width=1pt, draw=black!70},
+  sup/.style={-Latex, dashed, line width=0.8pt, draw=black!55}
+]
+\node[ext] (user)    at (0,0)       {Usuario (navegador)};
+\node[own] (nginx)   at (0,-1.5)    {NGINX · TLS};
+\node[ext] (owui)    at (0,-3.0)    {OpenWebUI · interfaz};
+\node[own] (pipe)    at (0,-4.5)    {Pipeline JARVIS\\(detecta la intención)};
+\node[own] (backend) at (0,-6.2)    {Backend FastAPI\\RAG · SQL · scraping · OCR};
+\node[db]  (qdrant)  at (0,-8.4)    {Qdrant · búsqueda híbrida\\(denso + BM25 + reranker)};
+\node[ext] (fuentes) at (-5.4,-8.4) {Fuentes externas\\SharePoint · Web · BOE};
+\node[own] (litellm) at (5.4,-7.6)  {LiteLLM · proxy + caché};
+\node[ext] (ollama)  at (5.4,-9.1)  {Ollama · modelos locales\\JARVIS 7B · Qwen 32B · VL};
+\node[mon] (obs)     at (5.4,-5.9)  {Observabilidad\\Prometheus · Grafana · Loki};
+\draw[fl] (user) -- (nginx);
+\draw[fl] (nginx) -- (owui);
+\draw[fl] (owui) -- (pipe);
+\draw[fl] (pipe) -- (backend);
+\draw[fl] (backend) -- (qdrant);
+\draw[fl] (backend) -- (fuentes);
+\draw[fl] (backend) -- (litellm);
+\draw[fl] (litellm) -- (ollama);
+\draw[sup] (backend) -- (obs);
+\end{tikzpicture}%
+}
+\caption[Arquitectura general del sistema a vista de pájaro.]{Arquitectura general del sistema. En azul, los componentes de desarrollo propio; en verde, las herramientas externas reutilizadas; en violeta, el almacenamiento vectorial; en naranja, la observabilidad. El recorrido principal lleva del usuario al backend, que consulta la base vectorial, las fuentes externas y los modelos servidos por Ollama; la observabilidad recoge métricas de forma transversal.}
+\label{fig:arquitectura-general}
 \end{figure}
 
 JARVIS (\textit{Just A Rather Very Intelligent System}) es un asistente conversacional corporativo desplegado en la infraestructura interna de la organización. Los empleados acceden al sistema a través de un navegador web y pueden interactuar con él en lenguaje natural para realizar las siguientes tareas:
@@ -28,6 +59,15 @@ JARVIS (\textit{Just A Rather Very Intelligent System}) es un asistente conversa
     \item Consultar el estado de la indexación de documentos.
     \item Listar los documentos disponibles en la base de conocimiento.
 \end{itemize}
+
+Y así es como el usuario interactúa con él en la práctica: la Figura~\ref{fig:screenshot-openwebui} muestra la interfaz en funcionamiento, con una consulta real y su respuesta acompañada de las fuentes citadas.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{screenshot_openwebui_jarvis.png}
+\caption[Interfaz de JARVIS (sobre OpenWebUI) en funcionamiento.]{Interfaz de JARVIS en funcionamiento. La capa visual la proporciona OpenWebUI; el usuario escribe su consulta y recibe la respuesta en \textit{streaming}, con las fuentes citadas.}
+\label{fig:screenshot-openwebui}
+\end{figure}
 
 Lo que el usuario ve es una interfaz de chat familiar, proporcionada por OpenWebUI ---una herramienta de código abierto que se ha reutilizado como capa de presentación, en lugar de construir una interfaz desde cero---. Ahora bien, el valor de este proyecto no reside en esa interfaz. OpenWebUI, por sí solo, se limita a conversar con un modelo de lenguaje que responde ``de memoria''. Lo que convierte esa ventana de chat en JARVIS es la capa desarrollada en este TFG que se sitúa detrás de ella: un \textit{pipeline} propio y un backend que interceptan cada mensaje antes de que llegue al modelo, detectan la intención del usuario, buscan en los documentos corporativos, consultan fuentes externas cuando hace falta y devuelven respuestas trazables citando su origen. Dicho de otro modo, OpenWebUI aporta la ventana; el trabajo de este proyecto aporta la inteligencia que hay al otro lado. Esta distinción se desarrolla en profundidad en el Capítulo~\ref{cap:implementacion}.
 
